@@ -22,6 +22,12 @@ class Settings(BaseSettings):
 
     ADMIN_DEFAULT_PASSWORD: str = "changeme"
 
+    MINIO_ENDPOINT: str = "http://minio:9000"
+    MINIO_ACCESS_KEY: str = "catalogit"
+    MINIO_SECRET_KEY: str = "catalogit_local"
+    MINIO_BUCKET_NAME: str = "catalogit-attachments"
+    MINIO_USE_SSL: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

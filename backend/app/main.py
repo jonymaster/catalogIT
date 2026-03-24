@@ -11,7 +11,8 @@ from app.audit import register_audit_listeners
 from app.config import get_settings
 from app.database import async_session
 from app.models.user import User
-from app.routers import api_tokens, auth, history, laptops, services, scim, settings, users
+from app.dependencies.storage import ensure_bucket
+from app.routers import api_tokens, attachments, auth, history, laptops, services, scim, settings, users
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,10 @@ async def _seed_admin() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await _seed_admin()
+    try:
+        await ensure_bucket()
+    except Exception:
+        logger.warning("MinIO bucket init skipped (is MinIO running?)")
     yield
 
 
@@ -86,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(settings.router)
     app.include_router(users.router)
     app.include_router(api_tokens.router)
+    app.include_router(attachments.router)
 
     @app.get("/health")
     async def health() -> dict:

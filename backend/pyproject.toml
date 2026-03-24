@@ -14,6 +14,7 @@ dependencies = [
     "httpx",
     "python-multipart",
     "bcrypt",
+    "aiobotocore",
 ]
 
 [tool.hatch.build.targets.wheel]

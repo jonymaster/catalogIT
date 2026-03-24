@@ -10,6 +10,7 @@ from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.service import Service
 from app.models.user import User
+from app.routers.attachments import delete_entity_attachments
 from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
 
 router = APIRouter(prefix="/api/services", tags=["services"])
@@ -95,4 +96,5 @@ async def delete_service(service_id: uuid.UUID, _user: User = Depends(_writer), 
     service = await db.get(Service, service_id)
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    await delete_entity_attachments("service", service_id, db)
     await db.delete(service)

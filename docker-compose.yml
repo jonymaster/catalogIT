@@ -15,6 +15,23 @@ services:
       timeout: 3s
       retries: 5
 
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-catalogit}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-catalogit_local}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./backend
@@ -27,6 +44,8 @@ services:
       - .env
     depends_on:
       db:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   ui:
@@ -42,3 +61,4 @@ services:
 
 volumes:
   pgdata:
+  minio_data:

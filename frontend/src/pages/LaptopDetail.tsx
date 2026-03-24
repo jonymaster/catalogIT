@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import client from "../api/client";
+import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Laptop } from "../types/models";
@@ -64,6 +65,8 @@ export function LaptopDetail() {
           )}
         </dl>
       </div>
+
+      <Attachments entityType="laptop" entityId={laptop.id} />
 
       <div>
         <h2 className="mb-4 text-lg font-medium text-gray-900">Change History</h2>

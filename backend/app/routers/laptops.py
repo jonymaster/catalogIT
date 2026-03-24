@@ -10,6 +10,7 @@ from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.laptop import Laptop
 from app.models.user import User
+from app.routers.attachments import delete_entity_attachments
 from app.schemas.laptop import LaptopCreate, LaptopRead, LaptopUpdate
 
 router = APIRouter(prefix="/api/laptops", tags=["laptops"])
@@ -64,4 +65,5 @@ async def delete_laptop(laptop_id: uuid.UUID, _user: User = Depends(_writer), db
     laptop = await db.get(Laptop, laptop_id)
     if not laptop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
+    await delete_entity_attachments("laptop", laptop_id, db)
     await db.delete(laptop)
