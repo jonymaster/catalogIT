@@ -1,0 +1,21 @@
+[project]
+name = "catalogit-backend"
+version = "0.1.0"
+description = "CatalogIT API backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy[asyncio]",
+    "asyncpg",
+    "alembic",
+    "pydantic-settings",
+    "python-jose[cryptography]",
+    "boto3",
+    "httpx",
+    "python-multipart",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
