@@ -6,12 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.service import Service
 from app.models.user import User
 from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
 
 router = APIRouter(prefix="/api/services", tags=["services"])
+
+_writer = require_role("admin", "editor")
 
 
 @router.get("/", response_model=list[ServiceRead])
@@ -29,7 +32,7 @@ async def get_service(service_id: uuid.UUID, db: AsyncSession = Depends(get_audi
 
 
 @router.post("/", response_model=ServiceRead, status_code=status.HTTP_201_CREATED)
-async def create_service(body: ServiceCreate, db: AsyncSession = Depends(get_audited_db)):
+async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
     owners = []
     if body.owner_ids:
         for uid in body.owner_ids:
@@ -60,6 +63,7 @@ async def create_service(body: ServiceCreate, db: AsyncSession = Depends(get_aud
 async def update_service(
     service_id: uuid.UUID,
     body: ServiceUpdate,
+    _user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
     service = await db.get(Service, service_id)
@@ -87,7 +91,7 @@ async def update_service(
 
 
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_service(service_id: uuid.UUID, db: AsyncSession = Depends(get_audited_db)):
+async def delete_service(service_id: uuid.UUID, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
     service = await db.get(Service, service_id)
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")

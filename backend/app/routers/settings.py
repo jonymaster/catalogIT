@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.oidc_config import OidcConfig
@@ -68,3 +70,17 @@ async def test_oidc_config(
         )
     except httpx.HTTPError as exc:
         return OidcTestResult(success=False, error=str(exc))
+
+
+class ScimStatus(BaseModel):
+    enabled: bool
+    endpoint_url: str
+
+
+@router.get("/scim", response_model=ScimStatus)
+async def get_scim_status(_user: User = Depends(_admin)):
+    settings = get_settings()
+    return ScimStatus(
+        enabled=bool(settings.SCIM_TOKEN),
+        endpoint_url="/scim/v2",
+    )

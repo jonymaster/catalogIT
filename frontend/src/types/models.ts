@@ -61,3 +61,14 @@ export interface OidcConfig {
   created_at: string;
   updated_at: string;
 }
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  token_prefix: string;
+  created_by_id: string;
+  created_at: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  is_revoked: boolean;
+}

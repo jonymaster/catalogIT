@@ -11,13 +11,19 @@ from app.audit import register_audit_listeners
 from app.config import get_settings
 from app.database import async_session
 from app.models.user import User
-from app.routers import auth, history, laptops, services, scim, settings
+from app.routers import api_tokens, auth, history, laptops, services, scim, settings, users
 
 logger = logging.getLogger(__name__)
 
 
 async def _seed_admin() -> None:
-    """Create the default admin account if no admin user exists yet.
+    """Ensure a working admin account exists on every startup.
+
+    - If no admin exists, create one from ADMIN_DEFAULT_PASSWORD.
+    - If the admin exists but never changed their password
+      (must_reset_password is still True), re-sync the hash from the env var
+      so a changed ADMIN_DEFAULT_PASSWORD always takes effect.
+    - If the admin already chose their own password, leave it alone.
 
     Silently skips if the users table has not been created (migrations not yet run).
     """
@@ -25,20 +31,28 @@ async def _seed_admin() -> None:
     try:
         async with async_session() as session:
             result = await session.execute(select(User).where(User.role == "admin"))
-            if result.scalar_one_or_none() is not None:
-                return
+            admin = result.scalar_one_or_none()
 
-            hashed = bcrypt.hashpw(cfg.ADMIN_DEFAULT_PASSWORD.encode(), bcrypt.gensalt()).decode()
-            admin = User(
-                external_id="local:admin",
-                email="admin@catalogit.local",
-                first_name="Admin",
-                last_name="User",
-                role="admin",
-                password_hash=hashed,
-                must_reset_password=True,
-            )
-            session.add(admin)
+            hashed = bcrypt.hashpw(
+                cfg.ADMIN_DEFAULT_PASSWORD.encode(), bcrypt.gensalt()
+            ).decode()
+
+            if admin is None:
+                admin = User(
+                    external_id="local:admin",
+                    email="admin@catalogit.local",
+                    first_name="Admin",
+                    last_name="User",
+                    role="admin",
+                    password_hash=hashed,
+                    must_reset_password=True,
+                )
+                session.add(admin)
+                logger.info("Default admin account created")
+            elif admin.must_reset_password:
+                admin.password_hash = hashed
+                logger.info("Admin password re-synced from ADMIN_DEFAULT_PASSWORD")
+
             await session.commit()
     except Exception:
         logger.warning("Admin seed skipped (run migrations first: alembic upgrade head)")
@@ -70,6 +84,8 @@ def create_app() -> FastAPI:
     app.include_router(laptops.router)
     app.include_router(history.router)
     app.include_router(settings.router)
+    app.include_router(users.router)
+    app.include_router(api_tokens.router)
 
     @app.get("/health")
     async def health() -> dict:

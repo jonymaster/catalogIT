@@ -6,11 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.laptop import Laptop
+from app.models.user import User
 from app.schemas.laptop import LaptopCreate, LaptopRead, LaptopUpdate
 
 router = APIRouter(prefix="/api/laptops", tags=["laptops"])
+
+_writer = require_role("admin", "editor")
 
 
 @router.get("/", response_model=list[LaptopRead])
@@ -28,7 +32,7 @@ async def get_laptop(laptop_id: uuid.UUID, db: AsyncSession = Depends(get_audite
 
 
 @router.post("/", response_model=LaptopRead, status_code=status.HTTP_201_CREATED)
-async def create_laptop(body: LaptopCreate, db: AsyncSession = Depends(get_audited_db)):
+async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
     laptop = Laptop(**body.model_dump())
     db.add(laptop)
     await db.flush()
@@ -40,6 +44,7 @@ async def create_laptop(body: LaptopCreate, db: AsyncSession = Depends(get_audit
 async def update_laptop(
     laptop_id: uuid.UUID,
     body: LaptopUpdate,
+    _user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)
@@ -55,7 +60,7 @@ async def update_laptop(
 
 
 @router.delete("/{laptop_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_laptop(laptop_id: uuid.UUID, db: AsyncSession = Depends(get_audited_db)):
+async def delete_laptop(laptop_id: uuid.UUID, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
     laptop = await db.get(Laptop, laptop_id)
     if not laptop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")

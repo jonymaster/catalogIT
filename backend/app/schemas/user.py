@@ -2,8 +2,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
+
+
+class Role(str, Enum):
+    admin = "admin"
+    editor = "editor"
+    viewer = "viewer"
 
 
 class UserRead(BaseModel):
@@ -18,3 +26,8 @@ class UserRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    role: Literal["admin", "editor", "viewer"] | None = None
+    is_active: bool | None = None

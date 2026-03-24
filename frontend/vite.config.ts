@@ -11,6 +11,8 @@ export default defineConfig({
       "/api": "http://api:8000",
       "/auth": "http://api:8000",
       "/scim": "http://api:8000",
+      "/docs": "http://api:8000",
+      "/openapi.json": "http://api:8000",
     },
   },
 });

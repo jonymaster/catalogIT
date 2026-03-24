@@ -13,9 +13,16 @@ interface UserInfo {
   role: string;
 }
 
+const ROLE_HIERARCHY: Record<string, number> = {
+  viewer: 0,
+  editor: 1,
+  admin: 2,
+};
+
 interface AuthContextValue {
   token: string | null;
   user: UserInfo | null;
+  canEdit: boolean;
   login: () => void;
   logout: () => void;
   setToken: (token: string) => void;
@@ -68,8 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setToken]);
 
+  const canEdit =
+    !!user?.role && (ROLE_HIERARCHY[user.role] ?? 0) >= ROLE_HIERARCHY.editor;
+
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, setToken }}>
+    <AuthContext.Provider value={{ token, user, canEdit, login, logout, setToken }}>
       {children}
     </AuthContext.Provider>
   );
