@@ -1,10 +1,11 @@
 export interface User {
   id: string;
-  okta_id: string;
+  external_id: string;
   email: string;
   first_name: string;
   last_name: string;
   is_active: boolean;
+  role: string;
   created_at: string;
   updated_at: string;
 }
@@ -49,4 +50,14 @@ export interface AuditLogEntry {
   timestamp: string;
   old_values: Record<string, unknown> | null;
   new_values: Record<string, unknown> | null;
+}
+
+export interface OidcConfig {
+  provider_name: string;
+  issuer_url: string;
+  client_id: string;
+  scopes: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }

@@ -29,7 +29,7 @@ def _user_to_scim(user: User) -> ScimUserResource:
         name=ScimName(givenName=user.first_name, familyName=user.last_name),
         emails=[ScimEmail(value=user.email, primary=True)],
         active=user.is_active,
-        externalId=user.okta_id,
+        externalId=user.external_id,
     )
 
 
@@ -84,7 +84,7 @@ async def create_user(body: ScimCreateUser, db: AsyncSession = Depends(get_db)) 
         email = body.emails[0].value
 
     user = User(
-        okta_id=body.externalId or str(uuid.uuid4()),
+        external_id=body.externalId or str(uuid.uuid4()),
         email=email,
         first_name=body.name.givenName,
         last_name=body.name.familyName,

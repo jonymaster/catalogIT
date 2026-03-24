@@ -11,10 +11,13 @@ dependencies = [
     "alembic",
     "pydantic-settings",
     "python-jose[cryptography]",
-    "boto3",
     "httpx",
     "python-multipart",
+    "bcrypt",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [build-system]
 requires = ["hatchling"]

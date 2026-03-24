@@ -10,6 +10,7 @@ import {
 interface UserInfo {
   sub: string;
   email: string;
+  role: string;
 }
 
 interface AuthContextValue {
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(() => {
-    window.location.href = "/auth/login";
+    window.location.href = "/auth/oidc/login";
   }, []);
 
   const logout = useCallback(() => {
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  // Capture token from callback redirect
+  // Capture token from OIDC callback redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const callbackToken = params.get("token");

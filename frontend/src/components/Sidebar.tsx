@@ -9,6 +9,7 @@ const navigation = [
 
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
@@ -33,6 +34,24 @@ export function Sidebar() {
             {item.name}
           </NavLink>
         ))}
+
+        {isAdmin && (
+          <>
+            <div className="my-3 h-px bg-gray-200" />
+            <NavLink
+              to="/settings"
+              className={({ isActive }) =>
+                `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`
+              }
+            >
+              Settings
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="border-t border-gray-200 p-4">
