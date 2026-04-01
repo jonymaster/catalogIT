@@ -4,10 +4,84 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
+  display_name: string | null;
+  department: string | null;
   is_active: boolean;
   role: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  website: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface LoginMethod {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  method_type: string;
+  last_four: string | null;
+  notes: string | null;
+}
+
+export interface Contract {
+  id: string;
+  vendor_id: string;
+  contract_ref: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  auto_renew: boolean;
+  total_value: number | null;
+  terms_notes: string | null;
+  vendor?: Vendor;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceLogin {
+  id: string;
+  login_method_id: string;
+  is_primary: boolean;
+  login_method?: LoginMethod;
+}
+
+export interface CostRecord {
+  id: string;
+  service_id: string;
+  payment_method_id: string | null;
+  fiscal_year: number;
+  amount: number;
+  record_type: "actual" | "estimated" | "budget";
+  notes: string | null;
+  recorded_at: string;
+  recorded_by_id: string | null;
+}
+
+export interface ServiceHistoryEntry {
+  id: string;
+  service_id: string;
+  action_date: string;
+  action_type: string;
+  description: string | null;
+  changed_by_id: string | null;
+  created_at: string;
 }
 
 export interface Service {
@@ -22,6 +96,21 @@ export interface Service {
   automated_provisioning: boolean;
   notes: string | null;
   owners: User[];
+  // Normalized fields
+  vendor_id: string | null;
+  category_id: string | null;
+  payment_method_id: string | null;
+  contract_id: string | null;
+  classification: string | null;
+  service_type: string | null;
+  scim_enabled: boolean | null;
+  scim_notes: string | null;
+  criticality: string | null;
+  is_active: boolean;
+  deprecated_at: string | null;
+  vendor: Vendor | null;
+  category_rel: Category | null;
+  logins: ServiceLogin[];
   created_at: string;
   updated_at: string;
 }

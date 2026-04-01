@@ -40,6 +40,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/.venv
+      - ./data:/data
     env_file:
       - .env
     depends_on:

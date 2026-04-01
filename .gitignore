@@ -40,6 +40,9 @@ docker-compose.override.yml
 # PostgreSQL data
 pgdata/
 
+# Local seed / dev data
+data/
+
 # Coverage
 htmlcov/
 .coverage

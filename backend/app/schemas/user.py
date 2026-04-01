@@ -20,6 +20,8 @@ class UserRead(BaseModel):
     email: str
     first_name: str
     last_name: str
+    display_name: str | None = None
+    department: str | None = None
     is_active: bool
     role: str
     created_at: datetime
@@ -31,3 +33,5 @@ class UserRead(BaseModel):
 class UserUpdate(BaseModel):
     role: Literal["admin", "editor", "viewer"] | None = None
     is_active: bool | None = None
+    display_name: str | None = None
+    department: str | None = None
