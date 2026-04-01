@@ -1,24 +1,24 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import {
+  useParams,
+  Link,
+  useNavigate,
+  NavLink,
+  Outlet,
+} from "react-router-dom";
 import client from "../api/client";
-import { Attachments } from "../components/Attachments";
-import { AuditTimeline } from "../components/AuditTimeline";
-import { StatusBadge } from "../components/StatusBadge";
+import { useAuth } from "../context/AuthContext";
 import type { Service } from "../types/models";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900">{children}</dd>
-    </div>
-  );
-}
+const tabs = [
+  { to: ".", label: "Overview", end: true },
+  { to: "costs", label: "Costs", end: false },
+];
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { canEdit } = useAuth();
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,56 +30,72 @@ export function ServiceDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  async function handleDelete() {
+    if (!id) return;
+    if (!window.confirm("Are you sure you want to delete this service?"))
+      return;
+    await client.delete(`/api/services/${id}`);
+    navigate("/services");
+  }
+
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
-  if (!service) return <p className="text-sm text-red-600">Service not found.</p>;
+  if (!service)
+    return <p className="text-sm text-red-600">Service not found.</p>;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Link to="/services" className="text-sm text-gray-500 hover:text-gray-700">
-          &larr; Back to Services
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-900">{service.name}</h1>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <Link
+            to="/services"
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            &larr; Back to Services
+          </Link>
+          <h1 className="mt-2 text-2xl font-semibold text-gray-900">
+            {service.name}
+          </h1>
+        </div>
+        {canEdit && (
+          <div className="flex gap-2">
+            <Link
+              to={`/services/${id}/edit`}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Edit
+            </Link>
+            <button
+              onClick={handleDelete}
+              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
-          <Field label="Status">
-            <StatusBadge status={service.status} />
-          </Field>
-          <Field label="Category">{service.category || "--"}</Field>
-          <Field label="License Type">{service.license_type || "--"}</Field>
-          <Field label="Billing Schedule">{service.billing_schedule || "--"}</Field>
-          <Field label="Yearly Cost">
-            {service.yearly_cost != null
-              ? `$${Number(service.yearly_cost).toLocaleString()}`
-              : "--"}
-          </Field>
-          <Field label="SSO Integrated">{service.sso_integrated ? "Yes" : "No"}</Field>
-          <Field label="Auto Provisioning">
-            {service.automated_provisioning ? "Yes" : "No"}
-          </Field>
-          <Field label="Owners">
-            {service.owners.length > 0
-              ? service.owners
-                  .map((o) => `${o.first_name} ${o.last_name}`)
-                  .join(", ")
-              : "--"}
-          </Field>
-          {service.notes && (
-            <div className="col-span-full">
-              <Field label="Notes">{service.notes}</Field>
-            </div>
-          )}
-        </dl>
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex gap-6">
+          {tabs.map((tab) => (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              end={tab.end}
+              className={({ isActive }) =>
+                `whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "border-gray-900 text-gray-900"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`
+              }
+            >
+              {tab.label}
+            </NavLink>
+          ))}
+        </nav>
       </div>
 
-      <Attachments entityType="service" entityId={service.id} />
-
-      <div>
-        <h2 className="mb-4 text-lg font-medium text-gray-900">Change History</h2>
-        <AuditTimeline tableName="services" recordId={service.id} />
-      </div>
+      <Outlet context={{ service }} />
     </div>
   );
 }

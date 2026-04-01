@@ -1,23 +1,14 @@
-import { useState } from "react";
-import { SettingsOidc } from "./settings/SettingsOidc";
-import { SettingsScim } from "./settings/SettingsScim";
-import { SettingsUsers } from "./settings/SettingsUsers";
-import { SettingsTokens } from "./settings/SettingsTokens";
-import { SettingsApi } from "./settings/SettingsApi";
+import { NavLink, Outlet } from "react-router-dom";
 
 const tabs = [
-  { id: "oidc", label: "OIDC" },
-  { id: "scim", label: "SCIM" },
-  { id: "users", label: "Users" },
-  { id: "tokens", label: "API Tokens" },
-  { id: "api", label: "API Docs" },
-] as const;
-
-type TabId = (typeof tabs)[number]["id"];
+  { to: "oidc", label: "OIDC" },
+  { to: "scim", label: "SCIM" },
+  { to: "users", label: "Users" },
+  { to: "tokens", label: "API Tokens" },
+  { to: "api", label: "API Docs" },
+];
 
 export function Settings() {
-  const [activeTab, setActiveTab] = useState<TabId>("oidc");
-
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
@@ -28,27 +19,25 @@ export function Settings() {
       <div className="mt-6 border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "border-gray-900 text-gray-900"
-                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-              }`}
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              className={({ isActive }) =>
+                `whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "border-gray-900 text-gray-900"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`
+              }
             >
               {tab.label}
-            </button>
+            </NavLink>
           ))}
         </nav>
       </div>
 
       <div className="mt-6">
-        {activeTab === "oidc" && <SettingsOidc />}
-        {activeTab === "scim" && <SettingsScim />}
-        {activeTab === "users" && <SettingsUsers />}
-        {activeTab === "tokens" && <SettingsTokens />}
-        {activeTab === "api" && <SettingsApi />}
+        <Outlet />
       </div>
     </div>
   );

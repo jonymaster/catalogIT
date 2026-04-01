@@ -21,7 +21,7 @@ class OidcConfigWrite(BaseModel):
     provider_name: str
     issuer_url: str
     client_id: str
-    client_secret: str
+    client_secret: str = ""
     scopes: str = "openid profile email"
     enabled: bool = True
 

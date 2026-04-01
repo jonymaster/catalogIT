@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 
 class CostRecordCreate(BaseModel):
-    service_id: uuid.UUID
     payment_method_id: uuid.UUID | None = None
     fiscal_year: int
     amount: float
@@ -27,11 +26,13 @@ class CostRecordRead(BaseModel):
     id: uuid.UUID
     service_id: uuid.UUID
     payment_method_id: uuid.UUID | None
+    payment_method_name: str | None = None
     fiscal_year: int
     amount: float
     record_type: str
     notes: str | None
     recorded_at: datetime
     recorded_by_id: uuid.UUID | None
+    recorded_by_name: str | None = None
 
     model_config = {"from_attributes": True}

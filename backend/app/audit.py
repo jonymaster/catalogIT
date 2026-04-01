@@ -58,9 +58,12 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
         if table not in AUDITED_TABLES:
             continue
         insp = inspect(instance)
+        column_keys = {a.key for a in insp.mapper.column_attrs}
         old_vals = {}
         new_vals = {}
         for attr in insp.attrs:
+            if attr.key not in column_keys:
+                continue
             hist = attr.history
             if hist.has_changes():
                 key = attr.key

@@ -1,4 +1,4 @@
-interface Column<T> {
+export interface Column<T> {
   key: string;
   header: string;
   render?: (row: T) => React.ReactNode;
@@ -8,19 +8,25 @@ interface Props<T> {
   columns: Column<T>[];
   data: T[];
   onRowClick?: (row: T) => void;
+  visibleKeys?: string[];
 }
 
 export function DataTable<T extends { id: string }>({
   columns,
   data,
   onRowClick,
+  visibleKeys,
 }: Props<T>) {
+  const active = visibleKeys
+    ? columns.filter((c) => visibleKeys.includes(c.key))
+    : columns;
+
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            {columns.map((col) => (
+            {active.map((col) => (
               <th
                 key={col.key}
                 className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
@@ -34,7 +40,7 @@ export function DataTable<T extends { id: string }>({
           {data.length === 0 && (
             <tr>
               <td
-                colSpan={columns.length}
+                colSpan={active.length}
                 className="px-4 py-8 text-center text-sm text-gray-500"
               >
                 No records found.
@@ -51,7 +57,7 @@ export function DataTable<T extends { id: string }>({
                   : undefined
               }
             >
-              {columns.map((col) => (
+              {active.map((col) => (
                 <td
                   key={col.key}
                   className="whitespace-nowrap px-4 py-3 text-sm text-gray-700"

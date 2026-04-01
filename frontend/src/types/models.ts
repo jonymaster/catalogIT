@@ -66,12 +66,14 @@ export interface CostRecord {
   id: string;
   service_id: string;
   payment_method_id: string | null;
+  payment_method_name: string | null;
   fiscal_year: number;
   amount: number;
   record_type: "actual" | "estimated" | "budget";
   notes: string | null;
   recorded_at: string;
   recorded_by_id: string | null;
+  recorded_by_name: string | null;
 }
 
 export interface ServiceHistoryEntry {

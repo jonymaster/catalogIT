@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import bcrypt
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+logger = logging.getLogger(__name__)
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from jose import jwt
 from sqlalchemy import select
@@ -121,8 +124,13 @@ async def reset_password(
 
 # ── Generic OIDC ─────────────────────────────────────────────────
 
+def _oidc_callback_url() -> str:
+    settings = get_settings()
+    return settings.FRONTEND_URL.rstrip("/") + "/auth/oidc/callback"
+
+
 @router.get("/oidc/login")
-async def oidc_login(request: Request, db: AsyncSession = Depends(get_db)):
+async def oidc_login(db: AsyncSession = Depends(get_db)):
     """Redirect the user to the configured OIDC provider's authorization endpoint."""
     oidc = await _get_oidc_config(db)
     if not oidc or not oidc.enabled:
@@ -134,12 +142,11 @@ async def oidc_login(request: Request, db: AsyncSession = Depends(get_db)):
     state = secrets.token_urlsafe(32)
     _state_store[state] = True
 
-    callback_url = str(request.url_for("oidc_callback"))
     params = {
         "client_id": oidc.client_id,
         "response_type": "code",
         "scope": oidc.scopes,
-        "redirect_uri": callback_url,
+        "redirect_uri": _oidc_callback_url(),
         "state": state,
     }
     return RedirectResponse(url=f"{authorize_url}?{urlencode(params)}")
@@ -149,7 +156,6 @@ async def oidc_login(request: Request, db: AsyncSession = Depends(get_db)):
 async def oidc_callback(
     code: str,
     state: str,
-    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Handle the OIDC callback: exchange code for tokens, upsert user, return JWT."""
@@ -164,37 +170,57 @@ async def oidc_callback(
     discovery = await _discover_oidc(oidc.issuer_url)
     token_url = discovery["token_endpoint"]
 
-    callback_url = str(request.url_for("oidc_callback"))
-
     async with httpx.AsyncClient(timeout=10) as client:
         token_resp = await client.post(
             token_url,
             data={
                 "grant_type": "authorization_code",
                 "code": code,
-                "redirect_uri": callback_url,
-                "client_id": oidc.client_id,
-                "client_secret": oidc.client_secret,
+                "redirect_uri": _oidc_callback_url(),
             },
+            auth=(oidc.client_id, oidc.client_secret),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
     if token_resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="Token exchange failed")
+        logger.error("OIDC token exchange failed: %s %s", token_resp.status_code, token_resp.text)
+        raise HTTPException(status_code=502, detail=f"Token exchange failed: {token_resp.text}")
 
     token_data = token_resp.json()
     id_token = token_data.get("id_token", "")
+    access_token = token_data.get("access_token", "")
 
-    # Decode without verification -- in production, verify against the provider's JWKS.
     claims = jwt.get_unverified_claims(id_token)
+
+    userinfo_endpoint = discovery.get("userinfo_endpoint")
+    if userinfo_endpoint and access_token:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                ui_resp = await client.get(
+                    userinfo_endpoint,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+            if ui_resp.status_code == 200:
+                claims = {**claims, **ui_resp.json()}
+        except httpx.HTTPError:
+            logger.warning("Failed to fetch userinfo, falling back to id_token claims")
 
     external_id = claims["sub"]
     email = claims.get("email", "")
     first_name = claims.get("given_name", "")
     last_name = claims.get("family_name", "")
 
+    if not first_name and not last_name and claims.get("name"):
+        parts = claims["name"].split(None, 1)
+        first_name = parts[0]
+        last_name = parts[1] if len(parts) > 1 else ""
+
     result = await db.execute(select(User).where(User.external_id == external_id))
     user = result.scalar_one_or_none()
+
+    if user is None and email:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
 
     if user is None:
         user = User(
@@ -204,13 +230,17 @@ async def oidc_callback(
             last_name=last_name,
         )
         db.add(user)
-        await db.flush()
     else:
-        user.email = email
-        user.first_name = first_name
-        user.last_name = last_name
-        await db.flush()
+        user.external_id = external_id
+        if email:
+            user.email = email
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
+
+    await db.flush()
 
     settings = get_settings()
     frontend_url = settings.FRONTEND_URL.rstrip("/")
-    return RedirectResponse(url=f"{frontend_url}/auth/callback?token={_mint_jwt(user)}")
+    return RedirectResponse(url=f"{frontend_url}/sso/callback?token={_mint_jwt(user)}")

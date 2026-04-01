@@ -40,7 +40,8 @@ async def save_oidc_config(
     config.provider_name = body.provider_name
     config.issuer_url = body.issuer_url
     config.client_id = body.client_id
-    config.client_secret = body.client_secret
+    if body.client_secret:
+        config.client_secret = body.client_secret
     config.scopes = body.scopes
     config.enabled = body.enabled
 

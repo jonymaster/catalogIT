@@ -12,7 +12,11 @@ from app.config import get_settings
 from app.database import async_session
 from app.models.user import User
 from app.dependencies.storage import ensure_bucket
-from app.routers import api_tokens, attachments, auth, history, laptops, services, scim, settings, users
+from app.routers import (
+    api_tokens, attachments, auth, categories, cost_records, dashboard,
+    history, laptops, login_methods, payment_methods, services, scim,
+    settings, users, vendors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +96,12 @@ def create_app() -> FastAPI:
     app.include_router(users.router)
     app.include_router(api_tokens.router)
     app.include_router(attachments.router)
+    app.include_router(vendors.router)
+    app.include_router(categories.router)
+    app.include_router(login_methods.router)
+    app.include_router(payment_methods.router)
+    app.include_router(cost_records.router)
+    app.include_router(dashboard.router)
 
     @app.get("/health")
     async def health() -> dict:
