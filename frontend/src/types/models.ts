@@ -41,6 +41,12 @@ export interface PaymentMethod {
   notes: string | null;
 }
 
+export interface ServiceStatus {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export interface Contract {
   id: string;
   vendor_id: string;
@@ -102,16 +108,19 @@ export interface Service {
   vendor_id: string | null;
   category_id: string | null;
   payment_method_id: string | null;
+  service_status_id: string | null;
   contract_id: string | null;
   classification: string | null;
   service_type: string | null;
   scim_enabled: boolean | null;
   scim_notes: string | null;
   criticality: string | null;
+  nonprofit_pricing: boolean;
   is_active: boolean;
   deprecated_at: string | null;
   vendor: Vendor | null;
   category_rel: Category | null;
+  service_status: ServiceStatus | null;
   logins: ServiceLogin[];
   created_at: string;
   updated_at: string;

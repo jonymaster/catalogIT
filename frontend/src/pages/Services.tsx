@@ -31,6 +31,11 @@ const columns: Column<Service>[] = [
     render: (s) => <CriticalityBadge value={s.criticality} />,
   },
   {
+    key: "nonprofit_pricing",
+    header: "Nonprofit",
+    render: (s) => (s.nonprofit_pricing ? "Yes" : "No"),
+  },
+  {
     key: "yearly_cost",
     header: "Yearly Cost",
     render: (s) =>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
 import type {
@@ -7,6 +7,7 @@ import type {
   Vendor,
   Category,
   PaymentMethod,
+  ServiceStatus,
 } from "../types/models";
 
 interface Props {
@@ -27,21 +28,14 @@ interface FormData {
   vendor_id: string;
   category_id: string;
   payment_method_id: string;
+  service_status_id: string;
   classification: string;
   service_type: string;
   scim_enabled: boolean;
   scim_notes: string;
   criticality: string;
+  nonprofit_pricing: boolean;
 }
-
-const STATUS_OPTIONS = [
-  "Contract",
-  "Self-Managed",
-  "Active",
-  "Under Review",
-  "Deprecated",
-  "Trial",
-];
 const CLASSIFICATION_OPTIONS = ["core_saas", "subscription"];
 const SERVICE_TYPE_OPTIONS = ["contract", "self_managed", "deprecated"];
 const BILLING_OPTIONS = ["monthly", "annually", "on_demand", "na"];
@@ -62,11 +56,13 @@ function toFormData(s?: Service): FormData {
     vendor_id: s?.vendor_id ?? "",
     category_id: s?.category_id ?? "",
     payment_method_id: s?.payment_method_id ?? "",
+    service_status_id: s?.service_status_id ?? "",
     classification: s?.classification ?? "",
     service_type: s?.service_type ?? "",
     scim_enabled: s?.scim_enabled ?? false,
     scim_notes: s?.scim_notes ?? "",
     criticality: s?.criticality ?? "",
+    nonprofit_pricing: s?.nonprofit_pricing ?? false,
   };
 }
 
@@ -82,6 +78,7 @@ export function ServiceForm({ initial }: Props) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -89,13 +86,62 @@ export function ServiceForm({ initial }: Props) {
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
-    ]).then(([u, v, c, p]) => {
+      client.get<ServiceStatus[]>("/api/service-statuses/"),
+    ]).then(([u, v, c, p, s]) => {
       setUsers(u.data);
       setVendors(v.data);
       setCategories(c.data);
       setPaymentMethods(p.data);
+      setServiceStatuses(s.data);
     });
   }, []);
+
+  useEffect(() => {
+    if (serviceStatuses.length === 0) {
+      return;
+    }
+
+    setForm((current) => {
+      if (
+        current.service_status_id &&
+        serviceStatuses.some((status) => status.id === current.service_status_id)
+      ) {
+        return current;
+      }
+
+      const matchedStatus = serviceStatuses.find(
+        (status) => status.name === current.status,
+      );
+      if (!matchedStatus) {
+        return current;
+      }
+
+      return {
+        ...current,
+        service_status_id: matchedStatus.id,
+        status: matchedStatus.name,
+      };
+    });
+  }, [serviceStatuses]);
+
+  const selectedStatusValue = useMemo(() => {
+    if (form.service_status_id) {
+      return form.service_status_id;
+    }
+    if (form.status) {
+      return `legacy:${form.status}`;
+    }
+    return "";
+  }, [form.service_status_id, form.status]);
+
+  const hasLegacyStatusOption = useMemo(
+    () =>
+      Boolean(
+        form.status &&
+          !serviceStatuses.some((status) => status.name === form.status),
+      ),
+    [form.status, serviceStatuses],
+  );
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -120,11 +166,13 @@ export function ServiceForm({ initial }: Props) {
       vendor_id: form.vendor_id || null,
       category_id: form.category_id || null,
       payment_method_id: form.payment_method_id || null,
+      service_status_id: form.service_status_id || null,
       classification: form.classification || null,
       service_type: form.service_type || null,
       scim_enabled: form.scim_enabled,
       scim_notes: form.scim_notes || null,
       criticality: form.criticality || null,
+      nonprofit_pricing: form.nonprofit_pricing,
     };
 
     try {
@@ -171,14 +219,32 @@ export function ServiceForm({ initial }: Props) {
           <label className={labelCls}>Status</label>
           <select
             className={inputCls}
-            value={form.status}
-            onChange={(e) => set("status", e.target.value)}
+            value={selectedStatusValue}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value.startsWith("legacy:")) {
+                set("service_status_id", "");
+                set("status", value.replace("legacy:", ""));
+                return;
+              }
+
+              const selectedStatus = serviceStatuses.find(
+                (status) => status.id === value,
+              );
+              set("service_status_id", value);
+              set("status", selectedStatus?.name ?? "");
+            }}
           >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {serviceStatuses.map((status) => (
+              <option key={status.id} value={status.id}>
+                {status.name}
               </option>
             ))}
+            {hasLegacyStatusOption && (
+              <option value={`legacy:${form.status}`}>
+                {form.status} (legacy value)
+              </option>
+            )}
           </select>
         </div>
 
@@ -372,6 +438,15 @@ export function ServiceForm({ initial }: Props) {
               className="h-4 w-4 rounded border-gray-300"
             />
             SCIM Enabled
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={form.nonprofit_pricing}
+              onChange={(e) => set("nonprofit_pricing", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Nonprofit Pricing
           </label>
         </div>
       </div>

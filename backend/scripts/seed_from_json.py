@@ -27,6 +27,7 @@ from app.models import (
     Service,
     ServiceHistoryEntry,
     ServiceLogin,
+    ServiceStatus,
     User,
     Vendor,
     service_owners,
@@ -40,6 +41,18 @@ SEED_DIR = Path(_os.environ.get("SEED_DIR", str(_default_seed)))
 # Stable UUID namespace so repeated runs produce the same IDs
 NS = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 
+STATUS_NAME_MAP = {
+    "contract": "Contract",
+    "self_managed": "Self-Managed",
+    "self-managed": "Self-Managed",
+    "active": "Active",
+    "under_review": "Under Review",
+    "under-review": "Under Review",
+    "under review": "Under Review",
+    "deprecated": "Deprecated",
+    "trial": "Trial",
+}
+
 
 def _uuid(table: str, seed_id: int) -> uuid.UUID:
     return uuid.uuid5(NS, f"{table}:{seed_id}")
@@ -52,6 +65,16 @@ def _load(name: str) -> list[dict]:
         return []
     with open(path) as f:
         return json.load(f)
+
+
+def _normalize_status_name(raw: str | None) -> str:
+    if not raw:
+        return "Active"
+    normalized = raw.strip()
+    if not normalized:
+        return "Active"
+    lookup_key = normalized.lower().replace(" ", "_")
+    return STATUS_NAME_MAP.get(lookup_key, normalized)
 
 
 async def _seed_vendors(session: AsyncSession) -> None:
@@ -102,6 +125,44 @@ async def _seed_payment_methods(session: AsyncSession) -> None:
     print(f"  payment_methods: {len(rows)} processed")
 
 
+async def _seed_service_statuses(session: AsyncSession) -> None:
+    default_statuses = [
+        ("Contract", "Service is in contract onboarding or procurement."),
+        ("Self-Managed", "Service is operated internally or outside a vendor contract."),
+        ("Active", "Service is active and in normal use."),
+        ("Under Review", "Service is being reviewed for fit, cost, or compliance."),
+        ("Deprecated", "Service is being phased out or replaced."),
+        ("Trial", "Service is being evaluated before broader adoption."),
+    ]
+    seeded_statuses = {
+        _normalize_status_name(row.get("status") or row.get("service_type"))
+        for row in _load("services.json")
+    }
+    status_rows = []
+    existing_names = set()
+    for name, description in default_statuses:
+        status_rows.append((name, description))
+        existing_names.add(name.lower())
+    for name in sorted(seeded_statuses):
+        if name.lower() not in existing_names:
+            status_rows.append((name, "Imported from service seed data."))
+            existing_names.add(name.lower())
+
+    for index, (name, description) in enumerate(status_rows, start=1):
+        uid = _uuid("service_status", index)
+        existing = await session.get(ServiceStatus, uid)
+        if existing:
+            continue
+        result = await session.execute(
+            select(ServiceStatus).where(ServiceStatus.name == name)
+        )
+        if result.scalar_one_or_none():
+            continue
+        session.add(ServiceStatus(id=uid, name=name, description=description))
+    await session.flush()
+    print(f"  service_statuses: {len(status_rows)} processed")
+
+
 async def _seed_users(session: AsyncSession) -> None:
     """Seed users from the JSON file. Only creates users that don't already
     exist by email, and sets the department + display_name fields."""
@@ -136,6 +197,11 @@ async def _seed_services(session: AsyncSession) -> None:
     rows = _load("services.json")
     user_rows = _load("users.json")
     user_email_by_seed_id = {u["id"]: u["email"] for u in user_rows}
+    result = await session.execute(select(ServiceStatus))
+    service_statuses = {
+        status.name.lower(): status.id
+        for status in result.scalars().all()
+    }
 
     for r in rows:
         svc_id = _uuid("service", r["id"])
@@ -143,20 +209,24 @@ async def _seed_services(session: AsyncSession) -> None:
         if existing:
             continue
 
+        normalized_status = _normalize_status_name(r.get("status") or r.get("service_type"))
+
         svc = Service(
             id=svc_id,
             name=r["name"],
-            status=r.get("service_type", "self_managed"),
+            status=normalized_status,
             license_type=r.get("classification", ""),
             category="",
             billing_schedule=r.get("billing_schedule", ""),
             vendor_id=_uuid("vendor", r["vendor_id"]),
             category_id=_uuid("category", r["category_id"]),
             payment_method_id=_uuid("payment_method", r["payment_method_id"]),
+            service_status_id=service_statuses.get(normalized_status.lower()),
             classification=r.get("classification"),
             service_type=r.get("service_type"),
             scim_enabled=r.get("scim_enabled", False),
             criticality=r.get("criticality"),
+            nonprofit_pricing=r.get("nonprofit_pricing", False),
         )
         session.add(svc)
         await session.flush()
@@ -245,6 +315,7 @@ async def main() -> None:
             await _seed_categories(session)
             await _seed_login_methods(session)
             await _seed_payment_methods(session)
+            await _seed_service_statuses(session)
             await _seed_users(session)
             await _seed_services(session)
             await _seed_cost_records(session)

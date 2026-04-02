@@ -42,6 +42,9 @@ class Service(Base):
     payment_method_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("payment_methods.id", ondelete="SET NULL"), nullable=True
     )
+    service_status_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("service_statuses.id", ondelete="SET NULL"), nullable=True
+    )
     contract_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("contracts.id", ondelete="SET NULL"), nullable=True
     )
@@ -51,6 +54,7 @@ class Service(Base):
     scim_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     scim_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     criticality: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    nonprofit_pricing: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     deprecated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -67,6 +71,7 @@ class Service(Base):
     vendor: Mapped["Vendor | None"] = relationship(lazy="selectin")  # noqa: F821
     category_rel: Mapped["Category | None"] = relationship(lazy="selectin")  # noqa: F821
     payment_method: Mapped["PaymentMethod | None"] = relationship(lazy="selectin")  # noqa: F821
+    service_status: Mapped["ServiceStatus | None"] = relationship(lazy="selectin")  # noqa: F821
     contract: Mapped["Contract | None"] = relationship(lazy="selectin")  # noqa: F821
     logins: Mapped[list["ServiceLogin"]] = relationship(  # noqa: F821
         lazy="selectin",

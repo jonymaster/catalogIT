@@ -3,12 +3,13 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.service import Service
+from app.models.service_status import ServiceStatus
 from app.models.user import User
 from app.routers.attachments import delete_entity_attachments
 from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
@@ -16,6 +17,37 @@ from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
 router = APIRouter(prefix="/api/services", tags=["services"])
 
 _writer = require_role("admin", "editor")
+
+
+async def _find_service_status_by_name(
+    status_name: str,
+    db: AsyncSession,
+) -> ServiceStatus | None:
+    normalized = status_name.strip()
+    if not normalized:
+        return None
+    return await db.scalar(
+        select(ServiceStatus).where(func.lower(ServiceStatus.name) == normalized.lower())
+    )
+
+
+async def _resolve_service_status(
+    db: AsyncSession,
+    *,
+    service_status_id: uuid.UUID | None,
+    status_name: str | None,
+) -> ServiceStatus | None:
+    if service_status_id is not None:
+        service_status = await db.get(ServiceStatus, service_status_id)
+        if service_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Service status not found",
+            )
+        return service_status
+    if status_name:
+        return await _find_service_status_by_name(status_name, db)
+    return None
 
 
 @router.get("/", response_model=list[ServiceRead])
@@ -42,9 +74,15 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
                 raise HTTPException(status_code=400, detail=f"User {uid} not found")
             owners.append(user)
 
+    service_status = await _resolve_service_status(
+        db,
+        service_status_id=body.service_status_id,
+        status_name=body.status,
+    )
+
     service = Service(
         name=body.name,
-        status=body.status,
+        status=service_status.name if service_status else body.status,
         license_type=body.license_type,
         category=body.category,
         billing_schedule=body.billing_schedule,
@@ -53,6 +91,17 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         automated_provisioning=body.automated_provisioning,
         notes=body.notes,
         owners=owners,
+        vendor_id=body.vendor_id,
+        category_id=body.category_id,
+        payment_method_id=body.payment_method_id,
+        service_status_id=service_status.id if service_status else None,
+        contract_id=body.contract_id,
+        classification=body.classification,
+        service_type=body.service_type,
+        scim_enabled=body.scim_enabled,
+        scim_notes=body.scim_notes,
+        criticality=body.criticality,
+        nonprofit_pricing=body.nonprofit_pricing,
     )
     db.add(service)
     await db.flush()
@@ -74,6 +123,8 @@ async def update_service(
     update_data = body.model_dump(exclude_unset=True)
 
     owner_ids = update_data.pop("owner_ids", None)
+    service_status_id = update_data.pop("service_status_id", None) if "service_status_id" in update_data else ...
+    status_name = update_data.pop("status", None) if "status" in update_data else ...
     if owner_ids is not None:
         owners = []
         for uid in owner_ids:
@@ -82,6 +133,24 @@ async def update_service(
                 raise HTTPException(status_code=400, detail=f"User {uid} not found")
             owners.append(user)
         service.owners = owners
+
+    if service_status_id is not ...:
+        if service_status_id is None:
+            service.service_status_id = None
+        else:
+            service_status = await _resolve_service_status(
+                db,
+                service_status_id=service_status_id,
+                status_name=None,
+            )
+            service.service_status_id = service_status.id
+            service.status = service_status.name
+
+    if status_name is not ... and not (service_status_id is not ... and service_status_id is not None):
+        if status_name is not None:
+            service.status = status_name
+            matched_status = await _find_service_status_by_name(status_name, db)
+            service.service_status_id = matched_status.id if matched_status else None
 
     for field, value in update_data.items():
         setattr(service, field, value)

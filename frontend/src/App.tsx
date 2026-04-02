@@ -25,6 +25,9 @@ import { SettingsScim } from "./pages/settings/SettingsScim";
 import { SettingsUsers } from "./pages/settings/SettingsUsers";
 import { SettingsTokens } from "./pages/settings/SettingsTokens";
 import { SettingsApi } from "./pages/settings/SettingsApi";
+import { SettingsReferenceData } from "./pages/settings/SettingsReferenceData";
+import { SettingsReferenceDataHome } from "./pages/settings/SettingsReferenceDataHome";
+import { SettingsReferenceDataResource } from "./pages/settings/SettingsReferenceDataResource";
 
 export default function App() {
   return (
@@ -60,6 +63,13 @@ export default function App() {
                 <Route path="oidc" element={<SettingsOidc />} />
                 <Route path="scim" element={<SettingsScim />} />
                 <Route path="users" element={<SettingsUsers />} />
+                <Route path="reference-data" element={<SettingsReferenceData />}>
+                  <Route index element={<SettingsReferenceDataHome />} />
+                  <Route
+                    path=":resourceKey"
+                    element={<SettingsReferenceDataResource />}
+                  />
+                </Route>
                 <Route path="tokens" element={<SettingsTokens />} />
                 <Route path="api" element={<SettingsApi />} />
               </Route>

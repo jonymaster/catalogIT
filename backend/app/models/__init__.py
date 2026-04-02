@@ -3,6 +3,7 @@ from app.models.vendor import Vendor
 from app.models.category import Category
 from app.models.login_method import LoginMethod
 from app.models.payment_method import PaymentMethod
+from app.models.service_status import ServiceStatus
 from app.models.contract import Contract
 from app.models.service import Service, service_owners
 from app.models.service_login import ServiceLogin
@@ -20,6 +21,7 @@ __all__ = [
     "Category",
     "LoginMethod",
     "PaymentMethod",
+    "ServiceStatus",
     "Contract",
     "Service",
     "service_owners",

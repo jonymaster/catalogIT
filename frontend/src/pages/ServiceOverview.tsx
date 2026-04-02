@@ -54,6 +54,9 @@ export function ServiceOverview() {
           <Field label="Criticality">
             <CriticalityBadge value={service.criticality} />
           </Field>
+          <Field label="Nonprofit Pricing">
+            {service.nonprofit_pricing ? "Yes" : "No"}
+          </Field>
           {service.vendor && (
             <Field label="Vendor">{service.vendor.name}</Field>
           )}

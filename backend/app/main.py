@@ -14,7 +14,8 @@ from app.models.user import User
 from app.dependencies.storage import ensure_bucket
 from app.routers import (
     api_tokens, attachments, auth, categories, cost_records, dashboard,
-    history, laptops, login_methods, payment_methods, services, scim,
+    history, laptops, login_methods, payment_methods, reference_data,
+    service_statuses, services, scim,
     settings, users, vendors,
 )
 
@@ -100,6 +101,8 @@ def create_app() -> FastAPI:
     app.include_router(categories.router)
     app.include_router(login_methods.router)
     app.include_router(payment_methods.router)
+    app.include_router(service_statuses.router)
+    app.include_router(reference_data.router)
     app.include_router(cost_records.router)
     app.include_router(dashboard.router)
 
