@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { BarChart } from "../components/charts/BarChart";
+import { SearchInput } from "../components/SearchInput";
 import { StackedBar } from "../components/charts/StackedBar";
 import type { Service, Laptop } from "../types/models";
 
@@ -33,6 +34,35 @@ function getCategoryColor(name: string): string {
 }
 
 const fmtFull = (n: number) => `$${n.toLocaleString()}`;
+
+function matchesServiceSearch(service: Service, query: string) {
+  return (
+    service.name.toLowerCase().includes(query) ||
+    service.category.toLowerCase().includes(query) ||
+    service.license_type.toLowerCase().includes(query) ||
+    service.status.toLowerCase().includes(query) ||
+    (service.vendor?.name ?? "").toLowerCase().includes(query) ||
+    service.owners.some(
+      (owner) =>
+        owner.first_name.toLowerCase().includes(query) ||
+        owner.last_name.toLowerCase().includes(query),
+    )
+  );
+}
+
+function matchesLaptopSearch(laptop: Laptop, query: string) {
+  const assignedTo = laptop.assigned_to
+    ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name}`
+    : "";
+
+  return (
+    laptop.serial_number.toLowerCase().includes(query) ||
+    laptop.model_name.toLowerCase().includes(query) ||
+    laptop.cpu.toLowerCase().includes(query) ||
+    laptop.status.toLowerCase().includes(query) ||
+    assignedTo.toLowerCase().includes(query)
+  );
+}
 
 function StatCard({
   label,
@@ -71,6 +101,9 @@ export function Dashboard() {
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const [dashData, setDashData] = useState<DashboardData | null>(null);
   const [dashYear, setDashYear] = useState<number>(new Date().getFullYear());
+  const [dashboardSearch, setDashboardSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     Promise.all([
@@ -91,8 +124,40 @@ export function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const years = dashData?.fiscal_years ?? [];
-  const records = dashData?.cost_records ?? [];
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  const years = useMemo(() => dashData?.fiscal_years ?? [], [dashData]);
+  const records = useMemo(() => dashData?.cost_records ?? [], [dashData]);
+  const normalizedSearch = dashboardSearch.trim().toLowerCase();
+
+  const serviceMatches = useMemo(() => {
+    if (!normalizedSearch) {
+      return [];
+    }
+
+    return services
+      .filter((service) => matchesServiceSearch(service, normalizedSearch))
+      .slice(0, 5);
+  }, [normalizedSearch, services]);
+
+  const laptopMatches = useMemo(() => {
+    if (!normalizedSearch) {
+      return [];
+    }
+
+    return laptops
+      .filter((laptop) => matchesLaptopSearch(laptop, normalizedSearch))
+      .slice(0, 5);
+  }, [laptops, normalizedSearch]);
 
   const costByYear = useMemo(() => {
     const m: Record<number, number> = {};
@@ -193,6 +258,113 @@ export function Dashboard() {
       <p className="mt-1 text-sm text-gray-500">
         Welcome{user?.email ? `, ${user.email}` : ""}.
       </p>
+
+      <div className="mt-8 flex justify-center">
+        <div className="relative w-full max-w-3xl" ref={searchRef}>
+          <div className="rounded-full border border-gray-200 bg-white p-2 shadow-sm">
+            <SearchInput
+              value={dashboardSearch}
+              onChange={(value) => {
+                setDashboardSearch(value);
+                setSearchOpen(true);
+              }}
+              onFocus={() => {
+                if (normalizedSearch) {
+                  setSearchOpen(true);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setSearchOpen(false);
+                }
+              }}
+              placeholder="Search services and hardware..."
+              bare
+              inputClassName="rounded-full py-4 pl-12 pr-5 text-base"
+              iconClassName="left-5 h-5 w-5"
+            />
+          </div>
+          {searchOpen && normalizedSearch && (
+            <div className="absolute left-0 top-full z-20 mt-3 w-full rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+              <div className="space-y-4">
+                {serviceMatches.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Services
+                    </p>
+                    <div className="space-y-1">
+                      {serviceMatches.map((service) => (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setDashboardSearch("");
+                            navigate(`/services/${service.id}`);
+                          }}
+                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+                        >
+                          <span>
+                            <span className="block text-sm font-medium text-gray-900">
+                              {service.name}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              {service.category} • {service.status}
+                            </span>
+                          </span>
+                          <span className="ml-4 text-xs text-gray-400">
+                            Service
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {laptopMatches.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+                      Hardware
+                    </p>
+                    <div className="space-y-1">
+                      {laptopMatches.map((laptop) => (
+                        <button
+                          key={laptop.id}
+                          type="button"
+                          onClick={() => {
+                            setSearchOpen(false);
+                            setDashboardSearch("");
+                            navigate(`/hardware/${laptop.id}`);
+                          }}
+                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+                        >
+                          <span>
+                            <span className="block text-sm font-medium text-gray-900">
+                              {laptop.model_name}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              {laptop.serial_number} • {laptop.status}
+                            </span>
+                          </span>
+                          <span className="ml-4 text-xs text-gray-400">
+                            Hardware
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {serviceMatches.length === 0 && laptopMatches.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    No matching services or hardware found.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Inventory stats */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

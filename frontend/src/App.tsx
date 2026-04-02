@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Shell } from "./components/Shell";
 import { Login } from "./pages/Login";
@@ -25,6 +26,7 @@ import { SettingsScim } from "./pages/settings/SettingsScim";
 import { SettingsUsers } from "./pages/settings/SettingsUsers";
 import { SettingsTokens } from "./pages/settings/SettingsTokens";
 import { SettingsApi } from "./pages/settings/SettingsApi";
+import { SettingsBranding } from "./pages/settings/SettingsBranding";
 import { SettingsReferenceData } from "./pages/settings/SettingsReferenceData";
 import { SettingsReferenceDataHome } from "./pages/settings/SettingsReferenceDataHome";
 import { SettingsReferenceDataResource } from "./pages/settings/SettingsReferenceDataResource";
@@ -33,50 +35,53 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/sso/callback" element={<AuthCallback />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Shell />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/services" element={<Services />} />
-              <Route path="/services/new" element={<ServiceCreate />} />
-              <Route path="/services/:id" element={<ServiceDetail />}>
-                <Route index element={<ServiceOverview />} />
-                <Route path="costs" element={<ServiceCosts />} />
-              </Route>
-              <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
-              <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
-              <Route path="/services/:id/edit" element={<ServiceEdit />} />
-              <Route path="/hardware" element={<Hardware />} />
-              <Route path="/hardware/new" element={<LaptopCreate />} />
-              <Route path="/hardware/:id" element={<LaptopDetail />} />
-              <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
-            </Route>
-          </Route>
-          <Route element={<ProtectedRoute requiredRole="admin" />}>
-            <Route element={<Shell />}>
-              <Route path="/users" element={<Users />} />
-              <Route path="/settings" element={<Settings />}>
-                <Route index element={<Navigate to="oidc" replace />} />
-                <Route path="oidc" element={<SettingsOidc />} />
-                <Route path="scim" element={<SettingsScim />} />
-                <Route path="users" element={<SettingsUsers />} />
-                <Route path="reference-data" element={<SettingsReferenceData />}>
-                  <Route index element={<SettingsReferenceDataHome />} />
-                  <Route
-                    path=":resourceKey"
-                    element={<SettingsReferenceDataResource />}
-                  />
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/sso/callback" element={<AuthCallback />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Shell />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/services/new" element={<ServiceCreate />} />
+                <Route path="/services/:id" element={<ServiceDetail />}>
+                  <Route index element={<ServiceOverview />} />
+                  <Route path="costs" element={<ServiceCosts />} />
                 </Route>
-                <Route path="tokens" element={<SettingsTokens />} />
-                <Route path="api" element={<SettingsApi />} />
+                <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
+                <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
+                <Route path="/services/:id/edit" element={<ServiceEdit />} />
+                <Route path="/hardware" element={<Hardware />} />
+                <Route path="/hardware/new" element={<LaptopCreate />} />
+                <Route path="/hardware/:id" element={<LaptopDetail />} />
+                <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
               </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route element={<ProtectedRoute requiredRole="admin" />}>
+              <Route element={<Shell />}>
+                <Route path="/users" element={<Users />} />
+                <Route path="/settings" element={<Settings />}>
+                  <Route index element={<Navigate to="oidc" replace />} />
+                  <Route path="oidc" element={<SettingsOidc />} />
+                  <Route path="scim" element={<SettingsScim />} />
+                  <Route path="users" element={<SettingsUsers />} />
+                  <Route path="branding" element={<SettingsBranding />} />
+                  <Route path="reference-data" element={<SettingsReferenceData />}>
+                    <Route index element={<SettingsReferenceDataHome />} />
+                    <Route
+                      path=":resourceKey"
+                      element={<SettingsReferenceDataResource />}
+                    />
+                  </Route>
+                  <Route path="tokens" element={<SettingsTokens />} />
+                  <Route path="api" element={<SettingsApi />} />
+                </Route>
+              </Route>
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

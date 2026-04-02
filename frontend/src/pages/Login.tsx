@@ -1,7 +1,8 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { BrandMark } from "../components/BrandMark";
+import { useAuth } from "../context/useAuth";
 
 interface OidcInfo {
   enabled: boolean;
@@ -56,9 +57,9 @@ export function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">
-          CatalogIT
-        </h1>
+        <div className="mb-2 flex justify-center">
+          <BrandMark align="center" />
+        </div>
         <p className="mb-8 text-center text-sm text-gray-500">
           IT Service &amp; Hardware Management
         </p>

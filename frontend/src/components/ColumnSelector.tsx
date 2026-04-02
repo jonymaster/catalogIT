@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect } from "react";
+import type { Column } from "./DataTable";
 
-interface Column {
-  key: string;
-  header: string;
-}
-
-interface Props {
-  columns: Column[];
+interface Props<T> {
+  columns: Column<T>[];
   visibleKeys: string[];
   onChange: (keys: string[]) => void;
 }
 
-export function ColumnSelector({ columns, visibleKeys, onChange }: Props) {
+export function ColumnSelector<T>({
+  columns,
+  visibleKeys,
+  onChange,
+}: Props<T>) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -70,7 +70,7 @@ export function ColumnSelector({ columns, visibleKeys, onChange }: Props) {
                 onChange={() => toggle(col.key)}
                 className="h-3.5 w-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
               />
-              {col.header}
+              {col.label ?? (typeof col.header === "string" ? col.header : col.key)}
             </label>
           ))}
         </div>

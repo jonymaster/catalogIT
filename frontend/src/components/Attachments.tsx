@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import type { Attachment } from "../types/models";
 
 function formatFileSize(bytes: number): string {

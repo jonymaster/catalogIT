@@ -7,7 +7,7 @@ import {
   Outlet,
 } from "react-router-dom";
 import client from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import type { Service } from "../types/models";
 
 const tabs = [

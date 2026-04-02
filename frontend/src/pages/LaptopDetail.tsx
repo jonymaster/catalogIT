@@ -4,7 +4,7 @@ import client from "../api/client";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { StatusBadge } from "../components/StatusBadge";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import type { Laptop } from "../types/models";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

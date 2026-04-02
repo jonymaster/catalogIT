@@ -162,6 +162,12 @@ export interface OidcConfig {
   updated_at: string;
 }
 
+export interface BrandingInfo {
+  logo_url: string | null;
+  logo_filename: string | null;
+  updated_at: string | null;
+}
+
 export interface ApiToken {
   id: string;
   name: string;

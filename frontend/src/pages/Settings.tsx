@@ -4,6 +4,7 @@ const tabs = [
   { to: "oidc", label: "OIDC" },
   { to: "scim", label: "SCIM" },
   { to: "users", label: "Users" },
+  { to: "branding", label: "Branding" },
   { to: "reference-data", label: "Reference Data" },
   { to: "tokens", label: "API Tokens" },
   { to: "api", label: "API Docs" },
@@ -14,7 +15,7 @@ export function Settings() {
     <div>
       <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
       <p className="mt-1 text-sm text-gray-500">
-        Manage authentication, users, integrations, and reference data.
+        Manage authentication, branding, users, integrations, and reference data.
       </p>
 
       <div className="mt-6 border-b border-gray-200">

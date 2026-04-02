@@ -2,17 +2,33 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  onFocus?: () => void;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  containerClassName?: string;
+  inputClassName?: string;
+  iconClassName?: string;
+  bare?: boolean;
 }
 
 export function SearchInput({
   value,
   onChange,
   placeholder = "Search...",
+  onFocus,
+  onKeyDown,
+  containerClassName = "",
+  inputClassName = "",
+  iconClassName = "",
+  bare = false,
 }: Props) {
+  const baseInputClassName = bare
+    ? "w-full rounded-md border-0 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 shadow-none outline-none focus:border-transparent focus:outline-none focus:ring-0"
+    : "w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
+
   return (
-    <div className="relative">
+    <div className={`relative ${containerClassName}`.trim()}>
       <svg
-        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+        className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 ${iconClassName}`.trim()}
         fill="none"
         viewBox="0 0 24 24"
         strokeWidth={2}
@@ -28,8 +44,10 @@ export function SearchInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className="w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+        className={`${baseInputClassName} ${inputClassName}`.trim()}
       />
     </div>
   );

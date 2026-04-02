@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
+import { BrandMark } from "./BrandMark";
 
 const navigation = [
   { name: "Dashboard", to: "/" },
@@ -13,8 +14,8 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
-        <span className="text-lg font-bold text-gray-900">CatalogIT</span>
+      <div className="border-b border-gray-200 px-6 py-4">
+        <BrandMark />
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">

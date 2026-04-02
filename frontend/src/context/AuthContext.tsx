@@ -1,51 +1,25 @@
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
+  AuthContext,
+  ROLE_HIERARCHY,
+  decodePayload,
+  type UserInfo,
+} from "./auth-context";
 
-interface UserInfo {
-  sub: string;
-  email: string;
-  role: string;
-}
-
-const ROLE_HIERARCHY: Record<string, number> = {
-  viewer: 0,
-  editor: 1,
-  admin: 2,
-};
-
-interface AuthContextValue {
-  token: string | null;
-  user: UserInfo | null;
-  canEdit: boolean;
-  login: () => void;
-  logout: () => void;
-  setToken: (token: string) => void;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-function decodePayload(token: string): UserInfo | null {
-  try {
-    const base64 = token.split(".")[1];
-    const json = atob(base64.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(json) as UserInfo;
-  } catch {
-    return null;
+function getInitialToken() {
+  const callbackToken = new URLSearchParams(window.location.search).get("token");
+  if (callbackToken) {
+    localStorage.setItem("catalogit_token", callbackToken);
+    return callbackToken;
   }
+
+  return localStorage.getItem("catalogit_token");
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(() =>
-    localStorage.getItem("catalogit_token"),
-  );
+  const [token, setTokenState] = useState<string | null>(getInitialToken);
   const [user, setUser] = useState<UserInfo | null>(() => {
-    const saved = localStorage.getItem("catalogit_token");
+    const saved = getInitialToken();
     return saved ? decodePayload(saved) : null;
   });
 
@@ -67,13 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Capture token from OIDC callback redirect
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const callbackToken = params.get("token");
+    const callbackToken = new URLSearchParams(window.location.search).get("token");
     if (callbackToken) {
-      setToken(callbackToken);
       window.history.replaceState({}, "", "/");
     }
-  }, [setToken]);
+  }, []);
 
   const canEdit =
     !!user?.role && (ROLE_HIERARCHY[user.role] ?? 0) >= ROLE_HIERARCHY.editor;
@@ -83,12 +55,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return ctx;
 }
