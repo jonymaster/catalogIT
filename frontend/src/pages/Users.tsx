@@ -14,7 +14,14 @@ export function Users() {
   const [search, setSearch] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<
-    Record<string, { role: string; is_active: boolean }>
+    Record<
+      string,
+      {
+        role: string;
+        is_active: boolean;
+        receive_renewal_notifications: boolean;
+      }
+    >
   >({});
   const { showToast } = useToast();
 
@@ -72,6 +79,8 @@ export function Users() {
       [user.id]: {
         role: user.role,
         is_active: user.is_active,
+        receive_renewal_notifications:
+          user.receive_renewal_notifications ?? true,
       },
     }));
   }
@@ -140,6 +149,9 @@ export function Users() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Status
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                    Renewal emails
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                     Actions
                   </th>
@@ -149,7 +161,7 @@ export function Users() {
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-8 text-center text-sm text-gray-500"
                     >
                       No users found.
@@ -179,6 +191,10 @@ export function Users() {
                                 role: e.target.value,
                                 is_active:
                                   current[user.id]?.is_active ?? user.is_active,
+                                receive_renewal_notifications:
+                                  current[user.id]?.receive_renewal_notifications ??
+                                  user.receive_renewal_notifications ??
+                                  true,
                               },
                             }))
                           }
@@ -206,6 +222,10 @@ export function Users() {
                                 role: current[user.id]?.role ?? user.role,
                                 is_active:
                                   !(current[user.id]?.is_active ?? user.is_active),
+                                receive_renewal_notifications:
+                                  current[user.id]?.receive_renewal_notifications ??
+                                  user.receive_renewal_notifications ??
+                                  true,
                               },
                             }))
                           }
@@ -226,6 +246,58 @@ export function Users() {
                       ) : (
                         <Badge color={user.is_active ? "green" : "red"}>
                           {user.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {editingUserId === user.id ? (
+                        <button
+                          type="button"
+                          disabled={saving === user.id}
+                          onClick={() =>
+                            setDrafts((current) => ({
+                              ...current,
+                              [user.id]: {
+                                role: current[user.id]?.role ?? user.role,
+                                is_active:
+                                  current[user.id]?.is_active ?? user.is_active,
+                                receive_renewal_notifications: !(
+                                  current[user.id]?.receive_renewal_notifications ??
+                                  user.receive_renewal_notifications ??
+                                  true
+                                ),
+                              },
+                            }))
+                          }
+                          className="rounded-md transition-opacity disabled:opacity-50"
+                        >
+                          <Badge
+                            color={
+                              (drafts[user.id]?.receive_renewal_notifications ??
+                                user.receive_renewal_notifications ??
+                                true)
+                                ? "green"
+                                : "gray"
+                            }
+                          >
+                            {(drafts[user.id]?.receive_renewal_notifications ??
+                              user.receive_renewal_notifications ??
+                              true)
+                              ? "On"
+                              : "Off"}
+                          </Badge>
+                        </button>
+                      ) : (
+                        <Badge
+                          color={
+                            user.receive_renewal_notifications ?? true
+                              ? "green"
+                              : "gray"
+                          }
+                        >
+                          {user.receive_renewal_notifications ?? true
+                            ? "On"
+                            : "Off"}
                         </Badge>
                       )}
                     </td>

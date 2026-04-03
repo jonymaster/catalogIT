@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str = "catalogit-attachments"
     MINIO_USE_SSL: bool = False
 
+    # Shared secret for POST /api/internal/notifications/renewal-dispatch (cron, k8s CronJob, etc.)
+    CRON_SECRET: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

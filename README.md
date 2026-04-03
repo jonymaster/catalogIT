@@ -47,6 +47,10 @@ docker compose exec api alembic upgrade head
 
 Admin-configured integrations (Gmail, Slack, Telegram, webhook) are documented in [docs/integrations/README.md](docs/integrations/README.md).
 
+**Renewal reminder emails** (to service owners) use the Gmail integration. Configure global defaults and templates under **Settings → Notifications**, then schedule a daily job:
+
+- Set `CRON_SECRET` in `.env` and call `POST /api/internal/notifications/renewal-dispatch` with header `X-Cron-Secret: <same value>` (Kubernetes CronJob, system cron, GitHub Actions, etc.), or run `python -m app.jobs.run_renewal_reminders` inside the API container.
+
 ## Project Structure
 
 ```

@@ -22,6 +22,7 @@ class User(Base):
     locale: Mapped[str | None] = mapped_column(String(20), nullable=True)
     timezone: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    receive_renewal_notifications: Mapped[bool] = mapped_column(default=True)
 
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(20), default="viewer")

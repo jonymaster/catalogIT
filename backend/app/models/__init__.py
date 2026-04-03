@@ -17,6 +17,8 @@ from app.models.attachment import Attachment
 from app.models.branding_config import BrandingConfig
 from app.models.integration_config import IntegrationConfig
 from app.models.oauth_state import OAuthState
+from app.models.notification_global_settings import NotificationGlobalSettings
+from app.models.renewal_notification_sent import RenewalNotificationSent
 
 __all__ = [
     "User",
@@ -39,4 +41,6 @@ __all__ = [
     "BrandingConfig",
     "IntegrationConfig",
     "OAuthState",
+    "NotificationGlobalSettings",
+    "RenewalNotificationSent",
 ]

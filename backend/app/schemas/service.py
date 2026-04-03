@@ -44,6 +44,8 @@ class ServiceCreate(BaseModel):
     scim_notes: str | None = None
     criticality: str | None = None
     nonprofit_pricing: bool = False
+    renewal_reminders_enabled: bool = True
+    renewal_offsets_days: list[int] | None = None
 
 
 class ServiceUpdate(BaseModel):
@@ -70,6 +72,8 @@ class ServiceUpdate(BaseModel):
     criticality: str | None = None
     nonprofit_pricing: bool | None = None
     is_active: bool | None = None
+    renewal_reminders_enabled: bool | None = None
+    renewal_offsets_days: list[int] | None = None
 
 
 class ServiceRead(BaseModel):
@@ -97,6 +101,8 @@ class ServiceRead(BaseModel):
     criticality: str | None = None
     nonprofit_pricing: bool = False
     is_active: bool = True
+    renewal_reminders_enabled: bool = True
+    renewal_offsets_days: list[int] | None = None
     deprecated_at: datetime | None = None
     vendor: VendorRead | None = None
     category_rel: CategoryRead | None = None

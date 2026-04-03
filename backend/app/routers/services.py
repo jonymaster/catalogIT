@@ -102,6 +102,8 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         scim_notes=body.scim_notes,
         criticality=body.criticality,
         nonprofit_pricing=body.nonprofit_pricing,
+        renewal_reminders_enabled=body.renewal_reminders_enabled,
+        renewal_offsets_days=body.renewal_offsets_days,
     )
     db.add(service)
     await db.flush()
@@ -121,6 +123,13 @@ async def update_service(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
 
     update_data = body.model_dump(exclude_unset=True)
+
+    ro = update_data.pop("renewal_offsets_days", ...)
+    if ro is not ...:
+        if ro is None or (isinstance(ro, list) and len(ro) == 0):
+            service.renewal_offsets_days = None
+        else:
+            service.renewal_offsets_days = ro
 
     owner_ids = update_data.pop("owner_ids", None)
     service_status_id = update_data.pop("service_status_id", None) if "service_status_id" in update_data else ...

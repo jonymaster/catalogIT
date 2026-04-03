@@ -3,27 +3,48 @@ import { createPortal } from "react-dom";
 
 export type SortDirection = "asc" | "desc";
 
-interface Props {
+type BaseProps = {
   label: string;
-  filterValue: string;
-  filterType: "text" | "select";
-  filterOptions?: string[];
-  filterPlaceholder?: string;
   sortDirection: SortDirection | null;
-  onFilterChange: (value: string) => void;
   onSortChange: (direction: SortDirection | null) => void;
+};
+
+type TextFilterProps = BaseProps & {
+  filterType: "text";
+  filterValue: string;
+  filterPlaceholder?: string;
+  onFilterChange: (value: string) => void;
+};
+
+type SelectFilterProps = BaseProps & {
+  filterType: "select";
+  filterOptions: string[];
+  selectedValues: string[];
+  onSelectedValuesChange: (values: string[]) => void;
+};
+
+export type ColumnHeaderMenuProps = TextFilterProps | SelectFilterProps;
+
+function toggleSelected(current: string[], option: string): string[] {
+  if (current.includes(option)) {
+    return current.filter((value) => value !== option);
+  }
+  return [...current, option];
 }
 
-export function ColumnHeaderMenu({
-  label,
-  filterValue,
-  filterType,
-  filterOptions = [],
-  filterPlaceholder = `Filter ${label.toLowerCase()}...`,
-  sortDirection,
-  onFilterChange,
-  onSortChange,
-}: Props) {
+export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
+  const {
+    label,
+    sortDirection,
+    onSortChange,
+    filterType,
+  } = props;
+
+  const filterActive =
+    filterType === "text"
+      ? Boolean(props.filterValue.trim())
+      : props.selectedValues.length > 0;
+
   const [openMenu, setOpenMenu] = useState<"filter" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
@@ -76,12 +97,26 @@ export function ColumnHeaderMenu({
       setMenuPosition({
         top: rect.bottom + window.scrollY + 8,
         left: rect.left + window.scrollX,
-        width: Math.max(rect.width + 48, 224),
+        width: Math.max(rect.width + 48, 240),
       });
     }
 
     setOpenMenu(menu);
   }
+
+  function clearFilter() {
+    if (filterType === "text") {
+      props.onFilterChange("");
+    } else {
+      props.onSelectedValuesChange([]);
+    }
+    closeMenu();
+  }
+
+  const filterPlaceholder =
+    filterType === "text"
+      ? props.filterPlaceholder ?? `Filter ${label.toLowerCase()}...`
+      : "";
 
   return (
     <div className="relative" ref={ref}>
@@ -104,7 +139,7 @@ export function ColumnHeaderMenu({
             toggleMenu("filter");
           }}
           className={`rounded-md p-1 transition-colors ${
-            filterValue
+            filterActive
               ? "bg-gray-900 text-white"
               : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
           }`}
@@ -129,23 +164,37 @@ export function ColumnHeaderMenu({
               Filter {label}
             </p>
             {filterType === "select" ? (
-              <select
-                value={filterValue}
-                onChange={(event) => onFilterChange(event.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-              >
-                <option value="">All</option>
-                {filterOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+              <div className="max-h-60 space-y-1 overflow-y-auto pr-1">
+                {props.filterOptions.length === 0 ? (
+                  <p className="text-sm text-gray-500">No values</p>
+                ) : (
+                  props.filterOptions.map((option) => (
+                    <label
+                      key={option}
+                      className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-gray-900 hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 shrink-0 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+                        checked={props.selectedValues.includes(option)}
+                        onChange={() =>
+                          props.onSelectedValuesChange(
+                            toggleSelected(props.selectedValues, option),
+                          )
+                        }
+                      />
+                      <span className="min-w-0 truncate" title={option}>
+                        {option}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
             ) : (
               <input
                 type="text"
-                value={filterValue}
-                onChange={(event) => onFilterChange(event.target.value)}
+                value={props.filterValue}
+                onChange={(event) => props.onFilterChange(event.target.value)}
                 placeholder={filterPlaceholder}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
               />
@@ -153,10 +202,7 @@ export function ColumnHeaderMenu({
             <div className="mt-3 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  onFilterChange("");
-                  closeMenu();
-                }}
+                onClick={clearFilter}
                 className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
               >
                 Clear

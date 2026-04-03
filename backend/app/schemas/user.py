@@ -25,6 +25,7 @@ class UserRead(BaseModel):
     locale: str | None = None
     timezone: str | None = None
     is_active: bool
+    receive_renewal_notifications: bool = True
     role: str
     created_at: datetime
     updated_at: datetime
@@ -35,6 +36,7 @@ class UserRead(BaseModel):
 class UserUpdate(BaseModel):
     role: Literal["admin", "editor", "viewer"] | None = None
     is_active: bool | None = None
+    receive_renewal_notifications: bool | None = None
     display_name: str | None = None
     department: str | None = None
     locale: str | None = None

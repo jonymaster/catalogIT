@@ -10,6 +10,10 @@ interface Props<T> {
   data: T[];
   onRowClick?: (row: T) => void;
   visibleKeys?: string[];
+  /** Zebra striping on data rows */
+  striped?: boolean;
+  /** Renders this column with stronger weight (e.g. primary identifier) */
+  primaryColumnKey?: string;
 }
 
 function columnsInOrder<T>(columns: Column<T>[], visibleKeys: string[]): Column<T>[] {
@@ -22,6 +26,8 @@ export function DataTable<T extends { id: string }>({
   data,
   onRowClick,
   visibleKeys,
+  striped = false,
+  primaryColumnKey,
 }: Props<T>) {
   const active = visibleKeys
     ? columnsInOrder(columns, visibleKeys)
@@ -44,7 +50,11 @@ export function DataTable<T extends { id: string }>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody
+            className={
+              striped ? "bg-white" : "divide-y divide-gray-200 bg-white"
+            }
+          >
             {data.length === 0 && (
               <tr>
                 <td
@@ -60,15 +70,31 @@ export function DataTable<T extends { id: string }>({
                 key={row.id}
                 onClick={() => onRowClick?.(row)}
                 className={
-                  onRowClick
-                    ? "cursor-pointer transition-colors hover:bg-gray-50"
-                    : undefined
+                  striped
+                    ? [
+                        "odd:bg-white even:bg-gray-50",
+                        onRowClick
+                          ? "cursor-pointer transition-colors hover:bg-gray-100"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
+                    : onRowClick
+                      ? "cursor-pointer transition-colors hover:bg-gray-50"
+                      : undefined
                 }
               >
                 {active.map((col) => (
                   <td
                     key={col.key}
-                    className="whitespace-nowrap px-4 py-3 text-sm text-gray-700"
+                    className={[
+                      "whitespace-nowrap px-4 py-3 text-sm text-gray-700",
+                      col.key === primaryColumnKey
+                        ? "font-semibold text-gray-900"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     {col.render
                       ? col.render(row)

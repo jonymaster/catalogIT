@@ -128,8 +128,12 @@ async def send_mail(
     row: IntegrationConfig,
     to_addr: str,
     sample_data: dict[str, Any],
+    *,
+    template_overrides: dict[str, Any] | None = None,
 ) -> None:
     meta = merged_metadata(row, "google_mail")
+    if template_overrides:
+        meta.update(template_overrides)
     data = dict(sample_data)
     subj, html, text = render_templates(meta, data)
     await ensure_google_sender_email(db, row)

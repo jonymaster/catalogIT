@@ -9,6 +9,7 @@ export interface User {
   locale: string | null;
   timezone: string | null;
   is_active: boolean;
+  receive_renewal_notifications: boolean;
   role: string;
   created_at: string;
   updated_at: string;
@@ -124,6 +125,8 @@ export interface Service {
   criticality: string | null;
   nonprofit_pricing: boolean;
   is_active: boolean;
+  renewal_reminders_enabled: boolean;
+  renewal_offsets_days: number[] | null;
   deprecated_at: string | null;
   vendor: Vendor | null;
   category_rel: Category | null;

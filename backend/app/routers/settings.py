@@ -14,9 +14,11 @@ from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.dependencies.storage import get_s3_client
 from app.models.branding_config import BrandingConfig
+from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.oidc_config import OidcConfig
 from app.models.user import User
 from app.schemas.branding import BrandingRead
+from app.schemas.notifications import NotificationSettingsRead, NotificationSettingsUpdate
 from app.schemas.oidc import OidcConfigRead, OidcConfigWrite, OidcTestResult
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -237,3 +239,59 @@ async def get_scim_status(_user: User = Depends(_admin)):
         enabled=bool(settings.SCIM_TOKEN),
         endpoint_url="/scim/v2",
     )
+
+
+def _validate_renewal_offsets(days: list[int]) -> list[int]:
+    if not days:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="renewal_offsets_days must contain at least one positive integer",
+        )
+    seen: set[int] = set()
+    out: list[int] = []
+    for x in days:
+        if not isinstance(x, int) or x <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="renewal_offsets_days must be positive integers only",
+            )
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+@router.get("/notifications", response_model=NotificationSettingsRead)
+async def get_notification_settings(
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await db.get(NotificationGlobalSettings, 1)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification settings not initialized",
+        )
+    return row
+
+
+@router.patch("/notifications", response_model=NotificationSettingsRead)
+async def patch_notification_settings(
+    body: NotificationSettingsUpdate,
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    row = await db.get(NotificationGlobalSettings, 1)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification settings not initialized",
+        )
+    data = body.model_dump(exclude_unset=True)
+    if "renewal_offsets_days" in data:
+        data["renewal_offsets_days"] = _validate_renewal_offsets(data["renewal_offsets_days"])
+    for key, value in data.items():
+        setattr(row, key, value)
+    await db.flush()
+    await db.refresh(row)
+    return row

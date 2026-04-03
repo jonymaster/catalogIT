@@ -29,7 +29,7 @@ interface ServiceColumnDefinition {
   render?: (service: Service) => React.ReactNode;
 }
 
-type ServiceFilters = Record<string, string>;
+type ServiceFilters = Record<string, string | string[]>;
 
 interface SortState {
   key: string | null;
@@ -113,6 +113,7 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getSortValue: (service) => categoryLabel(service),
     getFilterOptions: (services) =>
       getUniqueOptions(services.map((service) => categoryLabel(service))),
+    render: (service) => categoryLabel(service) || "--",
   },
   {
     key: "license_type",
@@ -238,7 +239,10 @@ export function Services() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<ServiceFilters>(() =>
     Object.fromEntries(
-      columnDefinitions.map((column) => [column.key, ""]),
+      columnDefinitions.map((column) => [
+        column.key,
+        column.filterType === "select" ? [] : "",
+      ]),
     ) as ServiceFilters,
   );
   const [sortState, setSortState] = useState<SortState>({
@@ -281,14 +285,20 @@ export function Services() {
       }
 
       return columnDefinitions.every((column) => {
-        const filterValue = filters[column.key]?.trim();
-        if (!filterValue) {
-          return true;
-        }
-
         const cellValue = column.getFilterValue(service);
         if (column.filterType === "select") {
-          return cellValue === filterValue;
+          const selected = filters[column.key];
+          const values = Array.isArray(selected) ? selected : [];
+          if (values.length === 0) {
+            return true;
+          }
+          return values.includes(cellValue);
+        }
+
+        const raw = filters[column.key];
+        const filterValue = typeof raw === "string" ? raw.trim() : "";
+        if (!filterValue) {
+          return true;
         }
 
         return cellValue.toLowerCase().includes(filterValue.toLowerCase());
@@ -314,6 +324,15 @@ export function Services() {
     });
   }, [filters, search, services, sortState]);
 
+  const hasActiveFilters = useMemo(() => {
+    if (search.trim()) {
+      return true;
+    }
+    return Object.values(filters).some((value) =>
+      Array.isArray(value) ? value.length > 0 : value.trim(),
+    );
+  }, [search, filters]);
+
   const columns = useMemo<Column<Service>[]>(() => {
     return columnDefinitions.map((column) => {
       const sortDirection =
@@ -326,29 +345,58 @@ export function Services() {
           column.key === "renewal_date"
             ? (service) => formatDateOnly(service.renewal_date, preferences)
             : column.render,
-        header: (
-          <ColumnHeaderMenu
-            label={column.label}
-            filterType={column.filterType}
-            filterValue={filters[column.key] ?? ""}
-            filterPlaceholder={column.filterPlaceholder}
-            filterOptions={column.getFilterOptions?.(services)}
-            sortDirection={sortDirection}
-            onFilterChange={(value) =>
-              setFilters((current) => ({
-                ...current,
-                [column.key]: value,
-              }))
-            }
-            onSortChange={(direction) =>
-              setSortState(
-                direction
-                  ? { key: column.key, direction }
-                  : { key: null, direction: null },
-              )
-            }
-          />
-        ),
+        header:
+          column.filterType === "select" ? (
+            <ColumnHeaderMenu
+              label={column.label}
+              filterType="select"
+              filterOptions={column.getFilterOptions?.(services) ?? []}
+              selectedValues={
+                Array.isArray(filters[column.key])
+                  ? (filters[column.key] as string[])
+                  : []
+              }
+              sortDirection={sortDirection}
+              onSelectedValuesChange={(values) =>
+                setFilters((current) => ({
+                  ...current,
+                  [column.key]: values,
+                }))
+              }
+              onSortChange={(direction) =>
+                setSortState(
+                  direction
+                    ? { key: column.key, direction }
+                    : { key: null, direction: null },
+                )
+              }
+            />
+          ) : (
+            <ColumnHeaderMenu
+              label={column.label}
+              filterType="text"
+              filterValue={
+                typeof filters[column.key] === "string"
+                  ? (filters[column.key] as string)
+                  : ""
+              }
+              filterPlaceholder={column.filterPlaceholder}
+              sortDirection={sortDirection}
+              onFilterChange={(value) =>
+                setFilters((current) => ({
+                  ...current,
+                  [column.key]: value,
+                }))
+              }
+              onSortChange={(direction) =>
+                setSortState(
+                  direction
+                    ? { key: column.key, direction }
+                    : { key: null, direction: null },
+                )
+              }
+            />
+          ),
       };
     });
   }, [filters, preferences, services, sortState]);
@@ -370,14 +418,30 @@ export function Services() {
         <p className="text-sm text-gray-500">Loading...</p>
       ) : (
         <>
-          <div className="mb-4 flex items-center gap-3">
-            <div className="max-w-sm flex-1">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="max-w-sm min-w-[200px] flex-1">
               <SearchInput
                 value={search}
                 onChange={setSearch}
                 placeholder="Search services..."
               />
             </div>
+            <p className="text-sm text-gray-600 whitespace-nowrap">
+              {hasActiveFilters ? (
+                <>
+                  <span className="font-medium text-gray-900">
+                    {filtered.length}
+                  </span>
+                  <span className="text-gray-500"> / {services.length} </span>
+                  {services.length === 1 ? "service" : "services"}
+                </>
+              ) : (
+                <>
+                  {services.length}{" "}
+                  {services.length === 1 ? "service" : "services"}
+                </>
+              )}
+            </p>
             <ColumnSelector
               columns={columns}
               visibleKeys={visibleKeys}
@@ -388,6 +452,8 @@ export function Services() {
             columns={columns}
             data={filtered}
             visibleKeys={visibleKeys}
+            striped
+            primaryColumnKey="name"
             onRowClick={(s) => navigate(`/services/${s.id}`)}
           />
         </>

@@ -35,6 +35,9 @@ interface FormData {
   scim_notes: string;
   criticality: string;
   nonprofit_pricing: boolean;
+  renewal_reminders_enabled: boolean;
+  renewal_use_custom_offsets: boolean;
+  renewal_offsets_input: string;
 }
 const CLASSIFICATION_OPTIONS = ["core_saas", "subscription"];
 const SERVICE_TYPE_OPTIONS = ["contract", "self_managed", "deprecated"];
@@ -63,6 +66,12 @@ function toFormData(s?: Service): FormData {
     scim_notes: s?.scim_notes ?? "",
     criticality: s?.criticality ?? "",
     nonprofit_pricing: s?.nonprofit_pricing ?? false,
+    renewal_reminders_enabled: s?.renewal_reminders_enabled ?? true,
+    renewal_use_custom_offsets: Boolean(
+      s?.renewal_offsets_days && s.renewal_offsets_days.length > 0,
+    ),
+    renewal_offsets_input:
+      s?.renewal_offsets_days?.join(", ") ?? "30, 14, 7, 1",
   };
 }
 
@@ -152,6 +161,28 @@ export function ServiceForm({ initial }: Props) {
     setSaving(true);
     setError(null);
 
+    let renewal_offsets_days: number[] | null = null;
+    if (form.renewal_use_custom_offsets) {
+      const parts = form.renewal_offsets_input.split(/[\s,]+/).filter(Boolean);
+      renewal_offsets_days = [];
+      for (const p of parts) {
+        const n = parseInt(p, 10);
+        if (Number.isNaN(n) || n <= 0) {
+          setError(
+            "Custom reminder offsets must be positive integers (e.g. 30, 14, 7, 1).",
+          );
+          setSaving(false);
+          return;
+        }
+        renewal_offsets_days.push(n);
+      }
+      if (renewal_offsets_days.length === 0) {
+        setError("Enter at least one reminder offset, or turn off custom offsets.");
+        setSaving(false);
+        return;
+      }
+    }
+
     const payload = {
       name: form.name,
       status: form.status,
@@ -173,6 +204,8 @@ export function ServiceForm({ initial }: Props) {
       scim_notes: form.scim_notes || null,
       criticality: form.criticality || null,
       nonprofit_pricing: form.nonprofit_pricing,
+      renewal_reminders_enabled: form.renewal_reminders_enabled,
+      renewal_offsets_days: renewal_offsets_days,
     };
 
     try {
@@ -361,6 +394,51 @@ export function ServiceForm({ initial }: Props) {
             value={form.renewal_date}
             onChange={(e) => set("renewal_date", e.target.value)}
           />
+        </div>
+
+        <div className="sm:col-span-2 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm font-medium text-gray-900">Renewal reminders</p>
+          <p className="text-xs text-gray-500">
+            Owners receive emails at the configured days before renewal (global
+            defaults in Settings → Notifications). Override the schedule for this
+            service only if needed.
+          </p>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={form.renewal_reminders_enabled}
+              onChange={(e) =>
+                set("renewal_reminders_enabled", e.target.checked)
+              }
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Send renewal reminder emails for this service
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={form.renewal_use_custom_offsets}
+              onChange={(e) =>
+                set("renewal_use_custom_offsets", e.target.checked)
+              }
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Use custom reminder offsets (instead of global defaults)
+          </label>
+          {form.renewal_use_custom_offsets && (
+            <div>
+              <label className={labelCls}>Custom days before renewal</label>
+              <input
+                type="text"
+                className={inputCls}
+                value={form.renewal_offsets_input}
+                onChange={(e) =>
+                  set("renewal_offsets_input", e.target.value)
+                }
+                placeholder="30, 14, 7, 1"
+              />
+            </div>
+          )}
         </div>
 
         <div>

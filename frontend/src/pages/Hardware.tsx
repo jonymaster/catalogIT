@@ -27,7 +27,7 @@ interface HardwareColumnDefinition {
   render?: (laptop: Laptop) => React.ReactNode;
 }
 
-type HardwareFilters = Record<string, string>;
+type HardwareFilters = Record<string, string | string[]>;
 
 interface SortState {
   key: string | null;
@@ -144,7 +144,10 @@ export function Hardware() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<HardwareFilters>(() =>
     Object.fromEntries(
-      columnDefinitions.map((column) => [column.key, ""]),
+      columnDefinitions.map((column) => [
+        column.key,
+        column.filterType === "select" ? [] : "",
+      ]),
     ) as HardwareFilters,
   );
   const [sortState, setSortState] = useState<SortState>({
@@ -181,14 +184,20 @@ export function Hardware() {
       }
 
       return columnDefinitions.every((column) => {
-        const filterValue = filters[column.key]?.trim();
-        if (!filterValue) {
-          return true;
-        }
-
         const cellValue = column.getFilterValue(laptop);
         if (column.filterType === "select") {
-          return cellValue === filterValue;
+          const selected = filters[column.key];
+          const values = Array.isArray(selected) ? selected : [];
+          if (values.length === 0) {
+            return true;
+          }
+          return values.includes(cellValue);
+        }
+
+        const raw = filters[column.key];
+        const filterValue = typeof raw === "string" ? raw.trim() : "";
+        if (!filterValue) {
+          return true;
         }
 
         return cellValue.toLowerCase().includes(filterValue.toLowerCase());
@@ -223,29 +232,58 @@ export function Hardware() {
         key: column.key,
         label: column.label,
         render: column.render,
-        header: (
-          <ColumnHeaderMenu
-            label={column.label}
-            filterType={column.filterType}
-            filterValue={filters[column.key] ?? ""}
-            filterPlaceholder={column.filterPlaceholder}
-            filterOptions={column.getFilterOptions?.(laptops)}
-            sortDirection={sortDirection}
-            onFilterChange={(value) =>
-              setFilters((current) => ({
-                ...current,
-                [column.key]: value,
-              }))
-            }
-            onSortChange={(direction) =>
-              setSortState(
-                direction
-                  ? { key: column.key, direction }
-                  : { key: null, direction: null },
-              )
-            }
-          />
-        ),
+        header:
+          column.filterType === "select" ? (
+            <ColumnHeaderMenu
+              label={column.label}
+              filterType="select"
+              filterOptions={column.getFilterOptions?.(laptops) ?? []}
+              selectedValues={
+                Array.isArray(filters[column.key])
+                  ? (filters[column.key] as string[])
+                  : []
+              }
+              sortDirection={sortDirection}
+              onSelectedValuesChange={(values) =>
+                setFilters((current) => ({
+                  ...current,
+                  [column.key]: values,
+                }))
+              }
+              onSortChange={(direction) =>
+                setSortState(
+                  direction
+                    ? { key: column.key, direction }
+                    : { key: null, direction: null },
+                )
+              }
+            />
+          ) : (
+            <ColumnHeaderMenu
+              label={column.label}
+              filterType="text"
+              filterValue={
+                typeof filters[column.key] === "string"
+                  ? (filters[column.key] as string)
+                  : ""
+              }
+              filterPlaceholder={column.filterPlaceholder}
+              sortDirection={sortDirection}
+              onFilterChange={(value) =>
+                setFilters((current) => ({
+                  ...current,
+                  [column.key]: value,
+                }))
+              }
+              onSortChange={(direction) =>
+                setSortState(
+                  direction
+                    ? { key: column.key, direction }
+                    : { key: null, direction: null },
+                )
+              }
+            />
+          ),
       };
     });
   }, [filters, laptops, sortState]);
@@ -285,6 +323,8 @@ export function Hardware() {
             columns={columns}
             data={filtered}
             visibleKeys={visibleKeys}
+            striped
+            primaryColumnKey="serial_number"
             onRowClick={(l) => navigate(`/hardware/${l.id}`)}
           />
         </>

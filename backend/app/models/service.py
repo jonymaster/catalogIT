@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Numeric, String, Table, Text, func
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Table, Text, func
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -51,6 +52,10 @@ class Service(Base):
     service_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     billing_schedule: Mapped[str] = mapped_column(String(100), default="")
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    renewal_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    renewal_offsets_days: Mapped[list[int] | None] = mapped_column(
+        ARRAY(Integer), nullable=True
+    )
     scim_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     scim_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     criticality: Mapped[str | None] = mapped_column(String(20), nullable=True)
