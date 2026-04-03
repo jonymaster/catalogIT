@@ -45,6 +45,8 @@ services:
       - .env
     environment:
       SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-true}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
     depends_on:
       db:
         condition: service_healthy

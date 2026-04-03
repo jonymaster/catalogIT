@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,10 +17,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_HOURS: int = 8
 
-    FRONTEND_URL: str = "http://localhost:5173"
+    # Env var FRONTEND_URL: browser origin for CORS and auth redirects (defaults suit local Vite).
+    FRONTEND_URL: str = Field(default="http://localhost:5173")
 
-    # Origin where the API is reachable (OAuth redirect URIs, integration meta). Use your public URL in production.
-    PUBLIC_BASE_URL: str = "http://localhost:8000"
+    # Env var PUBLIC_BASE_URL: where this API is reachable publicly (OAuth callbacks, integration metadata).
+    PUBLIC_BASE_URL: str = Field(default="http://localhost:8000")
 
     # Fernet key (urlsafe base64 32 bytes) for encrypting integration tokens at rest. Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     INTEGRATION_SECRET_KEY: str = ""
