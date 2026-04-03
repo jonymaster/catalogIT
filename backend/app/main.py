@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.audit import register_audit_listeners
 from app.config import get_settings
 from app.database import async_session
+from app.models.service import Service
 from app.models.user import User
 from app.dependencies.storage import ensure_bucket
 from app.routers import (
@@ -18,6 +19,7 @@ from app.routers import (
     service_statuses, services, scim,
     settings, users, vendors,
 )
+from scripts.seed_from_json import SEED_DIR, seed_database
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +66,27 @@ async def _seed_admin() -> None:
         logger.warning("Admin seed skipped (run migrations first: alembic upgrade head)")
 
 
+async def _seed_sample_data() -> None:
+    cfg = get_settings()
+    if not cfg.SEED_SAMPLE_DATA or not SEED_DIR.exists():
+        return
+
+    try:
+        async with async_session() as session:
+            existing_service = await session.scalar(select(Service.id).limit(1))
+        if existing_service is not None:
+            return
+
+        logger.info("No services found, loading sample seed data from %s", SEED_DIR)
+        await seed_database()
+    except Exception:
+        logger.warning("Sample data seed skipped (run migrations first: alembic upgrade head)")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await _seed_admin()
+    await _seed_sample_data()
     try:
         await ensure_bucket()
     except Exception:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -27,6 +27,7 @@ class ServiceCreate(BaseModel):
     license_type: str = ""
     category: str = ""
     billing_schedule: str = ""
+    renewal_date: date | None = None
     yearly_cost: float | None = None
     sso_integrated: bool = False
     automated_provisioning: bool = False
@@ -52,6 +53,7 @@ class ServiceUpdate(BaseModel):
     license_type: str | None = None
     category: str | None = None
     billing_schedule: str | None = None
+    renewal_date: date | None = None
     yearly_cost: float | None = None
     sso_integrated: bool | None = None
     automated_provisioning: bool | None = None
@@ -79,6 +81,7 @@ class ServiceRead(BaseModel):
     license_type: str
     category: str
     billing_schedule: str
+    renewal_date: date | None
     yearly_cost: float | None
     sso_integrated: bool
     automated_provisioning: bool

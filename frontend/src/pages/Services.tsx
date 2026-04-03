@@ -47,6 +47,10 @@ function getScimLabel(service: Service) {
   return service.scim_enabled == null ? "--" : getBooleanLabel(service.scim_enabled);
 }
 
+function formatDate(value: string | null) {
+  return value ? new Date(`${value}T00:00:00`).toLocaleDateString() : "--";
+}
+
 function getServiceSortValue(
   value: string | number | boolean | null,
 ): string | number {
@@ -67,7 +71,7 @@ function compareServiceValues(
     return left - right;
   }
 
-  return left.localeCompare(right, undefined, {
+  return String(left).localeCompare(String(right), undefined, {
     numeric: true,
     sensitivity: "base",
   });
@@ -161,6 +165,15 @@ const columnDefinitions: ServiceColumnDefinition[] = [
       service.yearly_cost != null
         ? `$${Number(service.yearly_cost).toLocaleString()}`
         : "--",
+  },
+  {
+    key: "renewal_date",
+    label: "Renewal Date",
+    filterType: "text",
+    filterPlaceholder: "Filter by renewal date...",
+    getFilterValue: (service) => service.renewal_date ?? "--",
+    getSortValue: (service) => service.renewal_date ?? "",
+    render: (service) => formatDate(service.renewal_date),
   },
   {
     key: "sso_integrated",

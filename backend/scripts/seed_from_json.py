@@ -307,7 +307,7 @@ async def _seed_service_history(session: AsyncSession) -> None:
     print(f"  service_history: {len(rows)} processed")
 
 
-async def main() -> None:
+async def seed_database() -> None:
     print(f"Seeding from {SEED_DIR} ...")
     async with async_session() as session:
         try:
@@ -325,6 +325,10 @@ async def main() -> None:
         except Exception:
             await session.rollback()
             raise
+
+
+async def main() -> None:
+    await seed_database()
     await engine.dispose()
 
 

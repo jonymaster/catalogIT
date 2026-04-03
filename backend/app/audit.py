@@ -7,7 +7,7 @@ new, modified, and deleted instances of audited models and writes AuditLog rows.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session, UOWTransaction
@@ -17,17 +17,20 @@ from app.models.audit_log import AuditLog
 AUDITED_TABLES: set[str] = {"services", "laptops"}
 
 
+def _serialize_value(value):
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
 def _serialize(instance) -> dict:
     """Convert an ORM instance to a plain dict of column values."""
     mapper = inspect(type(instance))
     result = {}
     for col in mapper.columns:
-        val = getattr(instance, col.key, None)
-        if isinstance(val, uuid.UUID):
-            val = str(val)
-        elif isinstance(val, datetime):
-            val = val.isoformat()
-        result[col.key] = val
+        result[col.key] = _serialize_value(getattr(instance, col.key, None))
     return result
 
 
@@ -69,16 +72,8 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
                 key = attr.key
                 old_val = hist.deleted[0] if hist.deleted else None
                 new_val = hist.added[0] if hist.added else None
-                if isinstance(old_val, uuid.UUID):
-                    old_val = str(old_val)
-                if isinstance(new_val, uuid.UUID):
-                    new_val = str(new_val)
-                if isinstance(old_val, datetime):
-                    old_val = old_val.isoformat()
-                if isinstance(new_val, datetime):
-                    new_val = new_val.isoformat()
-                old_vals[key] = old_val
-                new_vals[key] = new_val
+                old_vals[key] = _serialize_value(old_val)
+                new_vals[key] = _serialize_value(new_val)
         if old_vals or new_vals:
             session.add(AuditLog(
                 table_name=table,

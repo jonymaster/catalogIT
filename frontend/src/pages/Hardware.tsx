@@ -60,7 +60,7 @@ function compareHardwareValues(
     return left - right;
   }
 
-  return left.localeCompare(right, undefined, {
+  return String(left).localeCompare(String(right), undefined, {
     numeric: true,
     sensitivity: "base",
   });

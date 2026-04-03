@@ -5,6 +5,10 @@ import { ClassificationBadge, CriticalityBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Service } from "../types/models";
 
+function formatDate(value: string | null) {
+  return value ? new Date(`${value}T00:00:00`).toLocaleDateString() : "--";
+}
+
 function Field({
   label,
   children,
@@ -37,6 +41,7 @@ export function ServiceOverview() {
           <Field label="Billing Schedule">
             {service.billing_schedule || "--"}
           </Field>
+          <Field label="Renewal Date">{formatDate(service.renewal_date)}</Field>
           <Field label="Yearly Cost">
             {service.yearly_cost != null
               ? `$${Number(service.yearly_cost).toLocaleString()}`

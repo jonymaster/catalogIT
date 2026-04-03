@@ -99,6 +99,7 @@ export interface Service {
   license_type: string;
   category: string;
   billing_schedule: string;
+  renewal_date: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;
   automated_provisioning: boolean;

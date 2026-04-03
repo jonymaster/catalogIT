@@ -20,6 +20,7 @@ interface FormData {
   license_type: string;
   category: string;
   billing_schedule: string;
+  renewal_date: string;
   yearly_cost: string;
   sso_integrated: boolean;
   automated_provisioning: boolean;
@@ -48,6 +49,7 @@ function toFormData(s?: Service): FormData {
     license_type: s?.license_type ?? "",
     category: s?.category ?? "",
     billing_schedule: s?.billing_schedule ?? "",
+    renewal_date: s?.renewal_date ?? "",
     yearly_cost: s?.yearly_cost != null ? String(s.yearly_cost) : "",
     sso_integrated: s?.sso_integrated ?? false,
     automated_provisioning: s?.automated_provisioning ?? false,
@@ -158,6 +160,7 @@ export function ServiceForm({ initial }: Props) {
       license_type: form.license_type,
       category: form.category,
       billing_schedule: form.billing_schedule,
+      renewal_date: form.renewal_date || null,
       yearly_cost: form.yearly_cost ? Number(form.yearly_cost) : null,
       sso_integrated: form.sso_integrated,
       automated_provisioning: form.automated_provisioning,
@@ -360,6 +363,16 @@ export function ServiceForm({ initial }: Props) {
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className={labelCls}>Renewal Date</label>
+          <input
+            type="date"
+            className={inputCls}
+            value={form.renewal_date}
+            onChange={(e) => set("renewal_date", e.target.value)}
+          />
         </div>
 
         <div>

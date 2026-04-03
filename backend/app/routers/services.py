@@ -86,6 +86,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         license_type=body.license_type,
         category=body.category,
         billing_schedule=body.billing_schedule,
+        renewal_date=body.renewal_date,
         yearly_cost=body.yearly_cost,
         sso_integrated=body.sso_integrated,
         automated_provisioning=body.automated_provisioning,

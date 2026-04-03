@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     SCIM_TOKEN: str = ""
 
     ADMIN_DEFAULT_PASSWORD: str = "changeme"
+    SEED_SAMPLE_DATA: bool = False
 
     MINIO_ENDPOINT: str = "http://minio:9000"
     MINIO_ACCESS_KEY: str = "catalogit"
