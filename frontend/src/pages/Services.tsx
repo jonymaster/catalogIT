@@ -82,6 +82,10 @@ function getUniqueOptions(values: string[]) {
   );
 }
 
+function categoryLabel(service: Service): string {
+  return service.category_rel?.name ?? "";
+}
+
 const columnDefinitions: ServiceColumnDefinition[] = [
   {
     key: "name",
@@ -105,10 +109,10 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     key: "category",
     label: "Category",
     filterType: "select",
-    getFilterValue: (service) => service.category,
-    getSortValue: (service) => service.category,
+    getFilterValue: (service) => categoryLabel(service),
+    getSortValue: (service) => categoryLabel(service),
     getFilterOptions: (services) =>
-      getUniqueOptions(services.map((service) => service.category)),
+      getUniqueOptions(services.map((service) => categoryLabel(service))),
   },
   {
     key: "license_type",
@@ -162,6 +166,22 @@ const columnDefinitions: ServiceColumnDefinition[] = [
       service.yearly_cost != null
         ? `$${Number(service.yearly_cost).toLocaleString()}`
         : "--",
+  },
+  {
+    key: "billing_schedule",
+    label: "Billing Schedule",
+    filterType: "select",
+    getFilterValue: (service) =>
+      service.billing_schedule.trim() ? service.billing_schedule.trim() : "--",
+    getSortValue: (service) => service.billing_schedule ?? "",
+    getFilterOptions: (services) =>
+      getUniqueOptions(
+        services.map((service) =>
+          service.billing_schedule.trim() ? service.billing_schedule.trim() : "--",
+        ),
+      ),
+    render: (service) =>
+      service.billing_schedule.trim() ? service.billing_schedule.trim() : "--",
   },
   {
     key: "renewal_date",
@@ -245,9 +265,10 @@ export function Services() {
       const matchesSearch =
         !q ||
         service.name.toLowerCase().includes(q) ||
-        service.category.toLowerCase().includes(q) ||
+        categoryLabel(service).toLowerCase().includes(q) ||
         service.license_type.toLowerCase().includes(q) ||
         service.status.toLowerCase().includes(q) ||
+        service.billing_schedule.toLowerCase().includes(q) ||
         (service.vendor?.name ?? "").toLowerCase().includes(q) ||
         service.owners.some(
           (owner) =>

@@ -25,7 +25,6 @@ class ServiceCreate(BaseModel):
     name: str
     status: str = "Contract"
     license_type: str = ""
-    category: str = ""
     billing_schedule: str = ""
     renewal_date: date | None = None
     yearly_cost: float | None = None
@@ -51,7 +50,6 @@ class ServiceUpdate(BaseModel):
     name: str | None = None
     status: str | None = None
     license_type: str | None = None
-    category: str | None = None
     billing_schedule: str | None = None
     renewal_date: date | None = None
     yearly_cost: float | None = None
@@ -79,7 +77,6 @@ class ServiceRead(BaseModel):
     name: str
     status: str
     license_type: str
-    category: str
     billing_schedule: str
     renewal_date: date | None
     yearly_cost: float | None

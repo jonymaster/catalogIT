@@ -18,6 +18,12 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Origin where the API is reachable (OAuth redirect URIs, integration meta). Use your public URL in production.
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+
+    # Fernet key (urlsafe base64 32 bytes) for encrypting integration tokens at rest. Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    INTEGRATION_SECRET_KEY: str = ""
+
     SCIM_TOKEN: str = ""
 
     ADMIN_DEFAULT_PASSWORD: str = "changeme"

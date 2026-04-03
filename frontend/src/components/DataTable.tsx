@@ -12,6 +12,11 @@ interface Props<T> {
   visibleKeys?: string[];
 }
 
+function columnsInOrder<T>(columns: Column<T>[], visibleKeys: string[]): Column<T>[] {
+  const byKey = new Map(columns.map((c) => [c.key, c]));
+  return visibleKeys.map((key) => byKey.get(key)).filter((c): c is Column<T> => c != null);
+}
+
 export function DataTable<T extends { id: string }>({
   columns,
   data,
@@ -19,7 +24,7 @@ export function DataTable<T extends { id: string }>({
   visibleKeys,
 }: Props<T>) {
   const active = visibleKeys
-    ? columns.filter((c) => visibleKeys.includes(c.key))
+    ? columnsInOrder(columns, visibleKeys)
     : columns;
 
   return (

@@ -216,7 +216,6 @@ async def _seed_services(session: AsyncSession) -> None:
             name=r["name"],
             status=normalized_status,
             license_type=r.get("classification", ""),
-            category="",
             billing_schedule=r.get("billing_schedule", ""),
             vendor_id=_uuid("vendor", r["vendor_id"]),
             category_id=_uuid("category", r["category_id"]),

@@ -50,12 +50,11 @@ async def get_dashboard(db: AsyncSession = Depends(get_audited_db)):
         svc = services.get(str(r.service_id))
         if not svc:
             continue
-        years.add(r.fiscal_year)
+        if r.fiscal_year is not None:
+            years.add(r.fiscal_year)
         cat_name = None
         if svc.category_id:
             cat_name = categories.get(str(svc.category_id))
-        if not cat_name and svc.category:
-            cat_name = svc.category
         out.append(
             CostRecordOut(
                 service_id=str(r.service_id),

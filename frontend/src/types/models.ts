@@ -104,7 +104,6 @@ export interface Service {
   name: string;
   status: string;
   license_type: string;
-  category: string;
   billing_schedule: string;
   renewal_date: string | null;
   yearly_cost: number | null;

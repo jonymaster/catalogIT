@@ -43,11 +43,16 @@ Enterprise web application for managing IT Services and Hardware.
 docker compose exec api alembic upgrade head
 ```
 
+## Outbound notifications
+
+Admin-configured integrations (Gmail, Slack, Telegram, webhook) are documented in [docs/integrations/README.md](docs/integrations/README.md).
+
 ## Project Structure
 
 ```
 catalogIT/
   backend/          # FastAPI application
   frontend/         # React (Vite) application
+  docs/integrations/# Integration setup (OAuth, webhooks)
   docker-compose.yml
 ```

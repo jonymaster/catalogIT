@@ -24,6 +24,7 @@ import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
 import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
+import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
 import { SettingsScim } from "./pages/settings/SettingsScim";
 import { SettingsUsers } from "./pages/settings/SettingsUsers";
 import { SettingsTokens } from "./pages/settings/SettingsTokens";
@@ -68,6 +69,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />}>
                   <Route index element={<Navigate to="oidc" replace />} />
                   <Route path="oidc" element={<SettingsOidc />} />
+                  <Route path="integrations" element={<SettingsIntegrations />} />
                   <Route path="scim" element={<SettingsScim />} />
                   <Route path="users" element={<SettingsUsers />} />
                   <Route path="branding" element={<SettingsBranding />} />

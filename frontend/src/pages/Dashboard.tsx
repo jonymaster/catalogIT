@@ -36,9 +36,10 @@ function getCategoryColor(name: string): string {
 const fmtFull = (n: number) => `$${n.toLocaleString()}`;
 
 function matchesServiceSearch(service: Service, query: string) {
+  const cat = (service.category_rel?.name ?? "").toLowerCase();
   return (
     service.name.toLowerCase().includes(query) ||
-    service.category.toLowerCase().includes(query) ||
+    cat.includes(query) ||
     service.license_type.toLowerCase().includes(query) ||
     service.status.toLowerCase().includes(query) ||
     (service.vendor?.name ?? "").toLowerCase().includes(query) ||
@@ -309,7 +310,7 @@ export function Dashboard() {
                               {service.name}
                             </span>
                             <span className="block text-xs text-gray-500">
-                              {service.category} • {service.status}
+                              {service.category_rel?.name ?? "—"} • {service.status}
                             </span>
                           </span>
                           <span className="ml-4 text-xs text-gray-400">

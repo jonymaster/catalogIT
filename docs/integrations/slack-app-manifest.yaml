@@ -1,0 +1,31 @@
+# Slack app manifest template for CatalogIT outbound notifications.
+# Replace YOUR_PUBLIC_BASE_URL with your deployment API origin (same as PUBLIC_BASE_URL).
+# Create the app at https://api.slack.com/apps → Create from manifest
+
+display_information:
+  name: CatalogIT Notifications
+  description: Sends CatalogIT notifications to Slack for your workspace.
+  background_color: "#111827"
+
+features:
+  bot_user:
+    display_name: CatalogIT
+    always_online: false
+
+oauth_config:
+  redirect_urls:
+    - YOUR_PUBLIC_BASE_URL/api/integrations/slack/oauth/callback
+  scopes:
+    bot:
+      - channels:read
+      - groups:read
+      - im:read
+      - mpim:read
+      - chat:write
+      - users:read
+      - team:read
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

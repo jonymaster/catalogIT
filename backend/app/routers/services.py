@@ -84,7 +84,6 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         name=body.name,
         status=service_status.name if service_status else body.status,
         license_type=body.license_type,
-        category=body.category,
         billing_schedule=body.billing_schedule,
         renewal_date=body.renewal_date,
         yearly_cost=body.yearly_cost,

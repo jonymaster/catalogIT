@@ -35,7 +35,9 @@ export function ServiceOverview() {
           <Field label="Status">
             <StatusBadge status={service.status} />
           </Field>
-          <Field label="Category">{service.category || "--"}</Field>
+          <Field label="Category">
+            {service.category_rel?.name ?? "--"}
+          </Field>
           <Field label="License Type">{service.license_type || "--"}</Field>
           <Field label="Billing Schedule">
             {service.billing_schedule || "--"}

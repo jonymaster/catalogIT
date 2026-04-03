@@ -94,7 +94,16 @@ function isSupportedSchedule(service: Service) {
   return schedule === "monthly" || schedule === "annually";
 }
 
+function isExplicitlyUnscheduled(service: Service) {
+  const schedule = service.billing_schedule.trim().toLowerCase();
+  return schedule === "na" || schedule === "on_demand";
+}
+
 function getUnscheduledReason(service: Service) {
+  if (isExplicitlyUnscheduled(service)) {
+    return null;
+  }
+
   if (!service.renewal_date) {
     return "Missing renewal date";
   }

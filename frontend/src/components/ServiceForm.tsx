@@ -18,7 +18,6 @@ interface FormData {
   name: string;
   status: string;
   license_type: string;
-  category: string;
   billing_schedule: string;
   renewal_date: string;
   yearly_cost: string;
@@ -47,7 +46,6 @@ function toFormData(s?: Service): FormData {
     name: s?.name ?? "",
     status: s?.status ?? "Contract",
     license_type: s?.license_type ?? "",
-    category: s?.category ?? "",
     billing_schedule: s?.billing_schedule ?? "",
     renewal_date: s?.renewal_date ?? "",
     yearly_cost: s?.yearly_cost != null ? String(s.yearly_cost) : "",
@@ -158,7 +156,6 @@ export function ServiceForm({ initial }: Props) {
       name: form.name,
       status: form.status,
       license_type: form.license_type,
-      category: form.category,
       billing_schedule: form.billing_schedule,
       renewal_date: form.renewal_date || null,
       yearly_cost: form.yearly_cost ? Number(form.yearly_cost) : null,
@@ -300,7 +297,7 @@ export function ServiceForm({ initial }: Props) {
         </div>
 
         <div>
-          <label className={labelCls}>Category (relation)</label>
+          <label className={labelCls}>Category</label>
           <select
             className={inputCls}
             value={form.category_id}
@@ -313,15 +310,6 @@ export function ServiceForm({ initial }: Props) {
               </option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Category (legacy text)</label>
-          <input
-            className={inputCls}
-            value={form.category}
-            onChange={(e) => set("category", e.target.value)}
-          />
         </div>
 
         <div>

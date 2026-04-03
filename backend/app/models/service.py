@@ -27,7 +27,6 @@ class Service(Base):
     # --- Legacy columns (kept for backwards compat, will be dropped later) ---
     status: Mapped[str] = mapped_column(String(50))
     license_type: Mapped[str] = mapped_column(String(100), default="")
-    category: Mapped[str] = mapped_column(String(100), default="")
     yearly_cost: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     sso_integrated: Mapped[bool] = mapped_column(Boolean, default=False)
     automated_provisioning: Mapped[bool] = mapped_column(Boolean, default=False)

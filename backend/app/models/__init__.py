@@ -15,6 +15,8 @@ from app.models.oidc_config import OidcConfig
 from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
 from app.models.branding_config import BrandingConfig
+from app.models.integration_config import IntegrationConfig
+from app.models.oauth_state import OAuthState
 
 __all__ = [
     "User",
@@ -35,4 +37,6 @@ __all__ = [
     "ApiToken",
     "Attachment",
     "BrandingConfig",
+    "IntegrationConfig",
+    "OAuthState",
 ]
