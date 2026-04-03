@@ -14,6 +14,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import type { Service } from "../types/models";
+import { formatDateOnly } from "../utils/formatting";
 
 type FilterType = "text" | "select";
 
@@ -45,10 +46,6 @@ function getBooleanLabel(value: boolean) {
 
 function getScimLabel(service: Service) {
   return service.scim_enabled == null ? "--" : getBooleanLabel(service.scim_enabled);
-}
-
-function formatDate(value: string | null) {
-  return value ? new Date(`${value}T00:00:00`).toLocaleDateString() : "--";
 }
 
 function getServiceSortValue(
@@ -173,7 +170,6 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     filterPlaceholder: "Filter by renewal date...",
     getFilterValue: (service) => service.renewal_date ?? "--",
     getSortValue: (service) => service.renewal_date ?? "",
-    render: (service) => formatDate(service.renewal_date),
   },
   {
     key: "sso_integrated",
@@ -233,7 +229,7 @@ export function Services() {
     "catalogit:services:columns",
     ALL_COLUMN_KEYS,
   );
-  const { canEdit } = useAuth();
+  const { canEdit, preferences } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -305,7 +301,10 @@ export function Services() {
       return {
         key: column.key,
         label: column.label,
-        render: column.render,
+        render:
+          column.key === "renewal_date"
+            ? (service) => formatDateOnly(service.renewal_date, preferences)
+            : column.render,
         header: (
           <ColumnHeaderMenu
             label={column.label}
@@ -331,7 +330,7 @@ export function Services() {
         ),
       };
     });
-  }, [filters, services, sortState]);
+  }, [filters, preferences, services, sortState]);
 
   return (
     <div>

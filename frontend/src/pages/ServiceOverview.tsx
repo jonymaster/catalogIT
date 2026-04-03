@@ -3,11 +3,9 @@ import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { ClassificationBadge, CriticalityBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
+import { useAuth } from "../context/useAuth";
 import type { Service } from "../types/models";
-
-function formatDate(value: string | null) {
-  return value ? new Date(`${value}T00:00:00`).toLocaleDateString() : "--";
-}
+import { formatDateOnly } from "../utils/formatting";
 
 function Field({
   label,
@@ -28,6 +26,7 @@ function Field({
 
 export function ServiceOverview() {
   const { service } = useOutletContext<{ service: Service }>();
+  const { preferences } = useAuth();
 
   return (
     <div className="space-y-8">
@@ -41,7 +40,9 @@ export function ServiceOverview() {
           <Field label="Billing Schedule">
             {service.billing_schedule || "--"}
           </Field>
-          <Field label="Renewal Date">{formatDate(service.renewal_date)}</Field>
+          <Field label="Renewal Date">
+            {formatDateOnly(service.renewal_date, preferences)}
+          </Field>
           <Field label="Yearly Cost">
             {service.yearly_cost != null
               ? `$${Number(service.yearly_cost).toLocaleString()}`

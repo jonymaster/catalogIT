@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import client from "../../api/client";
+import { useAuth } from "../../context/useAuth";
+import { formatDateTime } from "../../utils/formatting";
 
 interface ApiToken {
   id: string;
@@ -17,6 +19,7 @@ interface ApiTokenCreated extends ApiToken {
 }
 
 export function SettingsTokens() {
+  const { preferences } = useAuth();
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -191,11 +194,15 @@ export function SettingsTokens() {
                     {t.token_prefix}{"••••••••"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
-                    {new Date(t.created_at).toLocaleDateString()}
+                    {formatDateTime(t.created_at, preferences, {
+                      dateStyle: "medium",
+                    })}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                     {t.last_used_at
-                      ? new Date(t.last_used_at).toLocaleDateString()
+                      ? formatDateTime(t.last_used_at, preferences, {
+                          dateStyle: "medium",
+                        })
                       : "Never"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">

@@ -22,6 +22,8 @@ class UserRead(BaseModel):
     last_name: str
     display_name: str | None = None
     department: str | None = None
+    locale: str | None = None
+    timezone: str | None = None
     is_active: bool
     role: str
     created_at: datetime
@@ -35,3 +37,17 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     display_name: str | None = None
     department: str | None = None
+    locale: str | None = None
+    timezone: str | None = None
+
+
+class UserPreferencesRead(BaseModel):
+    locale: str | None = None
+    timezone: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserPreferencesUpdate(BaseModel):
+    locale: str | None = None
+    timezone: str | None = None

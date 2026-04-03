@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { UserPreferences } from "../types/models";
 
 export interface UserInfo {
   sub: string;
@@ -9,10 +10,14 @@ export interface UserInfo {
 export interface AuthContextValue {
   token: string | null;
   user: UserInfo | null;
+  preferences: UserPreferences | null;
+  preferencesLoading: boolean;
   canEdit: boolean;
   login: () => void;
   logout: () => void;
   setToken: (token: string) => void;
+  refreshPreferences: () => Promise<void>;
+  setPreferences: (preferences: UserPreferences | null) => void;
 }
 
 export const ROLE_HIERARCHY: Record<string, number> = {

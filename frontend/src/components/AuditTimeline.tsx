@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import client from "../api/client";
+import { useAuth } from "../context/useAuth";
 import type { AuditLogEntry } from "../types/models";
+import { formatDateTime } from "../utils/formatting";
 
 interface Props {
   tableName: string;
@@ -22,10 +24,6 @@ function formatChange(entry: AuditLogEntry): string {
   return parts.length > 0 ? parts.join(", ") : "Record updated";
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
 const actionColors: Record<string, string> = {
   INSERT: "bg-green-100 text-green-800",
   UPDATE: "bg-blue-100 text-blue-800",
@@ -33,6 +31,7 @@ const actionColors: Record<string, string> = {
 };
 
 export function AuditTimeline({ tableName, recordId }: Props) {
+  const { preferences } = useAuth();
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,7 +82,10 @@ export function AuditTimeline({ tableName, recordId }: Props) {
                     )}
                   </div>
                   <div className="shrink-0 whitespace-nowrap text-right text-xs text-gray-500">
-                    {formatDate(entry.timestamp)}
+                    {formatDateTime(entry.timestamp, preferences, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
                   </div>
                 </div>
               </div>

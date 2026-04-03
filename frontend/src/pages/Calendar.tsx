@@ -1,29 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
+import { useAuth } from "../context/useAuth";
 import type { Service } from "../types/models";
+import { formatDateOnly, formatMonthYear, formatWeekdayShort } from "../utils/formatting";
 
 interface CalendarEvent {
   id: string;
   service: Service;
   occurrence: Date;
 }
-
-const MONTH_LABEL = new Intl.DateTimeFormat(undefined, {
-  month: "long",
-  year: "numeric",
-});
-
-const DAY_LABEL = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-const DATE_LABEL = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
-const DAY_NAMES = Array.from({ length: 7 }, (_, index) =>
-  DAY_LABEL.format(new Date(2026, 0, 4 + index)),
-);
 
 function parseDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);
@@ -139,9 +125,17 @@ function buildCalendarDays(displayMonth: Date) {
 }
 
 export function Calendar() {
+  const { preferences } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [displayMonth, setDisplayMonth] = useState(() => monthStart(new Date()));
+  const dayNames = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) =>
+        formatWeekdayShort(new Date(2026, 0, 4 + index), preferences),
+      ),
+    [preferences],
+  );
 
   useEffect(() => {
     client
@@ -240,7 +234,7 @@ export function Calendar() {
             Visible Month
           </p>
           <p className="mt-1 text-lg font-semibold text-gray-900">
-            {MONTH_LABEL.format(displayMonth)}
+            {formatMonthYear(displayMonth, preferences)}
           </p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -261,7 +255,7 @@ export function Calendar() {
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-          {DAY_NAMES.map((dayName) => (
+          {dayNames.map((dayName) => (
             <div
               key={dayName}
               className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500"
@@ -328,7 +322,7 @@ export function Calendar() {
           <h2 className="text-lg font-medium text-gray-900">Month Renewal List</h2>
           {events.length === 0 ? (
             <p className="mt-3 text-sm text-gray-500">
-              No derived renewals fall in {MONTH_LABEL.format(displayMonth)}.
+              No derived renewals fall in {formatMonthYear(displayMonth, preferences)}.
             </p>
           ) : (
             <div className="mt-4 space-y-3">
@@ -350,7 +344,11 @@ export function Calendar() {
                     </p>
                   </div>
                   <p className="whitespace-nowrap text-sm text-gray-600">
-                    {DATE_LABEL.format(event.occurrence)}
+                    {formatDateOnly(
+                      event.occurrence,
+                      preferences,
+                      { month: "short", day: "numeric", year: "numeric" },
+                    )}
                   </p>
                 </div>
               ))}

@@ -83,7 +83,21 @@ export function Sidebar() {
 
       <div className="border-t border-gray-200 p-4">
         {user && (
-          <p className="mb-2 truncate text-sm text-gray-600">{user.email}</p>
+          <>
+            <p className="mb-2 truncate text-sm text-gray-600">{user.email}</p>
+            <NavLink
+              to="/me/settings"
+              className={({ isActive }) =>
+                `mb-3 flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`
+              }
+            >
+              Personal Settings
+            </NavLink>
+          </>
         )}
         <button
           onClick={logout}

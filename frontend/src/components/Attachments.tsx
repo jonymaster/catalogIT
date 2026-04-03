@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import client from "../api/client";
 import { useAuth } from "../context/useAuth";
 import type { Attachment } from "../types/models";
+import { formatDateTime } from "../utils/formatting";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,7 +16,7 @@ interface AttachmentsProps {
 }
 
 export function Attachments({ entityType, entityId }: AttachmentsProps) {
-  const { canEdit } = useAuth();
+  const { canEdit, preferences } = useAuth();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -155,7 +156,9 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
                 </button>
                 <p className="text-xs text-gray-400">
                   {formatFileSize(att.file_size)} &middot;{" "}
-                  {new Date(att.created_at).toLocaleDateString()}
+                  {formatDateTime(att.created_at, preferences, {
+                    dateStyle: "medium",
+                  })}
                 </p>
               </div>
               {canEdit && (

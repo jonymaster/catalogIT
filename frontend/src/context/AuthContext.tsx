@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react";
+import client from "../api/client";
+import type { UserPreferences } from "../types/models";
 import {
   AuthContext,
   ROLE_HIERARCHY,
@@ -22,11 +24,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const saved = getInitialToken();
     return saved ? decodePayload(saved) : null;
   });
+  const [preferences, setPreferencesState] = useState<UserPreferences | null>(null);
+  const [preferencesLoading, setPreferencesLoading] = useState(false);
+
+  const setPreferences = useCallback((nextPreferences: UserPreferences | null) => {
+    setPreferencesState(nextPreferences);
+  }, []);
 
   const setToken = useCallback((newToken: string) => {
     localStorage.setItem("catalogit_token", newToken);
     setTokenState(newToken);
     setUser(decodePayload(newToken));
+    setPreferencesState(null);
   }, []);
 
   const login = useCallback(() => {
@@ -37,6 +46,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("catalogit_token");
     setTokenState(null);
     setUser(null);
+    setPreferencesState(null);
+  }, []);
+
+  const refreshPreferences = useCallback(async () => {
+    const savedToken = localStorage.getItem("catalogit_token");
+    if (!savedToken) {
+      setPreferencesState(null);
+      return;
+    }
+
+    setPreferencesLoading(true);
+    try {
+      const response = await client.get<UserPreferences>("/api/me/preferences");
+      setPreferencesState(response.data);
+    } catch {
+      setPreferencesState(null);
+    } finally {
+      setPreferencesLoading(false);
+    }
   }, []);
 
   // Capture token from OIDC callback redirect
@@ -47,11 +75,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!token) {
+      setPreferencesState(null);
+      setPreferencesLoading(false);
+      return;
+    }
+
+    void refreshPreferences();
+  }, [token, refreshPreferences]);
+
   const canEdit =
     !!user?.role && (ROLE_HIERARCHY[user.role] ?? 0) >= ROLE_HIERARCHY.editor;
 
   return (
-    <AuthContext.Provider value={{ token, user, canEdit, login, logout, setToken }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        preferences,
+        preferencesLoading,
+        canEdit,
+        login,
+        logout,
+        setToken,
+        refreshPreferences,
+        setPreferences,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

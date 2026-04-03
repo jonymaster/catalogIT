@@ -6,10 +6,17 @@ export interface User {
   last_name: string;
   display_name: string | null;
   department: string | null;
+  locale: string | null;
+  timezone: string | null;
   is_active: boolean;
   role: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserPreferences {
+  locale: string | null;
+  timezone: string | null;
 }
 
 export interface Vendor {

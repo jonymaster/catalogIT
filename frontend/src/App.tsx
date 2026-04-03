@@ -20,6 +20,7 @@ import { ServiceCreate } from "./pages/ServiceCreate";
 import { ServiceEdit } from "./pages/ServiceEdit";
 import { LaptopCreate } from "./pages/LaptopCreate";
 import { LaptopEdit } from "./pages/LaptopEdit";
+import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
 import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
@@ -58,6 +59,7 @@ export default function App() {
                 <Route path="/hardware/new" element={<LaptopCreate />} />
                 <Route path="/hardware/:id" element={<LaptopDetail />} />
                 <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
+                <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
             </Route>
             <Route element={<ProtectedRoute requiredRole="admin" />}>
