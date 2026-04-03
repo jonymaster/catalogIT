@@ -20,7 +20,6 @@ def _bot_method_url(token: str, method: str) -> str:
 def normalize_bot_token(token: str) -> str:
     """Strip whitespace and an erroneous leading 'bot' (URL already adds /bot<token>/)."""
     t = token.strip()
-    # BotFather gives "123456789:AAH..."; some users paste "bot123456789:AAH..."
     if t.lower().startswith("bot") and ":" in t:
         t = t[3:].lstrip()
     return t
@@ -91,5 +90,4 @@ def _send_error(status_code: int, data: dict[str, Any]) -> ValueError:
     err_code = data.get("error_code")
     if err_code == 404 or status_code == 404:
         return _token_error(status_code, data)
-    # Common: bot blocked, chat not found, not a member
     return ValueError(f"Telegram: {desc} (error_code={err_code})")

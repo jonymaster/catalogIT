@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 async def _seed_admin() -> None:
     """Ensure a working admin account exists on every startup.
 
-    - If no admin exists, create one from ADMIN_DEFAULT_PASSWORD.
+    - If no admin exists, create one using ADMIN_* profile fields and ADMIN_DEFAULT_PASSWORD.
     - If the admin exists but never changed their password
       (must_reset_password is still True), re-sync the hash from the env var
       so a changed ADMIN_DEFAULT_PASSWORD always takes effect.
@@ -47,10 +47,10 @@ async def _seed_admin() -> None:
 
             if admin is None:
                 admin = User(
-                    external_id="local:admin",
-                    email="admin@catalogit.local",
-                    first_name="Admin",
-                    last_name="User",
+                    external_id=cfg.ADMIN_EXTERNAL_ID,
+                    email=cfg.ADMIN_EMAIL,
+                    first_name=cfg.ADMIN_FIRST_NAME,
+                    last_name=cfg.ADMIN_LAST_NAME,
                     role="admin",
                     password_hash=hashed,
                     must_reset_password=True,

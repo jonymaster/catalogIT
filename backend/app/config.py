@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     SCIM_TOKEN: str = ""
 
     ADMIN_DEFAULT_PASSWORD: str = "changeme"
+    # Bootstrap admin (only used when no admin user exists yet; see main._seed_admin)
+    ADMIN_EMAIL: str = "admin@catalogit.local"
+    ADMIN_EXTERNAL_ID: str = "local:admin"
+    ADMIN_FIRST_NAME: str = "Admin"
+    ADMIN_LAST_NAME: str = "User"
+
     SEED_SAMPLE_DATA: bool = False
 
     MINIO_ENDPOINT: str = "http://minio:9000"
