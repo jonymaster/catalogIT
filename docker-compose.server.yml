@@ -1,0 +1,87 @@
+# Production-oriented stack for a host behind Nginx Proxy Manager (or similar).
+#
+# Images (build and push before deploy):
+#   docker build -t jonymaster/catalogit-api:1.0.0 ./backend
+#   docker build -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 ./frontend
+#
+# Copy .env.example to .env on the server and set at least:
+#   DATABASE_URL, JWT_SECRET, INTEGRATION_SECRET_KEY, SCIM_TOKEN,
+#   FRONTEND_URL, PUBLIC_BASE_URL (your public https URLs),
+#   MINIO_*, POSTGRES_*, CRON_SECRET, and turn off SEED_SAMPLE_DATA if desired.
+#
+# After first start: docker compose -f docker-compose.server.yml exec api alembic upgrade head
+#
+# NPM: one hostname with path routing — "/" -> ui:80, "/api", "/auth", "/scim", "/docs",
+# "/openapi.json" -> api:8000 — so the browser keeps a single origin (matches frontend axios baseURL "/").
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-catalogit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:-catalogit}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-catalogit}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-catalogit}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: jonymaster/catalogit-api:${CATALOGIT_TAG:-1.0.0}
+    restart: unless-stopped
+    ports:
+      - "${API_PUBLISH:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  ui:
+    image: jonymaster/catalogit-ui:${CATALOGIT_TAG:-1.0.0}
+    restart: unless-stopped
+    ports:
+      - "${UI_PUBLISH:-8080}:80"
+    depends_on:
+      - api
+
+  cron:
+    image: alpine/curl:latest
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "0 6 * * * curl -sf -X POST -H 'X-Cron-Secret: $${CRON_SECRET}' http://api:8000/api/internal/notifications/renewal-dispatch >> /proc/1/fd/1 2>&1" > /etc/crontabs/root
+        crond -f -l 2
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  minio_data:
