@@ -61,6 +61,13 @@ export interface ServiceStatus {
   description: string | null;
 }
 
+export interface ServiceClassification {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+}
+
 export interface Contract {
   id: string;
   vendor_id: string;
@@ -123,7 +130,7 @@ export interface Service {
   payment_method_id: string | null;
   service_status_id: string | null;
   contract_id: string | null;
-  classification: string | null;
+  classification_id: string | null;
   scim_enabled: boolean | null;
   criticality: string | null;
   nonprofit_pricing: boolean;
@@ -136,6 +143,7 @@ export interface Service {
   cost_center: CostCenter | null;
   payment_method: PaymentMethod | null;
   service_status: ServiceStatus | null;
+  service_classification: ServiceClassification | null;
   logins: ServiceLogin[];
   created_at: string;
   updated_at: string;

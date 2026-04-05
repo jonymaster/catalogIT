@@ -35,6 +35,13 @@ function getCategoryColor(name: string): string {
 
 const fmtFull = (n: number) => `$${n.toLocaleString()}`;
 
+function classificationBarColor(slug: string | null): string {
+  if (slug === "core_saas") return "#7c3aed";
+  if (slug === "subscription") return "#3b82f6";
+  if (slug === "internal") return "#0d9488";
+  return "#64748b";
+}
+
 function matchesServiceSearch(service: Service, query: string) {
   const cat = (service.category_rel?.name ?? "").toLowerCase();
   return (
@@ -42,6 +49,9 @@ function matchesServiceSearch(service: Service, query: string) {
     cat.includes(query) ||
     (service.service_status?.name ?? service.status).toLowerCase().includes(query) ||
     (service.vendor?.name ?? "").toLowerCase().includes(query) ||
+    (service.service_classification?.name ?? "")
+      .toLowerCase()
+      .includes(query) ||
     service.owners.some(
       (owner) =>
         owner.first_name.toLowerCase().includes(query) ||
@@ -484,7 +494,7 @@ export function Dashboard() {
                   label:
                     s.name.length > 12 ? s.name.slice(0, 11) + "\u2026" : s.name,
                   value: s.cost,
-                  color: s.classification === "core_saas" ? "#7c3aed" : "#3b82f6",
+                  color: classificationBarColor(s.classification),
                 }))}
                 width={680}
                 height={200}

@@ -59,7 +59,11 @@ async def get_dashboard(db: AsyncSession = Depends(get_audited_db)):
             CostRecordOut(
                 service_id=str(r.service_id),
                 service_name=svc.name,
-                classification=svc.classification,
+                classification=(
+                    svc.service_classification.slug
+                    if svc.service_classification
+                    else None
+                ),
                 category_name=cat_name,
                 fiscal_year=r.fiscal_year,
                 amount=float(r.amount),

@@ -238,7 +238,29 @@ async def oidc_callback(
     id_token = token_data.get("id_token", "")
     access_token = token_data.get("access_token", "")
 
-    claims = jwt.get_unverified_claims(id_token)
+    # Verify id_token signature using provider's JWKS keys
+    jwks_uri = discovery.get("jwks_uri")
+    if jwks_uri:
+        async with httpx.AsyncClient(timeout=10) as client:
+            jwks_resp = await client.get(jwks_uri)
+        if jwks_resp.status_code != 200:
+            raise HTTPException(status_code=502, detail="Failed to fetch OIDC JWKS")
+        jwks = jwks_resp.json()
+        try:
+            claims = jwt.decode(
+                id_token,
+                jwks,
+                algorithms=["RS256", "ES256"],
+                audience=oidc.client_id,
+                issuer=oidc.issuer_url.rstrip("/"),
+            )
+        except JWTError as exc:
+            logger.error("OIDC id_token verification failed: %s", exc)
+            raise HTTPException(status_code=401, detail="Invalid OIDC id_token")
+    else:
+        # Fallback: no JWKS URI in discovery (non-standard provider)
+        logger.warning("OIDC provider has no jwks_uri; using unverified claims")
+        claims = jwt.get_unverified_claims(id_token)
 
     userinfo_endpoint = discovery.get("userinfo_endpoint")
     if userinfo_endpoint and access_token:

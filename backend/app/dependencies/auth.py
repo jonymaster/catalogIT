@@ -4,6 +4,8 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+import secrets
+
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
@@ -87,6 +89,6 @@ def require_scim_token(
 ) -> str:
     """Validate the static SCIM Bearer token used for provisioning."""
     settings = get_settings()
-    if not bearer or bearer.credentials != settings.SCIM_TOKEN:
+    if not bearer or not settings.SCIM_TOKEN or not secrets.compare_digest(bearer.credentials, settings.SCIM_TOKEN):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid SCIM token")
     return bearer.credentials

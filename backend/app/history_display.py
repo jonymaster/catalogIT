@@ -13,6 +13,7 @@ from app.models.category import Category
 from app.models.cost_center import CostCenter
 from app.models.contract import Contract
 from app.models.payment_method import PaymentMethod
+from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
 from app.models.user import User
 from app.models.vendor import Vendor
@@ -67,6 +68,7 @@ async def _humanize_service_fks(
         "vendor_id": (Vendor, lambda r: r.name),
         "payment_method_id": (PaymentMethod, lambda r: r.name),
         "service_status_id": (ServiceStatus, lambda r: r.name),
+        "classification_id": (ServiceClassification, lambda r: r.name),
         "contract_id": (Contract, _contract_label),
     }
 
@@ -117,6 +119,7 @@ def _friendly_service_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | N
         ("category_id", "category"),
         ("cost_center_id", "cost_center"),
         ("payment_method_id", "payment_method"),
+        ("classification_id", "classification"),
         ("contract_id", "contract"),
     ):
         if src in out:

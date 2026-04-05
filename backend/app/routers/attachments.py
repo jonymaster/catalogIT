@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
@@ -8,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.dependencies.auth import require_role
+from app.dependencies.auth import get_current_user, require_role
 from app.dependencies.db import get_audited_db
 from app.dependencies.storage import get_s3_client
 from app.models.attachment import Attachment
@@ -24,6 +26,13 @@ ALLOWED_CONTENT_TYPES = {"application/pdf"}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
 _writer = require_role("admin", "editor")
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip path separators, control characters, and quotes from a filename."""
+    name = os.path.basename(name)
+    name = re.sub(r'[\x00-\x1f"\\]', "", name)
+    return name or "attachment"
 
 
 async def _validate_entity(
@@ -46,6 +55,7 @@ async def _validate_entity(
 @router.get("/download/{attachment_id}")
 async def download_attachment(
     attachment_id: uuid.UUID,
+    _user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_audited_db),
 ):
     attachment = await db.get(Attachment, attachment_id)
@@ -62,11 +72,12 @@ async def download_attachment(
         )
         body = await resp["Body"].read()
 
+    safe_name = _sanitize_filename(attachment.original_filename)
     return Response(
         content=body,
         media_type=attachment.content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{attachment.original_filename}"',
+            "Content-Disposition": f"attachment; filename=\"{safe_name}\"",
         },
     )
 
@@ -171,7 +182,7 @@ async def upload_attachment(
         )
 
     file_id = uuid.uuid4()
-    original = file.filename or "attachment.pdf"
+    original = _sanitize_filename(file.filename or "attachment.pdf")
     storage_key = f"{entity_type}/{entity_id}/{file_id}_{original}"
 
     cfg = get_settings()

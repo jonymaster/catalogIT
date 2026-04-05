@@ -52,17 +52,15 @@ const classificationColors: Record<string, BadgeColor> = {
   internal: "teal",
 };
 
-export function ClassificationBadge({ value }: { value: string | null }) {
-  if (!value) return <span className="text-gray-400">--</span>;
-  const label =
-    value === "core_saas"
-      ? "Core SaaS"
-      : value === "subscription"
-        ? "Subscription"
-        : value === "internal"
-          ? "Internal"
-          : value;
+export function ClassificationBadge({
+  classification,
+}: {
+  classification: { slug: string; name: string } | null;
+}) {
+  if (!classification) return <span className="text-gray-400">--</span>;
   return (
-    <Badge color={classificationColors[value] ?? "gray"}>{label}</Badge>
+    <Badge color={classificationColors[classification.slug] ?? "gray"}>
+      {classification.name}
+    </Badge>
   );
 }

@@ -19,7 +19,7 @@ from app.dependencies.storage import ensure_bucket
 from app.routers import (
     api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
     history, integrations, internal, laptops, login_methods, me, payment_methods, reference_data,
-    service_statuses, services, scim,
+    service_classifications, service_statuses, services, scim,
     settings, users, vendors,
 )
 from scripts.seed_from_json import SEED_DIR, seed_database
@@ -41,7 +41,9 @@ async def _seed_admin() -> None:
     cfg = get_settings()
     try:
         async with async_session() as session:
-            result = await session.execute(select(User).where(User.role == "admin"))
+            result = await session.execute(
+                select(User).where(User.role == "admin").limit(1)
+            )
             admin = result.scalar_one_or_none()
 
             hashed = bcrypt.hashpw(
@@ -126,8 +128,8 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[cfg.FRONTEND_URL],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
     app.add_middleware(RequestAuditMiddleware)
 
@@ -151,6 +153,7 @@ def create_app() -> FastAPI:
     app.include_router(cost_centers.router)
     app.include_router(login_methods.router)
     app.include_router(payment_methods.router)
+    app.include_router(service_classifications.router)
     app.include_router(service_statuses.router)
     app.include_router(reference_data.router)
     app.include_router(cost_records.router)

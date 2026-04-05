@@ -25,6 +25,7 @@ from app.models import (
     LoginMethod,
     PaymentMethod,
     Service,
+    ServiceClassification,
     ServiceHistoryEntry,
     ServiceLogin,
     ServiceStatus,
@@ -202,6 +203,10 @@ async def _seed_services(session: AsyncSession) -> None:
         status.name.lower(): status.id
         for status in result.scalars().all()
     }
+    cls_result = await session.execute(select(ServiceClassification))
+    classifications_by_slug = {
+        c.slug: c.id for c in cls_result.scalars().all()
+    }
 
     for r in rows:
         svc_id = _uuid("service", r["id"])
@@ -220,7 +225,11 @@ async def _seed_services(session: AsyncSession) -> None:
             category_id=_uuid("category", r["category_id"]),
             payment_method_id=_uuid("payment_method", r["payment_method_id"]),
             service_status_id=service_statuses.get(normalized_status.lower()),
-            classification=r.get("classification"),
+            classification_id=(
+                classifications_by_slug.get(raw)
+                if (raw := r.get("classification"))
+                else None
+            ),
             scim_enabled=r.get("scim_enabled", False),
             criticality=r.get("criticality"),
             nonprofit_pricing=r.get("nonprofit_pricing", False),

@@ -11,9 +11,13 @@ RUN uv sync --no-dev
 
 FROM python:3.12-slim
 
+RUN adduser --disabled-password --gecos "" appuser
+
 WORKDIR /app
 COPY --from=builder /app /app
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+USER appuser
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

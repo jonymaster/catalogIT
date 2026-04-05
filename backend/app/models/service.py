@@ -45,10 +45,12 @@ class Service(Base):
     service_status_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("service_statuses.id", ondelete="SET NULL"), nullable=True
     )
+    classification_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("service_classifications.id", ondelete="SET NULL"), nullable=True
+    )
     contract_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("contracts.id", ondelete="SET NULL"), nullable=True
     )
-    classification: Mapped[str | None] = mapped_column(String(20), nullable=True)
     billing_schedule: Mapped[str] = mapped_column(String(100), default="")
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     renewal_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -76,6 +78,9 @@ class Service(Base):
     cost_center: Mapped["CostCenter | None"] = relationship(lazy="selectin")  # noqa: F821
     payment_method: Mapped["PaymentMethod | None"] = relationship(lazy="selectin")  # noqa: F821
     service_status: Mapped["ServiceStatus | None"] = relationship(lazy="selectin")  # noqa: F821
+    service_classification: Mapped["ServiceClassification | None"] = relationship(  # noqa: F821
+        lazy="selectin"
+    )
     contract: Mapped["Contract | None"] = relationship(lazy="selectin")  # noqa: F821
     logins: Mapped[list["ServiceLogin"]] = relationship(  # noqa: F821
         lazy="selectin",

@@ -4,6 +4,7 @@ from app.models.category import Category
 from app.models.cost_center import CostCenter
 from app.models.login_method import LoginMethod
 from app.models.payment_method import PaymentMethod
+from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
 from app.models.contract import Contract
 from app.models.service import Service, service_owners
@@ -28,6 +29,7 @@ __all__ = [
     "CostCenter",
     "LoginMethod",
     "PaymentMethod",
+    "ServiceClassification",
     "ServiceStatus",
     "Contract",
     "Service",

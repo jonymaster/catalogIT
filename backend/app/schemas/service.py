@@ -9,6 +9,7 @@ from app.schemas.category import CategoryRead
 from app.schemas.cost_center import CostCenterRead
 from app.schemas.login_method import LoginMethodRead
 from app.schemas.payment_method import PaymentMethodRead
+from app.schemas.service_classification import ServiceClassificationRead
 from app.schemas.service_status import ServiceStatusRead
 from app.schemas.user import UserRead
 from app.schemas.vendor import VendorRead
@@ -39,7 +40,7 @@ class ServiceCreate(BaseModel):
     payment_method_id: uuid.UUID | None = None
     service_status_id: uuid.UUID | None = None
     contract_id: uuid.UUID | None = None
-    classification: str | None = None
+    classification_id: uuid.UUID | None = None
     scim_enabled: bool | None = None
     criticality: str | None = None
     nonprofit_pricing: bool = False
@@ -63,7 +64,7 @@ class ServiceUpdate(BaseModel):
     payment_method_id: uuid.UUID | None = None
     service_status_id: uuid.UUID | None = None
     contract_id: uuid.UUID | None = None
-    classification: str | None = None
+    classification_id: uuid.UUID | None = None
     scim_enabled: bool | None = None
     criticality: str | None = None
     nonprofit_pricing: bool | None = None
@@ -89,7 +90,7 @@ class ServiceRead(BaseModel):
     payment_method_id: uuid.UUID | None = None
     service_status_id: uuid.UUID | None = None
     contract_id: uuid.UUID | None = None
-    classification: str | None = None
+    classification_id: uuid.UUID | None = None
     scim_enabled: bool | None = None
     criticality: str | None = None
     nonprofit_pricing: bool = False
@@ -102,6 +103,7 @@ class ServiceRead(BaseModel):
     cost_center: CostCenterRead | None = None
     payment_method: PaymentMethodRead | None = None
     service_status: ServiceStatusRead | None = None
+    service_classification: ServiceClassificationRead | None = None
     logins: list[ServiceLoginRead] = []
     created_at: datetime
     updated_at: datetime

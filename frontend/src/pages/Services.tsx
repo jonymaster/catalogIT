@@ -141,13 +141,18 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     key: "classification",
     label: "Classification",
     filterType: "select",
-    getFilterValue: (service) => service.classification ?? "--",
-    getSortValue: (service) => service.classification ?? "",
+    getFilterValue: (service) =>
+      service.service_classification?.name ?? "--",
+    getSortValue: (service) => service.service_classification?.name ?? "",
     getFilterOptions: (services) =>
       getUniqueOptions(
-        services.map((service) => service.classification ?? "--"),
+        services.map(
+          (service) => service.service_classification?.name ?? "--",
+        ),
       ),
-    render: (service) => <ClassificationBadge value={service.classification} />,
+    render: (service) => (
+      <ClassificationBadge classification={service.service_classification} />
+    ),
   },
   {
     key: "criticality",
@@ -318,6 +323,9 @@ export function Services() {
         service.name.toLowerCase().includes(q) ||
         categoryLabel(service).toLowerCase().includes(q) ||
         costCenterLabel(service).toLowerCase().includes(q) ||
+        (service.service_classification?.name ?? "")
+          .toLowerCase()
+          .includes(q) ||
         getServiceStatusLabel(service).toLowerCase().includes(q) ||
         (service.payment_method?.name ?? "").toLowerCase().includes(q) ||
         service.billing_schedule.toLowerCase().includes(q) ||

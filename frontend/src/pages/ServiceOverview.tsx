@@ -62,7 +62,7 @@ function renderField(
     case "classification":
       return (
         <Field label={SERVICE_FIELD_LABELS.classification}>
-          <ClassificationBadge value={service.classification} />
+          <ClassificationBadge classification={service.service_classification} />
         </Field>
       );
     case "criticality":

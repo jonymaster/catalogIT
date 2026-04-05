@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
+import DOMPurify from "dompurify";
 import client from "../../api/client";
 
 interface IntegrationChannel {
@@ -741,7 +742,7 @@ export function SettingsIntegrations() {
             </p>
             <div
               className="mt-2 border border-gray-200 bg-white p-2 text-xs max-w-none"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }}
             />
             <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-600">{previewText}</pre>
           </div>

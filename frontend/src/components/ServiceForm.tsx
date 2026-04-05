@@ -15,6 +15,7 @@ import type {
   CostCenter,
   PaymentMethod,
   ServiceStatus,
+  ServiceClassification,
 } from "../types/models";
 
 interface Props {
@@ -35,7 +36,7 @@ interface FormData {
   cost_center_id: string;
   payment_method_id: string;
   service_status_id: string;
-  classification: string;
+  classification_id: string;
   scim_enabled: boolean;
   criticality: string;
   nonprofit_pricing: boolean;
@@ -44,16 +45,8 @@ interface FormData {
   renewal_offsets_input: string;
 }
 
-const CLASSIFICATION_OPTIONS = ["core_saas", "subscription", "internal"];
 const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
-
-function classificationOptionLabel(value: string): string {
-  if (value === "core_saas") return "Core SaaS";
-  if (value === "subscription") return "Subscription";
-  if (value === "internal") return "Internal";
-  return value;
-}
 
 function toFormData(s?: Service): FormData {
   return {
@@ -70,7 +63,7 @@ function toFormData(s?: Service): FormData {
     cost_center_id: s?.cost_center_id ?? "",
     payment_method_id: s?.payment_method_id ?? "",
     service_status_id: s?.service_status_id ?? "",
-    classification: s?.classification ?? "",
+    classification_id: s?.classification_id ?? "",
     scim_enabled: s?.scim_enabled ?? false,
     criticality: s?.criticality ?? "",
     nonprofit_pricing: s?.nonprofit_pricing ?? false,
@@ -97,6 +90,9 @@ export function ServiceForm({ initial }: Props) {
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([]);
+  const [serviceClassifications, setServiceClassifications] = useState<
+    ServiceClassification[]
+  >([]);
 
   useEffect(() => {
     Promise.all([
@@ -106,13 +102,15 @@ export function ServiceForm({ initial }: Props) {
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
       client.get<ServiceStatus[]>("/api/service-statuses/"),
-    ]).then(([u, v, c, cc, p, s]) => {
+      client.get<ServiceClassification[]>("/api/service-classifications/"),
+    ]).then(([u, v, c, cc, p, s, cl]) => {
       setUsers(u.data);
       setVendors(v.data);
       setCategories(c.data);
       setCostCenters(cc.data);
       setPaymentMethods(p.data);
       setServiceStatuses(s.data);
+      setServiceClassifications(cl.data);
     });
   }, []);
 
@@ -208,7 +206,7 @@ export function ServiceForm({ initial }: Props) {
       cost_center_id: form.cost_center_id || null,
       payment_method_id: form.payment_method_id || null,
       service_status_id: form.service_status_id || null,
-      classification: form.classification || null,
+      classification_id: form.classification_id || null,
       scim_enabled: form.scim_enabled,
       criticality: form.criticality || null,
       nonprofit_pricing: form.nonprofit_pricing,
@@ -308,13 +306,13 @@ export function ServiceForm({ initial }: Props) {
             </label>
             <select
               className={inputCls}
-              value={form.classification}
-              onChange={(e) => set("classification", e.target.value)}
+              value={form.classification_id}
+              onChange={(e) => set("classification_id", e.target.value)}
             >
               <option value="">-- None --</option>
-              {CLASSIFICATION_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {classificationOptionLabel(o)}
+              {serviceClassifications.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>

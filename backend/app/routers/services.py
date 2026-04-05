@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.service import Service
+from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
 from app.models.user import User
 from app.routers.attachments import delete_entity_attachments
@@ -29,6 +30,21 @@ async def _find_service_status_by_name(
     return await db.scalar(
         select(ServiceStatus).where(func.lower(ServiceStatus.name) == normalized.lower())
     )
+
+
+async def _get_classification(
+    db: AsyncSession,
+    classification_id: uuid.UUID | None,
+) -> ServiceClassification | None:
+    if classification_id is None:
+        return None
+    row = await db.get(ServiceClassification, classification_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Service classification not found",
+        )
+    return row
 
 
 async def _resolve_service_status(
@@ -79,6 +95,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         service_status_id=body.service_status_id,
         status_name=body.status,
     )
+    classification = await _get_classification(db, body.classification_id)
 
     service = Service(
         name=body.name,
@@ -95,7 +112,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         payment_method_id=body.payment_method_id,
         service_status_id=service_status.id if service_status else None,
         contract_id=body.contract_id,
-        classification=body.classification,
+        classification_id=classification.id if classification else None,
         scim_enabled=body.scim_enabled,
         criticality=body.criticality,
         nonprofit_pricing=body.nonprofit_pricing,
@@ -129,6 +146,9 @@ async def update_service(
             service.renewal_offsets_days = ro
 
     owner_ids = update_data.pop("owner_ids", None)
+    classification_id = (
+        update_data.pop("classification_id", None) if "classification_id" in update_data else ...
+    )
     service_status_id = update_data.pop("service_status_id", None) if "service_status_id" in update_data else ...
     status_name = update_data.pop("status", None) if "status" in update_data else ...
     if owner_ids is not None:
@@ -139,6 +159,13 @@ async def update_service(
                 raise HTTPException(status_code=400, detail=f"User {uid} not found")
             owners.append(user)
         service.owners = owners
+
+    if classification_id is not ...:
+        if classification_id is None:
+            service.classification_id = None
+        else:
+            classification = await _get_classification(db, classification_id)
+            service.classification_id = classification.id
 
     if service_status_id is not ...:
         if service_status_id is None:

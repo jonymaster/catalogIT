@@ -21,12 +21,14 @@ async def ensure_unique_name(
     name: str,
     *,
     current_id: uuid.UUID | None = None,
+    attr: str = "name",
 ) -> None:
     normalized = name.strip()
     if not normalized:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required")
 
-    query = select(model).where(func.lower(model.name) == normalized.lower())
+    column = getattr(model, attr)
+    query = select(model).where(func.lower(column) == normalized.lower())
     if current_id is not None:
         query = query.where(model.id != current_id)
 
