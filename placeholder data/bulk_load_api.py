@@ -5,6 +5,9 @@ Reads the same shapes as ``backend/scripts/seed_from_json.py`` (vendors, categor
 payment_methods, users, services, cost_records), plus optional ``laptops.json`` for
 ``POST /api/laptops/``. ``service_history.json`` is not loaded (no public write API).
 
+Users are processed **first** (match by email, or SCIM create when configured) so
+owner links and laptop assignees resolve before services and laptops are created.
+
 Environment variables
 ---------------------
 CATALOGIT_BASE_URL   API origin; default ``http://127.0.0.1:8000`` (set to your deployment).
@@ -215,6 +218,57 @@ def run(seed_dir: Path, client: ApiClient) -> int:
         if r.get("serial_number")
     }
 
+    # --- Users first (match existing; optional SCIM create) — before vendors/services/laptops
+    user_seed_to_id: dict[int, str] = {}
+    for r in users_rows:
+        email = str(r["email"]).lower()
+        if email in user_by_email:
+            user_seed_to_id[int(r["id"])] = user_by_email[email]
+            continue
+        if not client.scim_token:
+            if client.dry_run:
+                user_seed_to_id[int(r["id"])] = _pred_uuid("user", int(r["id"]))
+                continue
+            print(
+                f"  [warn] No user for {email}; set CATALOGIT_SCIM_TOKEN to create via SCIM, "
+                "or provision users first. Owner links for this user will be skipped.",
+                file=sys.stderr,
+            )
+            continue
+        first, last = _split_name(r.get("name") or "")
+        dept = r.get("department")
+        scim_body: dict[str, Any] = {
+            "schemas": [
+                "urn:ietf:params:scim:schemas:core:2.0:User",
+                ENTERPRISE_USER_SCHEMA,
+            ],
+            "userName": r["email"],
+            "name": {"givenName": first, "familyName": last},
+            "displayName": r.get("name") or "",
+            "emails": [{"value": r["email"], "primary": True}],
+            "active": True,
+            "externalId": f"seed:{r['email']}",
+            ENTERPRISE_USER_SCHEMA: {"department": dept} if dept else {},
+        }
+        print(f"  SCIM create user: {email}")
+        created = client.post_json("/scim/v2/Users", scim_body, scim=True)
+        if client.dry_run:
+            uid = _pred_uuid("user", int(r["id"]))
+            user_by_email[email] = uid
+            user_seed_to_id[int(r["id"])] = uid
+        elif created and created.get("id"):
+            uid = str(created["id"])
+            user_by_email[email] = uid
+            user_seed_to_id[int(r["id"])] = uid
+
+    if client.scim_token and not client.dry_run:
+        existing_users = client.get_json("/api/settings/users/") or []
+        user_by_email = {str(u["email"]).lower(): str(u["id"]) for u in existing_users}
+        for r in users_rows:
+            email = str(r["email"]).lower()
+            if email in user_by_email:
+                user_seed_to_id[int(r["id"])] = user_by_email[email]
+
     # --- Ensure service statuses referenced by seed services
     needed_status_names: set[str] = set()
     for r in services_rows:
@@ -300,58 +354,6 @@ def run(seed_dir: Path, client: ApiClient) -> int:
             pid = _pred_uuid("payment_method", int(r["id"]))
         if pid:
             payment_seed_to_id[int(r["id"])] = pid
-
-    # --- Users: match existing; optional SCIM create
-    user_seed_to_id: dict[int, str] = {}
-    for r in users_rows:
-        email = str(r["email"]).lower()
-        if email in user_by_email:
-            user_seed_to_id[int(r["id"])] = user_by_email[email]
-            continue
-        if not client.scim_token:
-            if client.dry_run:
-                user_seed_to_id[int(r["id"])] = _pred_uuid("user", int(r["id"]))
-                continue
-            print(
-                f"  [warn] No user for {email}; set CATALOGIT_SCIM_TOKEN to create via SCIM, "
-                "or provision users first. Owner links for this user will be skipped.",
-                file=sys.stderr,
-            )
-            continue
-        first, last = _split_name(r.get("name") or "")
-        dept = r.get("department")
-        scim_body: dict[str, Any] = {
-            "schemas": [
-                "urn:ietf:params:scim:schemas:core:2.0:User",
-                ENTERPRISE_USER_SCHEMA,
-            ],
-            "userName": r["email"],
-            "name": {"givenName": first, "familyName": last},
-            "displayName": r.get("name") or "",
-            "emails": [{"value": r["email"], "primary": True}],
-            "active": True,
-            "externalId": f"seed:{r['email']}",
-            ENTERPRISE_USER_SCHEMA: {"department": dept} if dept else {},
-        }
-        print(f"  SCIM create user: {email}")
-        created = client.post_json("/scim/v2/Users", scim_body, scim=True)
-        if client.dry_run:
-            uid = _pred_uuid("user", int(r["id"]))
-            user_by_email[email] = uid
-            user_seed_to_id[int(r["id"])] = uid
-        elif created and created.get("id"):
-            uid = str(created["id"])
-            user_by_email[email] = uid
-            user_seed_to_id[int(r["id"])] = uid
-
-    # Refresh user map if we created via SCIM in non-dry-run
-    if client.scim_token and not client.dry_run:
-        existing_users = client.get_json("/api/settings/users/") or []
-        user_by_email = {str(u["email"]).lower(): str(u["id"]) for u in existing_users}
-        for r in users_rows:
-            email = str(r["email"]).lower()
-            if email in user_by_email:
-                user_seed_to_id[int(r["id"])] = user_by_email[email]
 
     # --- Services
     service_seed_to_id: dict[int, str] = {}
