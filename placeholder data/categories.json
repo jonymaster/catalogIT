@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "name": "Internal operations",
+    "description": "Back-office and employee-facing tools"
+  },
+  {
+    "id": 2,
+    "name": "Product Aurora",
+    "description": "Infrastructure for the Aurora product line"
+  },
+  {
+    "id": 3,
+    "name": "Product Nova",
+    "description": "Infrastructure for the Nova product line"
+  },
+  {
+    "id": 4,
+    "name": "Shared platform",
+    "description": "Engineering and security shared services"
+  },
+  {
+    "id": 5,
+    "name": "Cross-product",
+    "description": "Used by more than one product area"
+  }
+]

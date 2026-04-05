@@ -1,0 +1,6 @@
+[
+  { "id": 1, "name": "Corporate purchasing card", "method_type": "credit_card" },
+  { "id": 2, "name": "Purchase order", "method_type": "contract" },
+  { "id": 3, "name": "No charge", "method_type": "free" },
+  { "id": 4, "name": "Invoice (NET 30)", "method_type": "invoice" }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "name": "Alex Rivera",
+    "email": "alex.rivera@northwind.example",
+    "department": "IT Operations"
+  },
+  {
+    "id": 2,
+    "name": "Sam Okonkwo",
+    "email": "sam.okonkwo@northwind.example",
+    "department": "Security"
+  },
+  {
+    "id": 3,
+    "name": "Jordan Lee",
+    "email": "jordan.lee@northwind.example",
+    "department": "Engineering"
+  },
+  {
+    "id": 4,
+    "name": "Riley Chen",
+    "email": "riley.chen@northwind.example",
+    "department": "Engineering"
+  },
+  {
+    "id": 5,
+    "name": "Morgan Blake",
+    "email": "morgan.blake@northwind.example",
+    "department": "Design"
+  },
+  {
+    "id": 6,
+    "name": "Casey Nguyen",
+    "email": "casey.nguyen@northwind.example",
+    "department": "Finance"
+  }
+]
