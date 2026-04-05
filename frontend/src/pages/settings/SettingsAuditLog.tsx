@@ -132,12 +132,14 @@ export function SettingsAuditLog() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-medium text-gray-900">Audit log</h2>
-      <p className="text-sm text-gray-500">
-        Sign-ins, data changes, notifications, integration tests, and application errors for
-        this deployment. Events older than the retention window (90 days by default) are removed when
-        the server runs the scheduled audit-retention job.
-      </p>
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Audit logs</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Sign-ins, data changes, notifications, integration tests, and application errors for
+          this deployment. Events older than the retention window (90 days by default) are removed when
+          the server runs the scheduled audit-retention job.
+        </p>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm text-gray-700">

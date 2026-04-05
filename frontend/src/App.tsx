@@ -26,7 +26,6 @@ import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
 import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
 import { SettingsScim } from "./pages/settings/SettingsScim";
-import { SettingsUsers } from "./pages/settings/SettingsUsers";
 import { SettingsTokens } from "./pages/settings/SettingsTokens";
 import { SettingsApi } from "./pages/settings/SettingsApi";
 import { SettingsReferenceData } from "./pages/settings/SettingsReferenceData";
@@ -67,14 +66,14 @@ export default function App() {
             <Route element={<ProtectedRoute requiredRole="admin" />}>
               <Route element={<Shell />}>
                 <Route path="/users" element={<Users />} />
+                <Route path="/audit" element={<SettingsAuditLog />} />
                 <Route path="/settings" element={<Settings />}>
                   <Route index element={<Navigate to="oidc" replace />} />
+                  <Route path="audit" element={<Navigate to="/audit" replace />} />
                   <Route path="oidc" element={<SettingsOidc />} />
-                  <Route path="audit" element={<SettingsAuditLog />} />
                   <Route path="notifications" element={<SettingsNotifications />} />
                   <Route path="integrations" element={<SettingsIntegrations />} />
                   <Route path="scim" element={<SettingsScim />} />
-                  <Route path="users" element={<SettingsUsers />} />
                   <Route path="reference-data" element={<SettingsReferenceData />}>
                     <Route index element={<SettingsReferenceDataHome />} />
                     <Route

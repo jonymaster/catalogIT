@@ -2,11 +2,17 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { BrandMark } from "./BrandMark";
 
-const navigation = [
-  { name: "Dashboard", to: "/" },
+const mainNavAfterDashboard = [
   { name: "Services", to: "/services" },
   { name: "Hardware", to: "/hardware" },
 ];
+
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+    isActive
+      ? "bg-gray-100 text-gray-900"
+      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+  }`;
 
 export function Sidebar() {
   const { user, logout } = useAuth();
@@ -19,63 +25,36 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            className={({ isActive }) =>
-              `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-gray-100 text-gray-900"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`
-            }
-          >
+        <NavLink to="/" end className={linkClass}>
+          Dashboard
+        </NavLink>
+
+        <div className="my-3 h-px bg-gray-200" />
+        {mainNavAfterDashboard.map((item) => (
+          <NavLink key={item.to} to={item.to} className={linkClass}>
             {item.name}
           </NavLink>
         ))}
 
         <div className="my-3 h-px bg-gray-200" />
-        <NavLink
-          to="/calendar"
-          className={({ isActive }) =>
-            `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              isActive
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            }`
-          }
-        >
+        <NavLink to="/calendar" className={linkClass}>
           Calendar
         </NavLink>
 
         {isAdmin && (
           <>
             <div className="my-3 h-px bg-gray-200" />
-            <NavLink
-              to="/users"
-              className={({ isActive }) =>
-                `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`
-              }
-            >
+            <p className="px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Admin menu
+            </p>
+            <NavLink to="/users" className={linkClass}>
               Users
             </NavLink>
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                `flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-gray-100 text-gray-900"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`
-              }
-            >
+            <NavLink to="/settings" className={linkClass}>
               Settings
+            </NavLink>
+            <NavLink to="/audit" className={linkClass}>
+              Audit logs
             </NavLink>
           </>
         )}
