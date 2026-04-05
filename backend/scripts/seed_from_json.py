@@ -22,12 +22,10 @@ from app.database import async_session, engine
 from app.models import (
     Category,
     CostRecord,
-    LoginMethod,
     PaymentMethod,
     Service,
     ServiceClassification,
     ServiceHistoryEntry,
-    ServiceLogin,
     ServiceStatus,
     User,
     Vendor,
@@ -100,18 +98,6 @@ async def _seed_categories(session: AsyncSession) -> None:
         session.add(Category(id=uid, name=r["name"], description=r.get("description")))
     await session.flush()
     print(f"  categories: {len(rows)} processed")
-
-
-async def _seed_login_methods(session: AsyncSession) -> None:
-    rows = _load("login_methods.json")
-    for r in rows:
-        uid = _uuid("login_method", r["id"])
-        existing = await session.get(LoginMethod, uid)
-        if existing:
-            continue
-        session.add(LoginMethod(id=uid, name=r["name"]))
-    await session.flush()
-    print(f"  login_methods: {len(rows)} processed")
 
 
 async def _seed_payment_methods(session: AsyncSession) -> None:
@@ -254,14 +240,6 @@ async def _seed_services(session: AsyncSession) -> None:
                     )
                 )
 
-        # Login methods
-        for i, lm_seed_id in enumerate(r.get("login_method_ids", [])):
-            session.add(ServiceLogin(
-                service_id=svc_id,
-                login_method_id=_uuid("login_method", lm_seed_id),
-                is_primary=(i == 0),
-            ))
-
     await session.flush()
     print(f"  services: {len(rows)} processed")
 
@@ -319,7 +297,6 @@ async def seed_database() -> None:
         try:
             await _seed_vendors(session)
             await _seed_categories(session)
-            await _seed_login_methods(session)
             await _seed_payment_methods(session)
             await _seed_service_statuses(session)
             await _seed_users(session)

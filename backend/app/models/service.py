@@ -82,10 +82,6 @@ class Service(Base):
         lazy="selectin"
     )
     contract: Mapped["Contract | None"] = relationship(lazy="selectin")  # noqa: F821
-    logins: Mapped[list["ServiceLogin"]] = relationship(  # noqa: F821
-        lazy="selectin",
-        cascade="all, delete-orphan",
-    )
     cost_records: Mapped[list["CostRecord"]] = relationship(  # noqa: F821
         lazy="noload",
         cascade="all, delete-orphan",

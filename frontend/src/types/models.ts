@@ -41,12 +41,6 @@ export interface CostCenter {
   description: string | null;
 }
 
-export interface LoginMethod {
-  id: string;
-  name: string;
-  description: string | null;
-}
-
 export interface PaymentMethod {
   id: string;
   name: string;
@@ -80,13 +74,6 @@ export interface Contract {
   vendor?: Vendor;
   created_at: string;
   updated_at: string;
-}
-
-export interface ServiceLogin {
-  id: string;
-  login_method_id: string;
-  is_primary: boolean;
-  login_method?: LoginMethod;
 }
 
 export interface CostRecord {
@@ -144,7 +131,6 @@ export interface Service {
   payment_method: PaymentMethod | null;
   service_status: ServiceStatus | null;
   service_classification: ServiceClassification | null;
-  logins: ServiceLogin[];
   created_at: string;
   updated_at: string;
 }

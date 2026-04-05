@@ -7,21 +7,11 @@ from pydantic import BaseModel
 
 from app.schemas.category import CategoryRead
 from app.schemas.cost_center import CostCenterRead
-from app.schemas.login_method import LoginMethodRead
 from app.schemas.payment_method import PaymentMethodRead
 from app.schemas.service_classification import ServiceClassificationRead
 from app.schemas.service_status import ServiceStatusRead
 from app.schemas.user import UserRead
 from app.schemas.vendor import VendorRead
-
-
-class ServiceLoginRead(BaseModel):
-    id: uuid.UUID
-    login_method_id: uuid.UUID
-    is_primary: bool
-    login_method: LoginMethodRead | None = None
-
-    model_config = {"from_attributes": True}
 
 
 class ServiceCreate(BaseModel):
@@ -104,7 +94,6 @@ class ServiceRead(BaseModel):
     payment_method: PaymentMethodRead | None = None
     service_status: ServiceStatusRead | None = None
     service_classification: ServiceClassificationRead | None = None
-    logins: list[ServiceLoginRead] = []
     created_at: datetime
     updated_at: datetime
 

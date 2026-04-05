@@ -162,29 +162,6 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
             ),
         ),
     ),
-    "login-methods": ReferenceResourceDefinition(
-        key="login-methods",
-        label="Login Method",
-        plural_label="Login Methods",
-        description="Define reusable authentication methods connected to service logins.",
-        api_path="/api/login-methods/",
-        settings_path="/settings/reference-data/login-methods",
-        search_fields=("name", "description"),
-        fields=(
-            ReferenceFieldDefinition(
-                key="name",
-                label="Name",
-                required=True,
-                placeholder="e.g. OIDC, SAML, Local account",
-            ),
-            ReferenceFieldDefinition(
-                key="description",
-                label="Description",
-                input_type="textarea",
-                placeholder="Optional notes about how the method is used.",
-            ),
-        ),
-    ),
     "service-statuses": ReferenceResourceDefinition(
         key="service-statuses",
         label="Service Status",
