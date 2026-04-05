@@ -322,14 +322,14 @@ export function Hardware() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Hardware</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Hardware</h1>
         <div className="flex shrink-0 items-center gap-2">
           {!loading && (
             <button
               type="button"
               onClick={handleExportCsv}
               disabled={filtered.length === 0}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Export CSV
             </button>
@@ -337,7 +337,7 @@ export function Hardware() {
           {canEdit && (
             <Link
               to="/hardware/new"
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
             >
               New Laptop
             </Link>
@@ -345,7 +345,7 @@ export function Hardware() {
         </div>
       </div>
       {loading ? (
-        <p className="text-sm text-gray-500">Loading...</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
       ) : (
         <>
           <div className="mb-4 flex items-center gap-3">

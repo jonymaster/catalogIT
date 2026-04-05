@@ -48,8 +48,8 @@ function ToastViewport({ toast }: { toast: ToastState | null }) {
 
   const tone =
     toast.type === "success"
-      ? "border-green-200 bg-green-50 text-green-800"
-      : "border-red-200 bg-red-50 text-red-800";
+      ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200"
+      : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200";
 
   return (
     <div className="pointer-events-none fixed right-4 top-4 z-50">

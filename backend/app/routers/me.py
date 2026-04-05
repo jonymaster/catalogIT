@@ -26,6 +26,9 @@ async def update_preferences(
     update_data = body.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
+        if field == "theme":
+            user.theme = value if value in ("light", "dark") else "light"
+            continue
         setattr(user, field, value.strip() or None if isinstance(value, str) else value)
 
     await db.flush()

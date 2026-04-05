@@ -244,33 +244,33 @@ export function SettingsNotifications() {
   }
 
   if (loading || !data) {
-    return <p className="text-sm text-gray-500">Loading...</p>;
+    return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   }
 
   return (
     <div className="space-y-8 max-w-2xl">
       <div>
-        <h2 className="text-lg font-medium text-gray-900">Renewal reminders</h2>
-        <p className="mt-1 text-sm text-gray-500">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Renewal reminders</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Service owners receive email reminders before each service renewal date
           (requires Gmail connected under{" "}
           <Link
             to="/settings/integrations"
-            className="font-medium text-gray-900 underline"
+            className="font-medium text-gray-900 dark:text-gray-100 underline"
           >
             Integrations
           </Link>
           ). A daily job calls the API to send due reminders; configure{" "}
-          <code className="rounded bg-gray-100 px-1 text-xs">CRON_SECRET</code>{" "}
+          <code className="rounded bg-gray-100 dark:bg-gray-800 px-1 text-xs">CRON_SECRET</code>{" "}
           and schedule{" "}
-          <code className="rounded bg-gray-100 px-1 text-xs">
+          <code className="rounded bg-gray-100 dark:bg-gray-800 px-1 text-xs">
             POST /api/internal/notifications/renewal-dispatch
           </code>
           .
         </p>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700">
+      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
         <input
           type="checkbox"
           checked={data.renewal_reminders_enabled}
@@ -279,35 +279,35 @@ export function SettingsNotifications() {
               d ? { ...d, renewal_reminders_enabled: e.target.checked } : d,
             )
           }
-          className="h-4 w-4 rounded border-gray-300"
+          className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
         />
         Enable renewal reminder emails
       </label>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Days before renewal (send on each day)
         </label>
         <input
           type="text"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+          className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
           value={offsetsText}
           onChange={(e) => setOffsetsText(e.target.value)}
           placeholder="30, 14, 7, 1"
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           Comma-separated. Emails send when the calendar date matches (renewal
           date minus each offset) in the timezone below.
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Calendar timezone
         </label>
         <input
           type="text"
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+          className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
           list="tz-suggestions"
           value={data.calendar_timezone}
           onChange={(e) =>
@@ -324,24 +324,24 @@ export function SettingsNotifications() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-gray-900">Email template</h3>
-        <p className="text-xs text-gray-500">
-          Upload one <code className="rounded bg-gray-100 px-1 text-xs">.html</code>{" "}
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Email template</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Upload one <code className="rounded bg-gray-100 dark:bg-gray-800 px-1 text-xs">.html</code>{" "}
           file (and optional images). Edit a copy of the{" "}
           <a
             href={`${REPO_MAIN}/email-templates/catalogit-renewal.html`}
-            className="font-medium text-gray-900 underline"
+            className="font-medium text-gray-900 dark:text-gray-100 underline"
             target="_blank"
             rel="noreferrer"
           >
             canned template
           </a>{" "}
           from the repo, or design your own. Use Mustache placeholders in the HTML
-          (e.g. <code className="rounded bg-gray-100 px-1">{"{{service_name}}"}</code>
+          (e.g. <code className="rounded bg-gray-100 dark:bg-gray-800 px-1">{"{{service_name}}"}</code>
           ). See{" "}
           <a
             href={`${REPO_MAIN}/docs/email-templates.md`}
-            className="font-medium text-gray-900 underline"
+            className="font-medium text-gray-900 dark:text-gray-100 underline"
             target="_blank"
             rel="noreferrer"
           >
@@ -350,7 +350,7 @@ export function SettingsNotifications() {
           for details. If you do not upload anything, the app uses the built-in HTML.
         </p>
 
-        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 space-y-2">
+        <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-3 text-xs text-gray-600 dark:text-gray-300 space-y-2">
           <p>
             Optional images (png, jpg, gif, webp, svg): name files like{" "}
             <code className="text-xs">logo.png</code> and in HTML use{" "}
@@ -359,7 +359,7 @@ export function SettingsNotifications() {
             <code className="text-xs">logo</code> image uploaded.
           </p>
           {data.renewal_email_html_storage_key && (
-            <p className="text-gray-800">
+            <p className="text-gray-800 dark:text-gray-100">
               Active:{" "}
               <code className="break-all text-xs">{data.renewal_email_html_storage_key}</code>
               {data.renewal_email_template_asset_keys &&
@@ -373,30 +373,30 @@ export function SettingsNotifications() {
             </p>
           )}
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-            <label className="block text-xs font-medium text-gray-700">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">
               HTML file
               <input
                 ref={htmlFileRef}
                 type="file"
                 accept=".html,.htm,text/html"
-                className="mt-1 block w-full text-sm text-gray-700"
+                className="mt-1 block w-full text-sm text-gray-700 dark:text-gray-200"
               />
             </label>
-            <label className="block text-xs font-medium text-gray-700">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">
               Images (optional)
               <input
                 ref={assetFilesRef}
                 type="file"
                 accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
                 multiple
-                className="mt-1 block w-full text-sm text-gray-700"
+                className="mt-1 block w-full text-sm text-gray-700 dark:text-gray-200"
               />
             </label>
             <button
               type="button"
               disabled={uploading}
               onClick={() => void uploadTemplate()}
-              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
             >
               {uploading ? "Uploading…" : "Upload HTML + images"}
             </button>
@@ -408,21 +408,21 @@ export function SettingsNotifications() {
                 type="button"
                 disabled={saving}
                 onClick={() => void clearUploadedTemplate()}
-                className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50"
+                className="rounded-md border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-red-800 dark:text-red-200 hover:bg-red-50 dark:bg-red-950/40 disabled:opacity-50"
               >
                 Reset to default template
               </button>
             )}
           </div>
-          <p className="text-gray-500">
-            <strong className="text-gray-700">Preview</strong> opens the rendered HTML in a new
+          <p className="text-gray-500 dark:text-gray-400">
+            <strong className="text-gray-700 dark:text-gray-200">Preview</strong> opens the rendered HTML in a new
             tab (sample data). Your browser shows it like a normal page.
           </p>
           <button
             type="button"
             disabled={previewLoading}
             onClick={() => void openPreviewInNewTab()}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
           >
             {previewLoading ? "Opening…" : "Preview HTML in new tab"}
           </button>
@@ -430,10 +430,10 @@ export function SettingsNotifications() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-gray-900">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
           Additional notification recipients
         </h3>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           These users receive renewal notifications for all eligible services,
           regardless of ownership. Admin users already receive notifications by
           default and do not need to be added here.
@@ -444,7 +444,7 @@ export function SettingsNotifications() {
             {selectedRecipients.map((u) => (
               <span
                 key={u.id}
-                className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700"
+                className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1 text-sm text-gray-700 dark:text-gray-200"
               >
                 {u.first_name} {u.last_name}
                 {u.role === "admin" && (
@@ -453,7 +453,7 @@ export function SettingsNotifications() {
                 <button
                   type="button"
                   onClick={() => removeRecipient(u.id)}
-                  className="ml-1 text-gray-400 hover:text-gray-600"
+                  className="ml-1 text-gray-400 hover:text-gray-600 dark:text-gray-300"
                   aria-label={`Remove ${u.first_name} ${u.last_name}`}
                 >
                   &times;
@@ -469,16 +469,16 @@ export function SettingsNotifications() {
             value={recipientSearch}
             onChange={(e) => setRecipientSearch(e.target.value)}
             placeholder="Search users to add..."
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+            className="block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
           />
           {recipientSearch && availableUsers.length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+            <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
               {availableUsers.slice(0, 10).map((u) => (
                 <li key={u.id}>
                   <button
                     type="button"
                     onClick={() => addRecipient(u.id)}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     {u.first_name} {u.last_name}{" "}
                     <span className="text-gray-400">{u.email}</span>
@@ -493,7 +493,7 @@ export function SettingsNotifications() {
             </ul>
           )}
           {recipientSearch && availableUsers.length === 0 && (
-            <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-lg">
+            <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-500 dark:text-gray-400 shadow-lg">
               No matching users found.
             </div>
           )}
@@ -504,7 +504,7 @@ export function SettingsNotifications() {
         type="button"
         disabled={saving}
         onClick={() => void save()}
-        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
       >
         {saving ? "Saving..." : "Save"}
       </button>

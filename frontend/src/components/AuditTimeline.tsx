@@ -33,9 +33,9 @@ function formatChange(entry: AuditLogEntry): string {
 }
 
 const actionColors: Record<string, string> = {
-  INSERT: "bg-green-100 text-green-800",
-  UPDATE: "bg-blue-100 text-blue-800",
-  DELETE: "bg-red-100 text-red-800",
+  INSERT: "bg-green-100 text-green-800 dark:text-green-200",
+  UPDATE: "bg-blue-100 text-blue-800 dark:text-blue-200",
+  DELETE: "bg-red-100 text-red-800 dark:text-red-200",
 };
 
 export function AuditTimeline({
@@ -88,11 +88,11 @@ export function AuditTimeline({
   }
 
   if (loading && entries.length === 0) {
-    return <p className="text-sm text-gray-500">Loading history...</p>;
+    return <p className="text-sm text-gray-500 dark:text-gray-400">Loading history...</p>;
   }
 
   if (entries.length === 0) {
-    return <p className="text-sm text-gray-500">No history recorded yet.</p>;
+    return <p className="text-sm text-gray-500 dark:text-gray-400">No history recorded yet.</p>;
   }
 
   return (
@@ -103,15 +103,15 @@ export function AuditTimeline({
             <div className="relative pb-8">
               {idx < entries.length - 1 && (
                 <span
-                  className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
+                  className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200 dark:bg-gray-700"
                   aria-hidden="true"
                 />
               )}
               <div className="relative flex space-x-3">
                 <div>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 ring-4 ring-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 ring-4 ring-white">
                     <span
-                      className={`inline-flex rounded-full px-1.5 py-0.5 text-xs font-medium ${actionColors[entry.action] ?? "bg-gray-100 text-gray-800"}`}
+                      className={`inline-flex rounded-full px-1.5 py-0.5 text-xs font-medium ${actionColors[entry.action] ?? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100"}`}
                     >
                       {entry.action[0]}
                     </span>
@@ -119,14 +119,14 @@ export function AuditTimeline({
                 </div>
                 <div className="flex min-w-0 flex-1 justify-between space-x-4">
                   <div>
-                    <p className="text-sm text-gray-700">{formatChange(entry)}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-200">{formatChange(entry)}</p>
                     {entry.changed_by && (
-                      <p className="mt-0.5 text-xs text-gray-500">
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                         by {entry.changed_by.first_name} {entry.changed_by.last_name}
                       </p>
                     )}
                   </div>
-                  <div className="shrink-0 whitespace-nowrap text-right text-xs text-gray-500">
+                  <div className="shrink-0 whitespace-nowrap text-right text-xs text-gray-500 dark:text-gray-400">
                     {formatDateTime(entry.timestamp, preferences, {
                       dateStyle: "medium",
                       timeStyle: "short",
@@ -139,8 +139,8 @@ export function AuditTimeline({
         ))}
       </ul>
       {totalCount > 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
-          <p className="text-xs text-gray-500">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             {totalCount} entr{totalCount === 1 ? "y" : "ies"}
             {totalPages > 0 && (
               <>
@@ -154,7 +154,7 @@ export function AuditTimeline({
               type="button"
               onClick={() => void goToPage(page - 1)}
               disabled={page <= 1 || loading}
-              className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-40"
+              className="text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40"
             >
               Previous
             </button>
@@ -162,7 +162,7 @@ export function AuditTimeline({
               type="button"
               onClick={() => void goToPage(page + 1)}
               disabled={totalPages === 0 || page >= totalPages || loading}
-              className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-40"
+              className="text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40"
             >
               Next
             </button>

@@ -22,8 +22,8 @@ export function SearchInput({
   bare = false,
 }: Props) {
   const baseInputClassName = bare
-    ? "w-full rounded-md border-0 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 shadow-none outline-none focus:border-transparent focus:outline-none focus:ring-0"
-    : "w-full rounded-md border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
+    ? "w-full rounded-md border-0 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 shadow-none outline-none focus:border-transparent focus:outline-none focus:ring-0"
+    : "w-full rounded-md border border-gray-300 dark:border-gray-600 py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400";
 
   return (
     <div className={`relative ${containerClassName}`.trim()}>

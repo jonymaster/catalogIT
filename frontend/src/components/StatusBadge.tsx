@@ -1,3 +1,4 @@
+/** Light-theme chip styles only — same in dark mode for consistent pills on list views. */
 const statusStyles: Record<string, string> = {
   // Service statuses
   Contract: "bg-emerald-100 text-emerald-800",

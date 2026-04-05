@@ -196,8 +196,8 @@ export function Calendar() {
   if (loading) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Calendar</h1>
-        <p className="mt-4 text-sm text-gray-500">Loading renewal calendar...</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Calendar</h1>
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading renewal calendar...</p>
       </div>
     );
   }
@@ -206,8 +206,8 @@ export function Calendar() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Calendar</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Calendar</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Renewal events are derived from each service renewal date and its
             monthly or annual billing schedule.
           </p>
@@ -216,21 +216,21 @@ export function Calendar() {
           <button
             type="button"
             onClick={() => setDisplayMonth((current) => shiftMonth(current, -1))}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Previous
           </button>
           <button
             type="button"
             onClick={() => setDisplayMonth(monthStart(new Date()))}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Today
           </button>
           <button
             type="button"
             onClick={() => setDisplayMonth((current) => shiftMonth(current, 1))}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Next
           </button>
@@ -238,36 +238,36 @@ export function Calendar() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Visible Month
           </p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
+          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {formatMonthYear(displayMonth, preferences)}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Renewals This Month
           </p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">{events.length}</p>
+          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{events.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Not Scheduled
           </p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">
+          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {unscheduledServices.length}
           </p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950">
           {dayNames.map((dayName) => (
             <div
               key={dayName}
-              className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500"
+              className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
             >
               {dayName}
             </div>
@@ -282,17 +282,17 @@ export function Calendar() {
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-36 border-b border-r border-gray-200 p-2 align-top ${
-                  inMonth ? "bg-white" : "bg-gray-50/70"
+                className={`min-h-36 border-b border-r border-gray-200 dark:border-gray-700 p-2 align-top ${
+                  inMonth ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-950/70"
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span
                     className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm ${
                       isToday
-                        ? "bg-gray-900 font-medium text-white"
+                        ? "bg-gray-900 dark:bg-gray-100 font-medium text-white dark:text-gray-900"
                         : inMonth
-                          ? "text-gray-900"
+                          ? "text-gray-900 dark:text-gray-100"
                           : "text-gray-400"
                     }`}
                   >
@@ -308,10 +308,10 @@ export function Calendar() {
                     <Link
                       key={event.id}
                       to={`/services/${event.service.id}`}
-                      className="block rounded-md border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900 hover:bg-blue-100"
+                      className="block rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-2 text-xs text-blue-900 hover:bg-blue-100"
                     >
                       <p className="font-medium">{event.service.name}</p>
-                      <p className="mt-0.5 text-blue-800">
+                      <p className="mt-0.5 text-blue-800 dark:text-blue-200">
                         {event.service.vendor?.name ?? "No vendor"}
                       </p>
                       <p className="mt-0.5 text-blue-700">
@@ -327,10 +327,10 @@ export function Calendar() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-medium text-gray-900">Month Renewal List</h2>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Month Renewal List</h2>
           {events.length === 0 ? (
-            <p className="mt-3 text-sm text-gray-500">
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
               No derived renewals fall in {formatMonthYear(displayMonth, preferences)}.
             </p>
           ) : (
@@ -338,21 +338,21 @@ export function Calendar() {
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-3"
+                  className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-700 p-3"
                 >
                   <div>
                     <Link
                       to={`/services/${event.service.id}`}
-                      className="text-sm font-medium text-gray-900 hover:text-gray-700"
+                      className="text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-200"
                     >
                       {event.service.name}
                     </Link>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       {event.service.vendor?.name ?? "No vendor"} •{" "}
                       {event.service.status}
                     </p>
                   </div>
-                  <p className="whitespace-nowrap text-sm text-gray-600">
+                  <p className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                     {formatDateOnly(
                       event.occurrence,
                       preferences,
@@ -365,14 +365,14 @@ export function Calendar() {
           )}
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-medium text-gray-900">Not Yet Scheduled</h2>
-          <p className="mt-1 text-sm text-gray-500">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Not Yet Scheduled</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Services need both a renewal date and a monthly or annual billing
             schedule to appear on the calendar.
           </p>
           {unscheduledServices.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-500">
+            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
               All services are schedulable.
             </p>
           ) : (

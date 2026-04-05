@@ -135,10 +135,10 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">Attachments</h2>
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Attachments</h2>
         {canEdit && (
           <label
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 ${uploading ? "pointer-events-none opacity-50" : ""}`}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${uploading ? "pointer-events-none opacity-50" : ""}`}
           >
             <svg
               className="h-4 w-4"
@@ -171,12 +171,12 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
       )}
 
       {loading && attachments.length === 0 ? (
-        <p className="text-sm text-gray-500">Loading attachments...</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading attachments...</p>
       ) : attachments.length === 0 ? (
         <p className="text-sm text-gray-400">No attachments yet.</p>
       ) : (
         <>
-          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             {attachments.map((att) => (
               <li
                 key={att.id}
@@ -186,7 +186,7 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
                   <button
                     type="button"
                     onClick={() => handleDownload(att)}
-                    className="truncate text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    className="truncate text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-200 hover:underline"
                     title={att.original_filename}
                   >
                     {att.original_filename}
@@ -224,8 +224,8 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
             ))}
           </ul>
           {totalCount > 0 && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
-              <p className="text-xs text-gray-500">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {totalCount} file{totalCount === 1 ? "" : "s"}
                 {totalPages > 0 && (
                   <>
@@ -239,7 +239,7 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
                   type="button"
                   onClick={() => void goToPage(page - 1)}
                   disabled={page <= 1 || loading}
-                  className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-40"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40"
                 >
                   Previous
                 </button>
@@ -247,7 +247,7 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
                   type="button"
                   onClick={() => void goToPage(page + 1)}
                   disabled={totalPages === 0 || page >= totalPages || loading}
-                  className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-40"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-40"
                 >
                   Next
                 </button>

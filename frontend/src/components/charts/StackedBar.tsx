@@ -52,7 +52,7 @@ export function StackedBar({
               y1={y}
               x2={width - 10}
               y2={y}
-              stroke="#e5e7eb"
+              className="stroke-gray-200 dark:stroke-gray-700"
               strokeWidth="0.5"
             />
             <text
@@ -60,7 +60,7 @@ export function StackedBar({
               y={y + 3}
               textAnchor="end"
               fontSize="10"
-              fill="#9ca3af"
+              className="fill-gray-400 dark:fill-gray-500"
             >
               {fmt(max * f)}
             </text>
@@ -98,8 +98,8 @@ export function StackedBar({
               y={10 + chartH - cumH - 4}
               textAnchor="middle"
               fontSize="9"
-              fill="#374151"
               fontWeight="500"
+              className="fill-gray-800 dark:fill-gray-100"
             >
               {fmt(total)}
             </text>
@@ -108,8 +108,8 @@ export function StackedBar({
               y={height - 4}
               textAnchor="middle"
               fontSize="11"
-              fill="#6b7280"
               fontWeight="500"
+              className="fill-gray-600 dark:fill-gray-400"
             >
               {yd.year}
             </text>

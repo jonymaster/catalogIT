@@ -10,10 +10,10 @@ import type { Laptop } from "../types/models";
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
+      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-gray-900">{children}</dd>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{children}</dd>
     </div>
   );
 }
@@ -40,32 +40,32 @@ export function LaptopDetail() {
     navigate("/hardware");
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!laptop) return <p className="text-sm text-red-600">Laptop not found.</p>;
 
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div>
-          <Link to="/hardware" className="text-sm text-gray-500 hover:text-gray-700">
+          <Link to="/hardware" className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             &larr; Back to Hardware
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold text-gray-900">
+          <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {laptop.model_name}
           </h1>
-          <p className="text-sm text-gray-500">S/N: {laptop.serial_number}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">S/N: {laptop.serial_number}</p>
         </div>
         {canEdit && (
           <div className="flex gap-2">
             <Link
               to={`/hardware/${id}/edit`}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Edit
             </Link>
             <button
               onClick={handleDelete}
-              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:bg-red-950/40"
             >
               Delete
             </button>
@@ -73,7 +73,7 @@ export function LaptopDetail() {
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
         <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
           <Field label="Status">
             <StatusBadge status={laptop.status} />
@@ -97,7 +97,7 @@ export function LaptopDetail() {
       <Attachments entityType="laptop" entityId={laptop.id} />
 
       <div>
-        <h2 className="mb-4 text-lg font-medium text-gray-900">Change History</h2>
+        <h2 className="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">Change History</h2>
         <AuditTimeline tableName="laptops" recordId={laptop.id} />
       </div>
     </div>

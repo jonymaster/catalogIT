@@ -38,7 +38,7 @@ export function ServiceDetail() {
     navigate("/services");
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!service)
     return <p className="text-sm text-red-600">Service not found.</p>;
 
@@ -48,11 +48,11 @@ export function ServiceDetail() {
         <div>
           <Link
             to="/services"
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             &larr; Back to Services
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold text-gray-900">
+          <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {service.name}
           </h1>
         </div>
@@ -60,13 +60,13 @@ export function ServiceDetail() {
           <div className="flex gap-2">
             <Link
               to={`/services/${id}/edit`}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Edit
             </Link>
             <button
               onClick={handleDelete}
-              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/40"
             >
               Delete
             </button>
@@ -74,7 +74,7 @@ export function ServiceDetail() {
         )}
       </div>
 
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex gap-6">
           {tabs.map((tab) => (
             <NavLink
@@ -84,8 +84,8 @@ export function ServiceDetail() {
               className={({ isActive }) =>
                 `whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
                   isActive
-                    ? "border-gray-900 text-gray-900"
-                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                    ? "border-gray-900 dark:border-gray-100 text-gray-900 dark:text-gray-100"
+                    : "border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200"
                 }`
               }
             >

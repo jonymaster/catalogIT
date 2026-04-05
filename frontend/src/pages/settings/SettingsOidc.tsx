@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import client from "../../api/client";
+import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
 
 interface OidcConfig {
   provider_name: string;
@@ -90,11 +91,13 @@ export function SettingsOidc() {
   return (
     <form
       onSubmit={handleSave}
-      className="max-w-xl space-y-6 rounded-lg border border-gray-200 bg-white p-6"
+      className="max-w-xl space-y-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
     >
-      <h2 className="text-lg font-medium text-gray-900">
+      <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
         OIDC Provider Configuration
       </h2>
+
+      <IntegrationEnabledIndicator enabled={config.enabled} />
 
       <div className="space-y-4">
         <Field
@@ -138,9 +141,9 @@ export function SettingsOidc() {
             type="checkbox"
             checked={config.enabled}
             onChange={(e) => update("enabled", e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-900 accent-gray-900 focus:ring-gray-500 dark:accent-gray-100 dark:focus:ring-gray-400"
           />
-          <label htmlFor="enabled" className="text-sm font-medium text-gray-700">
+          <label htmlFor="enabled" className="text-sm font-medium text-gray-700 dark:text-gray-200">
             Enable OIDC login
           </label>
         </div>
@@ -150,8 +153,8 @@ export function SettingsOidc() {
         <div
           className={`rounded-md p-4 text-sm ${
             testResult.success
-              ? "bg-green-50 text-green-800"
-              : "bg-red-50 text-red-800"
+              ? "bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200"
+              : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200"
           }`}
         >
           {testResult.success ? (
@@ -174,7 +177,9 @@ export function SettingsOidc() {
       {message && (
         <p
           className={`text-sm ${
-            message.type === "success" ? "text-green-600" : "text-red-600"
+            message.type === "success"
+              ? "text-green-700 dark:text-green-300"
+              : "text-red-700 dark:text-red-300"
           }`}
         >
           {message.text}
@@ -186,14 +191,14 @@ export function SettingsOidc() {
           type="button"
           onClick={handleTest}
           disabled={testing || !config.issuer_url}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+          className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
         >
           {testing ? "Testing..." : "Test connection"}
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save"}
         </button>
@@ -219,7 +224,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-200">
         {label}
       </label>
       <input
@@ -228,7 +233,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
       />
     </div>
   );

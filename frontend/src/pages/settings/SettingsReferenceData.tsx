@@ -27,7 +27,7 @@ export function SettingsReferenceData() {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-gray-500">Loading...</p>;
+    return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   }
 
   if (error) {
@@ -37,8 +37,8 @@ export function SettingsReferenceData() {
   return (
     <div className="space-y-6">
       <div className="max-w-3xl space-y-2">
-        <h2 className="text-lg font-medium text-gray-900">Reference Data</h2>
-        <p className="text-sm text-gray-600">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Reference Data</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
           Manage the reusable lookup data that powers service and hardware
           metadata across CatalogIT.
         </p>
@@ -51,8 +51,8 @@ export function SettingsReferenceData() {
           className={({ isActive }) =>
             `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               isActive
-                ? "bg-gray-900 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:bg-gray-700"
             }`
           }
         >
@@ -65,8 +65,8 @@ export function SettingsReferenceData() {
             className={({ isActive }) =>
               `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:bg-gray-700"
               }`
             }
           >

@@ -34,16 +34,16 @@ export function DataTable<T extends { id: string }>({
     : columns;
 
   return (
-    <div className="overflow-visible rounded-lg border border-gray-200 bg-white">
+    <div className="overflow-visible rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-950">
             <tr>
               {active.map((col) => (
                 <th
                   key={col.key}
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
                 >
                   {col.header}
                 </th>
@@ -52,14 +52,14 @@ export function DataTable<T extends { id: string }>({
           </thead>
           <tbody
             className={
-              striped ? "bg-white" : "divide-y divide-gray-200 bg-white"
+              striped ? "bg-white dark:bg-gray-900" : "divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900"
             }
           >
             {data.length === 0 && (
               <tr>
                 <td
                   colSpan={active.length}
-                  className="px-4 py-8 text-center text-sm text-gray-500"
+                  className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                 >
                   No records found.
                 </td>
@@ -72,15 +72,15 @@ export function DataTable<T extends { id: string }>({
                 className={
                   striped
                     ? [
-                        "odd:bg-white even:bg-gray-50",
+                        "[&:nth-child(odd)]:bg-white dark:[&:nth-child(odd)]:bg-gray-900 [&:nth-child(even)]:bg-gray-50 dark:[&:nth-child(even)]:bg-gray-950",
                         onRowClick
-                          ? "cursor-pointer transition-colors hover:bg-gray-100"
+                          ? "cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                           : "",
                       ]
                         .filter(Boolean)
                         .join(" ")
                     : onRowClick
-                      ? "cursor-pointer transition-colors hover:bg-gray-50"
+                      ? "cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
                       : undefined
                 }
               >
@@ -88,9 +88,9 @@ export function DataTable<T extends { id: string }>({
                   <td
                     key={col.key}
                     className={[
-                      "whitespace-nowrap px-4 py-3 text-sm text-gray-700",
+                      "whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-200",
                       col.key === primaryColumnKey
-                        ? "font-semibold text-gray-900"
+                        ? "font-semibold text-gray-900 dark:text-gray-100"
                         : "",
                     ]
                       .filter(Boolean)

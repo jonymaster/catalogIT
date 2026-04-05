@@ -53,11 +53,11 @@ function ResourceFieldInput({
   onChange: (value: string) => void;
 }) {
   const sharedClassName =
-    "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
+    "mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400";
 
   return (
     <label className="block">
-      <span className="text-sm font-medium text-gray-700">
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
         {field.label}
         {field.required ? " *" : ""}
       </span>
@@ -81,7 +81,7 @@ function ResourceFieldInput({
         />
       )}
       {field.help_text && (
-        <span className="mt-1 block text-xs text-gray-500">{field.help_text}</span>
+        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{field.help_text}</span>
       )}
     </label>
   );
@@ -264,7 +264,7 @@ export function SettingsReferenceDataResource() {
           <div className="flex justify-end gap-3">
             <button
               type="button"
-              className="text-sm text-gray-600 hover:text-gray-900"
+              className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
               onClick={(event) => {
                 event.stopPropagation();
                 setEditingRecord(row);
@@ -284,7 +284,7 @@ export function SettingsReferenceDataResource() {
             </button>
             <button
               type="button"
-              className="text-sm text-red-600 hover:text-red-800"
+              className="text-sm text-red-600 hover:text-red-800 dark:text-red-200"
               disabled={deletingId === row.id}
               onClick={(event) => {
                 event.stopPropagation();
@@ -305,17 +305,17 @@ export function SettingsReferenceDataResource() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
-          <h3 className="text-lg font-medium text-gray-900">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
             {resource.plural_label}
           </h3>
-          <p className="max-w-2xl text-sm text-gray-600">{resource.description}</p>
+          <p className="max-w-2xl text-sm text-gray-600 dark:text-gray-300">{resource.description}</p>
         </div>
         <button
           type="button"
           onClick={openCreateDialog}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
         >
           Add {resource.label}
         </button>
@@ -340,24 +340,24 @@ export function SettingsReferenceDataResource() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500">Loading...</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
       ) : (
         <DataTable columns={columns} data={filtered} />
       )}
 
       <dialog
         ref={dialogRef}
-        className="w-full max-w-2xl rounded-lg border border-gray-200 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
+        className="w-full max-w-2xl rounded-lg border border-gray-200 dark:border-gray-700 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
         onClose={() => {
           setEditingRecord(null);
         }}
       >
         <form onSubmit={handleSubmit} className="space-y-5 p-6">
           <div className="space-y-1">
-            <h4 className="text-lg font-semibold text-gray-900">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {editingRecord ? `Edit ${resource.label}` : `Add ${resource.label}`}
             </h4>
-            <p className="text-sm text-gray-600">{resource.description}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300">{resource.description}</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -384,14 +384,14 @@ export function SettingsReferenceDataResource() {
             <button
               type="button"
               onClick={closeDialog}
-              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
             >
               {saving ? "Saving..." : editingRecord ? "Save changes" : `Create ${resource.label}`}
             </button>

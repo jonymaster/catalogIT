@@ -8,6 +8,7 @@ export type BadgeColor =
   | "teal"
   | "pink";
 
+/** Light-theme chip styles only — same in dark mode for consistent, readable pills on data tables. */
 const colorMap: Record<BadgeColor, string> = {
   gray: "bg-gray-100 text-gray-700",
   green: "bg-emerald-100 text-emerald-800",

@@ -46,6 +46,7 @@ class UserUpdate(BaseModel):
 class UserPreferencesRead(BaseModel):
     locale: str | None = None
     timezone: str | None = None
+    theme: Literal["light", "dark"] = "light"
 
     model_config = {"from_attributes": True}
 
@@ -53,3 +54,4 @@ class UserPreferencesRead(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     locale: str | None = None
     timezone: str | None = None
+    theme: Literal["light", "dark"] | None = None

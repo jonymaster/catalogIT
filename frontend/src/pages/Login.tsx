@@ -15,16 +15,16 @@ interface Providers {
 }
 
 const inputClassName =
-  "mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-colors focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10";
+  "mt-1 block w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 shadow-sm transition-colors focus:border-gray-900 dark:focus:border-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900/10 dark:focus:ring-gray-100/10";
 
 function ProvidersLoading() {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14">
       <div
-        className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-gray-900"
+        className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-gray-900 dark:border-t-gray-100"
         aria-hidden
       />
-      <p className="text-sm text-gray-500">Loading sign-in options…</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400">Loading sign-in options…</p>
     </div>
   );
 }
@@ -57,7 +57,7 @@ function LocalLoginForm({
       <div>
         <label
           htmlFor={emailId}
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
         >
           Email
         </label>
@@ -74,7 +74,7 @@ function LocalLoginForm({
       <div>
         <label
           htmlFor={passwordId}
-          className="block text-sm font-medium text-gray-700"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-200"
         >
           Password
         </label>
@@ -92,7 +92,7 @@ function LocalLoginForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gray-800 disabled:opacity-50"
+        className="w-full rounded-lg bg-gray-900 dark:bg-gray-100 px-4 py-3 text-sm font-semibold text-white dark:text-gray-900 shadow-sm transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
       >
         {loading ? "Signing in…" : "Sign in"}
       </button>
@@ -149,12 +149,12 @@ export function Login() {
   const showOidcFirst = !!oidc;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-xl ring-1 ring-black/5">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 px-4 py-12 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+      <div className="w-full max-w-md rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-8 shadow-xl ring-1 ring-black/5">
         <div className="mb-2 flex justify-center">
           <BrandMark align="center" className="[&_img]:max-h-16" />
         </div>
-        <p className="mb-8 text-center text-sm text-gray-500">
+        <p className="mb-8 text-center text-sm text-gray-500 dark:text-gray-400">
           IT Service &amp; Hardware Management
         </p>
 
@@ -165,16 +165,16 @@ export function Login() {
             <button
               type="button"
               onClick={login}
-              className="w-full rounded-xl bg-gray-900 px-4 py-3.5 text-center text-sm font-semibold text-white shadow-md transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+              className="w-full rounded-xl bg-gray-900 dark:bg-gray-100 px-4 py-3.5 text-center text-sm font-semibold text-white dark:text-gray-900 shadow-md transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
             >
               Sign in with {oidc.provider_name || "SSO"}
             </button>
-            <p className="mt-3 text-center text-xs text-gray-500">
+            <p className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
               You will be redirected to your organization&apos;s sign-in page.
             </p>
 
-            <details className="group mt-8 border-t border-gray-100 pt-6">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 [&::-webkit-details-marker]:hidden">
+            <details className="group mt-8 border-t border-gray-100 dark:border-gray-800 pt-6">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors hover:text-gray-900 dark:hover:text-gray-100 [&::-webkit-details-marker]:hidden">
                 <span>Sign in with email and password</span>
                 <svg
                   className="h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180"

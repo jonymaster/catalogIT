@@ -40,7 +40,7 @@ export function BarChart({
               y1={y}
               x2={width - 10}
               y2={y}
-              stroke="#e5e7eb"
+              className="stroke-gray-200 dark:stroke-gray-700"
               strokeWidth="0.5"
             />
             <text
@@ -48,7 +48,7 @@ export function BarChart({
               y={y + 3}
               textAnchor="end"
               fontSize="10"
-              fill="#9ca3af"
+              className="fill-gray-400 dark:fill-gray-500"
             >
               {fmt(max * f)}
             </text>
@@ -71,24 +71,22 @@ export function BarChart({
               fill={d.color || color}
               opacity="0.85"
             />
-            {bh > 14 && (
-              <text
-                x={x + bw / 2}
-                y={y + 12}
-                textAnchor="middle"
-                fontSize="9"
-                fill="white"
-                fontWeight="500"
-              >
-                {fmt(d.value)}
-              </text>
-            )}
+            <text
+              x={x + bw / 2}
+              y={y - 4}
+              textAnchor="middle"
+              fontSize="9"
+              fontWeight="500"
+              className="fill-gray-800 dark:fill-gray-100"
+            >
+              {fmt(d.value)}
+            </text>
             <text
               x={x + bw / 2}
               y={height - 4}
               textAnchor="middle"
               fontSize="10"
-              fill="#6b7280"
+              className="fill-gray-600 dark:fill-gray-400"
             >
               {d.label}
             </text>

@@ -17,7 +17,7 @@ export function LaptopEdit() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!laptop)
     return <p className="text-sm text-red-600">Laptop not found.</p>;
 
@@ -26,15 +26,15 @@ export function LaptopEdit() {
       <div>
         <Link
           to={`/hardware/${id}`}
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           &larr; Back to {laptop.model_name}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-900">
+        <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
           Edit {laptop.model_name}
         </h1>
       </div>
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
         <LaptopForm initial={laptop} />
       </div>
     </div>

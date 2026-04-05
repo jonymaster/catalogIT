@@ -90,12 +90,12 @@ function StatCard({
   return (
     <div
       onClick={onClick}
-      className={`rounded-lg border border-gray-200 bg-white p-5 ${onClick ? "cursor-pointer transition-shadow hover:shadow-md" : ""}`}
+      className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 ${onClick ? "cursor-pointer transition-shadow hover:shadow-md" : ""}`}
     >
-      <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+      <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
         {label}
       </p>
-      <p className={`mt-1 text-2xl font-semibold ${color ?? "text-gray-900"}`}>
+      <p className={`mt-1 text-2xl font-semibold ${color ?? "text-gray-900 dark:text-gray-100"}`}>
         {value}
       </p>
       {subtext && <p className="mt-0.5 text-xs text-gray-400">{subtext}</p>}
@@ -254,8 +254,8 @@ export function Dashboard() {
   if (loading) {
     return (
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-4 text-sm text-gray-500">Loading...</p>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
       </div>
     );
   }
@@ -264,14 +264,14 @@ export function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-      <p className="mt-1 text-sm text-gray-500">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         Welcome{user?.email ? `, ${user.email}` : ""}.
       </p>
 
       <div className="mt-8 flex justify-center">
         <div className="relative w-full max-w-3xl" ref={searchRef}>
-          <div className="rounded-full border border-gray-200 bg-white p-2 shadow-sm">
+          <div className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 shadow-sm">
             <SearchInput
               value={dashboardSearch}
               onChange={(value) => {
@@ -295,11 +295,11 @@ export function Dashboard() {
             />
           </div>
           {searchOpen && normalizedSearch && (
-            <div className="absolute left-0 top-full z-20 mt-3 w-full rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+            <div className="absolute left-0 top-full z-20 mt-3 w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-xl">
               <div className="space-y-4">
                 {serviceMatches.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Services
                     </p>
                     <div className="space-y-1">
@@ -312,13 +312,13 @@ export function Dashboard() {
                             setDashboardSearch("");
                             navigate(`/services/${service.id}`);
                           }}
-                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
                           <span>
-                            <span className="block text-sm font-medium text-gray-900">
+                            <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
                               {service.name}
                             </span>
-                            <span className="block text-xs text-gray-500">
+                            <span className="block text-xs text-gray-500 dark:text-gray-400">
                               {service.category_rel?.name ?? "—"} • {service.status}
                             </span>
                           </span>
@@ -333,7 +333,7 @@ export function Dashboard() {
 
                 {laptopMatches.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Hardware
                     </p>
                     <div className="space-y-1">
@@ -346,13 +346,13 @@ export function Dashboard() {
                             setDashboardSearch("");
                             navigate(`/hardware/${laptop.id}`);
                           }}
-                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
                           <span>
-                            <span className="block text-sm font-medium text-gray-900">
+                            <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
                               {laptop.model_name}
                             </span>
-                            <span className="block text-xs text-gray-500">
+                            <span className="block text-xs text-gray-500 dark:text-gray-400">
                               {laptop.serial_number} • {laptop.status}
                             </span>
                           </span>
@@ -366,7 +366,7 @@ export function Dashboard() {
                 )}
 
                 {serviceMatches.length === 0 && laptopMatches.length === 0 && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     No matching services or hardware found.
                   </p>
                 )}
@@ -402,7 +402,7 @@ export function Dashboard() {
         <>
           {/* Year selector */}
           <div className="mt-8 flex items-center gap-3">
-            <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
+            <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Fiscal year:
             </span>
             {years.map((y) => (
@@ -411,8 +411,8 @@ export function Dashboard() {
                 onClick={() => setDashYear(y)}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                   dashYear === y
-                    ? "bg-gray-900 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:bg-gray-700"
                 }`}
               >
                 {y}
@@ -429,7 +429,7 @@ export function Dashboard() {
             <StatCard
               label="YoY Change"
               value={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`}
-              color={yoyChange < 0 ? "text-emerald-600" : yoyChange > 0 ? "text-red-600" : "text-gray-900"}
+              color={yoyChange < 0 ? "text-emerald-600" : yoyChange > 0 ? "text-red-600" : "text-gray-900 dark:text-gray-100"}
             />
             <StatCard
               label="Core SaaS"
@@ -444,8 +444,8 @@ export function Dashboard() {
           </div>
 
           {/* Total spend by year */}
-          <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+          <div className="mt-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Total spend by year
             </h3>
             <BarChart
@@ -459,16 +459,16 @@ export function Dashboard() {
 
           {/* Spend by category (stacked) */}
           {categoryNames.length > 0 && (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+            <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-medium uppercase tracking-wider text-gray-500">
+                <h3 className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Spend by category (stacked)
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {categoryNames.map((name) => (
                     <span
                       key={name}
-                      className="flex items-center gap-1 text-xs text-gray-500"
+                      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
                     >
                       <span
                         className="inline-block h-2 w-2 rounded-full"
@@ -485,8 +485,8 @@ export function Dashboard() {
 
           {/* Top spenders */}
           {topSpenders.length > 0 && (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500">
+            <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 Top {Math.min(12, topSpenders.length)} services by cost -- {dashYear}
               </h3>
               <BarChart
@@ -504,36 +504,36 @@ export function Dashboard() {
 
           {/* Category breakdown table */}
           {costByCategory.length > 0 && (
-            <div className="mt-4 overflow-hidden rounded-lg border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200 text-xs">
-                <thead className="bg-gray-50">
+            <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-xs">
+                <thead className="bg-gray-50 dark:bg-gray-950">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                       Category
                     </th>
                     {years.map((y) => (
                       <th
                         key={y}
                         className={`px-3 py-2 text-right text-xs font-medium uppercase ${
-                          y === dashYear ? "text-indigo-600" : "text-gray-500"
+                          y === dashYear ? "text-indigo-600" : "text-gray-500 dark:text-gray-400"
                         }`}
                       >
                         {y}
                       </th>
                     ))}
-                    <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">
+                    <th className="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                       YoY
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-gray-100 bg-white dark:bg-gray-900">
                   {costByCategory.map((cat) => {
                     const cur = cat.byYr[dashYear] ?? 0;
                     const prev = cat.byYr[dashYear - 1] ?? 0;
                     const delta = prev > 0 ? ((cur - prev) / prev) * 100 : 0;
                     return (
                       <tr key={cat.name}>
-                        <td className="px-3 py-2 font-medium text-gray-900">
+                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">
                           {cat.name}
                         </td>
                         {years.map((y) => (
@@ -541,8 +541,8 @@ export function Dashboard() {
                             key={y}
                             className={`px-3 py-2 text-right font-mono ${
                               y === dashYear
-                                ? "font-semibold text-gray-900"
-                                : "text-gray-500"
+                                ? "font-semibold text-gray-900 dark:text-gray-100"
+                                : "text-gray-500 dark:text-gray-400"
                             }`}
                           >
                             {fmtFull(cat.byYr[y] ?? 0)}
@@ -564,12 +564,12 @@ export function Dashboard() {
                       </tr>
                     );
                   })}
-                  <tr className="bg-gray-50 font-semibold">
-                    <td className="px-3 py-2 text-gray-900">Total</td>
+                  <tr className="bg-gray-50 dark:bg-gray-950 font-semibold">
+                    <td className="px-3 py-2 text-gray-900 dark:text-gray-100">Total</td>
                     {years.map((y) => (
                       <td
                         key={y}
-                        className="px-3 py-2 text-right font-mono text-gray-900"
+                        className="px-3 py-2 text-right font-mono text-gray-900 dark:text-gray-100"
                       >
                         {fmtFull(costByYear[y] ?? 0)}
                       </td>

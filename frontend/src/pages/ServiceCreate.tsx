@@ -7,15 +7,15 @@ export function ServiceCreate() {
       <div>
         <Link
           to="/services"
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           &larr; Back to Services
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-900">
+        <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
           New Service
         </h1>
       </div>
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
         <ServiceForm />
       </div>
     </div>

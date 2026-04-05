@@ -22,10 +22,10 @@ function Field({
 }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
+      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-gray-900">{children}</dd>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{children}</dd>
     </div>
   );
 }
@@ -114,16 +114,16 @@ function renderField(
         ? `Custom offsets: ${service.renewal_offsets_days!.join(", ")} days before renewal`
         : "Using global default reminder schedule from Settings";
       return (
-        <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="sm:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             {SERVICE_FIELD_LABELS.renewal_reminders}
           </p>
-          <p className="mt-2 text-sm text-gray-900">
+          <p className="mt-2 text-sm text-gray-900 dark:text-gray-100">
             Email reminders:{" "}
             {service.renewal_reminders_enabled ? "Enabled" : "Disabled"}
           </p>
           {service.renewal_reminders_enabled && (
-            <p className="mt-1 text-sm text-gray-600">{detail}</p>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{detail}</p>
           )}
         </div>
       );
@@ -174,9 +174,9 @@ export function ServiceOverview() {
       {SERVICE_VIEW_SECTIONS.map((section) => (
         <div
           key={section.id}
-          className="rounded-lg border border-gray-200 bg-white p-6"
+          className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
         >
-          <h2 className="mb-4 text-base font-semibold text-gray-900">
+          <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
             {section.title}
           </h2>
           <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -199,7 +199,7 @@ export function ServiceOverview() {
       <Attachments entityType="service" entityId={service.id} />
 
       <div>
-        <h2 className="mb-4 text-lg font-medium text-gray-900">
+        <h2 className="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">
           Change History
         </h2>
         <AuditTimeline

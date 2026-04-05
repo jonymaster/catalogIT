@@ -17,15 +17,15 @@ const categories = [
 function categoryClass(cat: string): string {
   switch (cat) {
     case "data_change":
-      return "bg-blue-100 text-blue-800";
+      return "bg-blue-100 text-blue-800 dark:text-blue-200";
     case "security":
       return "bg-amber-100 text-amber-900";
     case "notification":
-      return "bg-green-100 text-green-800";
+      return "bg-green-100 text-green-800 dark:text-green-200";
     case "error":
-      return "bg-red-100 text-red-800";
+      return "bg-red-100 text-red-800 dark:text-red-200";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100";
   }
 }
 
@@ -51,14 +51,14 @@ function AuditEventDetails({ row }: { row: GlobalAuditEventRow }) {
   return (
     <div className="space-y-2 text-left">
       {parts.length > 0 && (
-        <p className="text-xs text-gray-600">{parts.join(" · ")}</p>
+        <p className="text-xs text-gray-600 dark:text-gray-300">{parts.join(" · ")}</p>
       )}
       {hasDetailsPayload(row) ? (
-        <pre className="max-h-96 overflow-auto rounded border border-gray-200 bg-white p-3 font-mono text-xs leading-relaxed text-gray-800 whitespace-pre-wrap break-words">
+        <pre className="max-h-96 overflow-auto rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 font-mono text-xs leading-relaxed text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words">
           {JSON.stringify(row.details, null, 2)}
         </pre>
       ) : (
-        <p className="text-xs text-gray-500">No JSON payload for this event.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">No JSON payload for this event.</p>
       )}
     </div>
   );
@@ -133,8 +133,8 @@ export function SettingsAuditLog() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Audit logs</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Audit logs</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Sign-ins, data changes, notifications, integration tests, and application errors for
           this deployment. Events older than the retention window (90 days by default) are removed when
           the server runs the scheduled audit-retention job.
@@ -142,10 +142,10 @@ export function SettingsAuditLog() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm text-gray-700">
+        <label className="text-sm text-gray-700 dark:text-gray-200">
           Category
           <select
-            className="ml-2 rounded-md border border-gray-300 px-2 py-1 text-sm"
+            className="ml-2 rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
@@ -161,23 +161,23 @@ export function SettingsAuditLog() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-gray-500">No events yet.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">No events yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-950">
               <tr>
                 <th className="w-10 px-2 py-2" aria-label="Expand details" />
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Time</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Category</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Event</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Summary</th>
-                <th className="px-3 py-2 text-left font-medium text-gray-700">Actor</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Time</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Category</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Event</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Summary</th>
+                <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-200">Actor</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
               {items.map((row) => {
                 const open = expandedIds.has(row.id);
                 return (
@@ -187,7 +187,7 @@ export function SettingsAuditLog() {
                         <button
                           type="button"
                           onClick={() => toggleExpanded(row.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
                           aria-expanded={open}
                           aria-label={open ? "Hide details" : "Show details"}
                         >
@@ -196,7 +196,7 @@ export function SettingsAuditLog() {
                           </span>
                         </button>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-gray-600">
+                      <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">
                         {formatDateTime(row.occurred_at, preferences, {
                           dateStyle: "medium",
                           timeStyle: "short",
@@ -209,11 +209,11 @@ export function SettingsAuditLog() {
                           {row.category}
                         </span>
                       </td>
-                      <td className="max-w-[12rem] truncate px-3 py-2 font-mono text-xs text-gray-800">
+                      <td className="max-w-[12rem] truncate px-3 py-2 font-mono text-xs text-gray-800 dark:text-gray-100">
                         {row.event_type}
                       </td>
-                      <td className="max-w-md px-3 py-2 text-gray-800">{row.summary ?? "—"}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-gray-600">
+                      <td className="max-w-md px-3 py-2 text-gray-800 dark:text-gray-100">{row.summary ?? "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-gray-600 dark:text-gray-300">
                         {row.actor
                           ? `${row.actor.first_name} ${row.actor.last_name}`.trim() ||
                             row.actor.email
@@ -221,7 +221,7 @@ export function SettingsAuditLog() {
                       </td>
                     </tr>
                     {open && (
-                      <tr className="bg-gray-50">
+                      <tr className="bg-gray-50 dark:bg-gray-950">
                         <td colSpan={6} className="px-3 py-3">
                           <AuditEventDetails row={row} />
                         </td>
@@ -236,8 +236,8 @@ export function SettingsAuditLog() {
       )}
 
       {!loading && totalCount > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4">
-          <p className="text-sm text-gray-600">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             {totalCount} event{totalCount === 1 ? "" : "s"}
             {totalPages > 0 && (
               <>
@@ -251,7 +251,7 @@ export function SettingsAuditLog() {
               type="button"
               onClick={() => void goToPage(page - 1)}
               disabled={page <= 1}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Previous
             </button>
@@ -259,7 +259,7 @@ export function SettingsAuditLog() {
               type="button"
               onClick={() => void goToPage(page + 1)}
               disabled={totalPages === 0 || page >= totalPages}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next
             </button>

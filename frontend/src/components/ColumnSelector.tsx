@@ -69,10 +69,10 @@ export function ColumnSelector<T>({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
       >
         <svg
-          className="h-4 w-4 text-gray-500"
+          className="h-4 w-4 text-gray-500 dark:text-gray-400"
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={2}
@@ -88,8 +88,8 @@ export function ColumnSelector<T>({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-1 max-h-[min(70vh,28rem)] w-80 overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-          <div className="px-3 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+        <div className="absolute right-0 z-20 mt-1 max-h-[min(70vh,28rem)] w-80 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 py-1 shadow-lg">
+          <div className="px-3 py-2 text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400 uppercase">
             Visible (drag to reorder)
           </div>
           {visibleKeys.map((key, index) => {
@@ -120,7 +120,7 @@ export function ColumnSelector<T>({
                     setDragFrom(index);
                   }}
                   onDragEnd={() => setDragFrom(null)}
-                  className="inline-flex shrink-0 cursor-grab touch-none rounded p-0.5 text-gray-400 active:cursor-grabbing hover:bg-gray-100 hover:text-gray-600"
+                  className="inline-flex shrink-0 cursor-grab touch-none rounded p-0.5 text-gray-400 active:cursor-grabbing hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:text-gray-300"
                   aria-label={`Drag ${columnLabel(col)}`}
                 >
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -133,7 +133,7 @@ export function ColumnSelector<T>({
                   </svg>
                 </span>
                 <span
-                  className={`min-w-0 flex-1 truncate text-sm text-gray-700 ${
+                  className={`min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-200 ${
                     dragFrom === index ? "opacity-50" : ""
                   }`}
                 >
@@ -144,7 +144,7 @@ export function ColumnSelector<T>({
                     type="button"
                     disabled={index === 0}
                     onClick={() => move(index, index - 1)}
-                    className="rounded px-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="rounded px-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:text-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
                     aria-label={`Move ${columnLabel(col)} up`}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -155,7 +155,7 @@ export function ColumnSelector<T>({
                     type="button"
                     disabled={index === visibleKeys.length - 1}
                     onClick={() => move(index, index + 1)}
-                    className="rounded px-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
+                    className="rounded px-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:text-gray-100 disabled:cursor-not-allowed disabled:opacity-30"
                     aria-label={`Move ${columnLabel(col)} down`}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -168,14 +168,14 @@ export function ColumnSelector<T>({
                     type="checkbox"
                     checked
                     onChange={() => toggle(key)}
-                    className="h-3.5 w-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+                    className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
                   />
                 </label>
               </div>
             );
           })}
 
-          <div className="mt-1 border-t border-gray-200 px-3 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+          <div className="mt-1 border-t border-gray-200 dark:border-gray-700 px-3 py-2 text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400 uppercase">
             Hidden
           </div>
           {hiddenColumns.length === 0 ? (
@@ -184,13 +184,13 @@ export function ColumnSelector<T>({
             hiddenColumns.map((col) => (
               <label
                 key={col.key}
-                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
               >
                 <input
                   type="checkbox"
                   checked={false}
                   onChange={() => toggle(col.key)}
-                  className="h-3.5 w-3.5 rounded border-gray-300 text-gray-900 focus:ring-gray-500"
+                  className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
                 />
                 {columnLabel(col)}
               </label>

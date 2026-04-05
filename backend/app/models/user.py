@@ -21,6 +21,7 @@ class User(Base):
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     locale: Mapped[str | None] = mapped_column(String(20), nullable=True)
     timezone: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    theme: Mapped[str] = mapped_column(String(10), default="light")
     is_active: Mapped[bool] = mapped_column(default=True)
     receive_renewal_notifications: Mapped[bool] = mapped_column(default=True)
 

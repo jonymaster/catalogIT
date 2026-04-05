@@ -17,7 +17,7 @@ export function ServiceEdit() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!service)
     return <p className="text-sm text-red-600">Service not found.</p>;
 
@@ -26,15 +26,15 @@ export function ServiceEdit() {
       <div>
         <Link
           to={`/services/${id}`}
-          className="text-sm text-gray-500 hover:text-gray-700"
+          className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           &larr; Back to {service.name}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-900">
+        <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
           Edit {service.name}
         </h1>
       </div>
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
         <ServiceForm initial={service} />
       </div>
     </div>

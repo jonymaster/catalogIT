@@ -232,8 +232,8 @@ export function ServiceForm({ initial }: Props) {
   }
 
   const inputCls =
-    "block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
-  const labelCls = "block text-sm font-medium text-gray-700";
+    "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400";
+  const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200";
 
   function renderFieldControl(key: ServiceFieldKey) {
     switch (key) {
@@ -293,7 +293,7 @@ export function ServiceForm({ initial }: Props) {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Hold Ctrl/Cmd to select multiple
             </p>
           </div>
@@ -339,12 +339,12 @@ export function ServiceForm({ initial }: Props) {
       case "sso_integrated":
         return (
           <div className="flex items-end pb-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
               <input
                 type="checkbox"
                 checked={form.sso_integrated}
                 onChange={(e) => set("sso_integrated", e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
               />
               {SERVICE_FIELD_LABELS.sso_integrated}
             </label>
@@ -353,12 +353,12 @@ export function ServiceForm({ initial }: Props) {
       case "scim_enabled":
         return (
           <div className="flex items-end pb-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
               <input
                 type="checkbox"
                 checked={form.scim_enabled}
                 onChange={(e) => set("scim_enabled", e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
               />
               {SERVICE_FIELD_LABELS.scim_enabled}
             </label>
@@ -442,34 +442,34 @@ export function ServiceForm({ initial }: Props) {
         );
       case "renewal_reminders":
         return (
-          <div className="col-span-full space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <p className="text-sm font-medium text-gray-900">
+          <div className="col-span-full space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-4">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {SERVICE_FIELD_LABELS.renewal_reminders}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Owners receive emails at the configured days before renewal (global
               defaults in Settings → Notifications). Override the schedule for this
               service only if needed.
             </p>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
               <input
                 type="checkbox"
                 checked={form.renewal_reminders_enabled}
                 onChange={(e) =>
                   set("renewal_reminders_enabled", e.target.checked)
                 }
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
               />
               Send renewal reminder emails for this service
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
               <input
                 type="checkbox"
                 checked={form.renewal_use_custom_offsets}
                 onChange={(e) =>
                   set("renewal_use_custom_offsets", e.target.checked)
                 }
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
               />
               Use custom reminder offsets (instead of global defaults)
             </label>
@@ -537,12 +537,12 @@ export function ServiceForm({ initial }: Props) {
       case "nonprofit_pricing":
         return (
           <div className="flex items-end pb-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
               <input
                 type="checkbox"
                 checked={form.nonprofit_pricing}
                 onChange={(e) => set("nonprofit_pricing", e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
               />
               {SERVICE_FIELD_LABELS.nonprofit_pricing}
             </label>
@@ -568,7 +568,7 @@ export function ServiceForm({ initial }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-md bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -585,7 +585,7 @@ export function ServiceForm({ initial }: Props) {
 
       {SERVICE_VIEW_SECTIONS.map((section) => (
         <div key={section.id} className="space-y-4">
-          <h2 className="text-base font-semibold text-gray-900">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
             {section.title}
           </h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -609,14 +609,14 @@ export function ServiceForm({ initial }: Props) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
         >
           {saving ? "Saving..." : isEdit ? "Update Service" : "Create Service"}
         </button>
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
         >
           Cancel
         </button>

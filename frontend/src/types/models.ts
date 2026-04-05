@@ -18,6 +18,7 @@ export interface User {
 export interface UserPreferences {
   locale: string | null;
   timezone: string | null;
+  theme: "light" | "dark";
 }
 
 export interface Vendor {
