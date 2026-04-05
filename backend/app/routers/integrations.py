@@ -27,8 +27,6 @@ from app.models.integration_config import IntegrationConfig
 from app.models.oauth_state import OAuthState
 from app.models.user import User
 from app.schemas.integration import (
-    EmailTemplatePreviewRequest,
-    EmailTemplatePreviewResponse,
     GoogleMailIntegrationPatch,
     IntegrationChannelRead,
     IntegrationListResponse,
@@ -247,12 +245,6 @@ async def patch_google_mail(
         row.enabled = body.enabled
     if body.client_id is not None:
         meta["client_id"] = body.client_id
-    if body.email_subject_template is not None:
-        meta["email_subject_template"] = body.email_subject_template
-    if body.email_html_template is not None:
-        meta["email_html_template"] = body.email_html_template
-    if body.email_text_template is not None:
-        meta["email_text_template"] = body.email_text_template
     if body.client_secret is not None:
         _merge_secrets_row(row, {"client_secret": body.client_secret})
     row.metadata_ = meta
@@ -313,30 +305,6 @@ async def test_integration(
         entity_label=f"Integration ({channel})",
     )
     return TestSendResponse(ok=True, detail=None)
-
-
-@settings_router.post(
-    "/google_mail/preview",
-    response_model=EmailTemplatePreviewResponse,
-)
-async def preview_google_templates(
-    body: EmailTemplatePreviewRequest,
-    _user: User = Depends(_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    channel = "google_mail"
-    row = await db.get(IntegrationConfig, channel)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Integration not found")
-    from app.integrations import gmail_render
-
-    meta = merged_metadata(row, channel)
-    sample = dict(body.sample_data)
-    sample.setdefault("title", "CatalogIT")
-    sample.setdefault("body", "Sample notification body.")
-    sample.setdefault("service_name", "Example Service")
-    sample.setdefault("renewal_date", "2026-12-31")
-    return gmail_render.render_preview(meta, sample)
 
 
 # --- OAuth: Google ---

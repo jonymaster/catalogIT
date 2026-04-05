@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../../api/client";
+
+/** Source files in the public repo (docs + canned HTML). */
+const REPO_MAIN =
+  "https://github.com/jcoponet/catalogIT/blob/main";
 import { useToast } from "../../context/useToast";
 import type { User } from "../../types/models";
 
@@ -11,6 +15,8 @@ interface NotificationSettings {
   renewal_email_subject_template: string | null;
   renewal_email_html_template: string | null;
   renewal_email_text_template: string | null;
+  renewal_email_html_storage_key: string | null;
+  renewal_email_template_asset_keys: Record<string, string> | null;
   extra_recipient_ids: string[];
   updated_at: string | null;
 }
@@ -36,6 +42,10 @@ export function SettingsNotifications() {
   const [offsetsText, setOffsetsText] = useState("30, 14, 7, 1");
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [recipientSearch, setRecipientSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const htmlFileRef = useRef<HTMLInputElement>(null);
+  const assetFilesRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([
@@ -126,12 +136,6 @@ export function SettingsNotifications() {
           renewal_reminders_enabled: data.renewal_reminders_enabled,
           renewal_offsets_days: offsets,
           calendar_timezone: data.calendar_timezone.trim() || "UTC",
-          renewal_email_subject_template:
-            data.renewal_email_subject_template?.trim() || null,
-          renewal_email_html_template:
-            data.renewal_email_html_template?.trim() || null,
-          renewal_email_text_template:
-            data.renewal_email_text_template?.trim() || null,
           extra_recipient_ids: data.extra_recipient_ids,
         },
       );
@@ -142,6 +146,100 @@ export function SettingsNotifications() {
       showToast({ type: "error", text: "Failed to save." });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadTemplate() {
+    const html = htmlFileRef.current?.files?.[0];
+    if (!html) {
+      showToast({ type: "error", text: "Choose an HTML file (.html or .htm)." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("html", html);
+      const assets = assetFilesRef.current?.files;
+      if (assets?.length) {
+        for (let i = 0; i < assets.length; i++) {
+          fd.append("assets", assets[i]);
+        }
+      }
+      const res = await client.post<NotificationSettings>(
+        "/api/settings/notifications/email-template-upload",
+        fd,
+      );
+      setData(res.data);
+      if (htmlFileRef.current) htmlFileRef.current.value = "";
+      if (assetFilesRef.current) assetFilesRef.current.value = "";
+      showToast({ type: "success", text: "HTML template uploaded to storage." });
+    } catch {
+      showToast({ type: "error", text: "Upload failed." });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function clearUploadedTemplate() {
+    if (!data) return;
+    setSaving(true);
+    try {
+      const res = await client.patch<NotificationSettings>(
+        "/api/settings/notifications",
+        {
+          renewal_email_html_storage_key: null,
+          renewal_email_template_asset_keys: null,
+          renewal_email_html_template: null,
+          renewal_email_text_template: null,
+          renewal_email_subject_template: null,
+        },
+      );
+      setData(res.data);
+      showToast({
+        type: "success",
+        text: "Template reset to the built-in default. Upload a new file anytime.",
+      });
+    } catch {
+      showToast({ type: "error", text: "Failed to reset template." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openPreviewInNewTab() {
+    setPreviewLoading(true);
+    try {
+      const r = await client.post<{ html: string }>(
+        "/api/settings/notifications/email-preview",
+        {
+          sample_data: {
+            title: "CatalogIT",
+            service_name: "Example Service",
+            renewal_date: "2026-12-31",
+            days_before: "7",
+            owner_name: "Jane Doe",
+          },
+        },
+      );
+      const html = r.data.html;
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        URL.revokeObjectURL(url);
+        showToast({
+          type: "error",
+          text: "Could not open a new tab. Allow pop-ups for this site and try again.",
+        });
+        return;
+      }
+      window.setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 120_000);
+    } catch {
+      showToast({ type: "error", text: "Preview failed." });
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -226,75 +324,108 @@ export function SettingsNotifications() {
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-gray-900">Email templates</h3>
+        <h3 className="text-sm font-medium text-gray-900">Email template</h3>
         <p className="text-xs text-gray-500">
-          Mustache-style variables:{" "}
-          <code className="rounded bg-gray-100 px-1">{"{{service_name}}"}</code>,{" "}
-          <code className="rounded bg-gray-100 px-1">{"{{renewal_date}}"}</code>,{" "}
-          <code className="rounded bg-gray-100 px-1">{"{{days_before}}"}</code>,{" "}
-          <code className="rounded bg-gray-100 px-1">{"{{owner_name}}"}</code>,{" "}
-          <code className="rounded bg-gray-100 px-1">{"{{body}}"}</code>, etc.
-          Leave blank to use built-in defaults.
+          Upload one <code className="rounded bg-gray-100 px-1 text-xs">.html</code>{" "}
+          file (and optional images). Edit a copy of the{" "}
+          <a
+            href={`${REPO_MAIN}/email-templates/catalogit-renewal.html`}
+            className="font-medium text-gray-900 underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            canned template
+          </a>{" "}
+          from the repo, or design your own. Use Mustache placeholders in the HTML
+          (e.g. <code className="rounded bg-gray-100 px-1">{"{{service_name}}"}</code>
+          ). See{" "}
+          <a
+            href={`${REPO_MAIN}/docs/email-templates.md`}
+            className="font-medium text-gray-900 underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            docs/email-templates.md
+          </a>{" "}
+          for details. If you do not upload anything, the app uses the built-in HTML.
         </p>
-        <div>
-          <label className="block text-xs font-medium text-gray-600">Subject</label>
-          <input
-            type="text"
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono text-gray-900"
-            value={data.renewal_email_subject_template ?? ""}
-            onChange={(e) =>
-              setData((d) =>
-                d
-                  ? {
-                      ...d,
-                      renewal_email_subject_template:
-                        e.target.value || null,
-                    }
-                  : d,
-              )
-            }
-            placeholder="Built-in default"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600">HTML body</label>
-          <textarea
-            rows={5}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono text-gray-900"
-            value={data.renewal_email_html_template ?? ""}
-            onChange={(e) =>
-              setData((d) =>
-                d
-                  ? {
-                      ...d,
-                      renewal_email_html_template:
-                        e.target.value || null,
-                    }
-                  : d,
-              )
-            }
-            placeholder="Built-in default"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600">Plain text</label>
-          <textarea
-            rows={5}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono text-gray-900"
-            value={data.renewal_email_text_template ?? ""}
-            onChange={(e) =>
-              setData((d) =>
-                d
-                  ? {
-                      ...d,
-                      renewal_email_text_template:
-                        e.target.value || null,
-                    }
-                  : d,
-              )
-            }
-            placeholder="Built-in default"
-          />
+
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 space-y-2">
+          <p>
+            Optional images (png, jpg, gif, webp, svg): name files like{" "}
+            <code className="text-xs">logo.png</code> and in HTML use{" "}
+            <code className="text-xs">{"src=\"cid:logo\""}</code> (name without extension = CID).
+            Or use <code className="text-xs">{"{{logo_block}}"}</code> with a{" "}
+            <code className="text-xs">logo</code> image uploaded.
+          </p>
+          {data.renewal_email_html_storage_key && (
+            <p className="text-gray-800">
+              Active:{" "}
+              <code className="break-all text-xs">{data.renewal_email_html_storage_key}</code>
+              {data.renewal_email_template_asset_keys &&
+                Object.keys(data.renewal_email_template_asset_keys).length > 0 && (
+                  <>
+                    {" "}
+                    · inline images:{" "}
+                    {Object.keys(data.renewal_email_template_asset_keys).join(", ")}
+                  </>
+                )}
+            </p>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="block text-xs font-medium text-gray-700">
+              HTML file
+              <input
+                ref={htmlFileRef}
+                type="file"
+                accept=".html,.htm,text/html"
+                className="mt-1 block w-full text-sm text-gray-700"
+              />
+            </label>
+            <label className="block text-xs font-medium text-gray-700">
+              Images (optional)
+              <input
+                ref={assetFilesRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                multiple
+                className="mt-1 block w-full text-sm text-gray-700"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => void uploadTemplate()}
+              className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {uploading ? "Uploading…" : "Upload HTML + images"}
+            </button>
+            {(data.renewal_email_html_storage_key ||
+              data.renewal_email_html_template ||
+              data.renewal_email_subject_template ||
+              data.renewal_email_text_template) && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void clearUploadedTemplate()}
+                className="rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50"
+              >
+                Reset to default template
+              </button>
+            )}
+          </div>
+          <p className="text-gray-500">
+            <strong className="text-gray-700">Preview</strong> opens the rendered HTML in a new
+            tab (sample data). Your browser shows it like a normal page.
+          </p>
+          <button
+            type="button"
+            disabled={previewLoading}
+            onClick={() => void openPreviewInNewTab()}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {previewLoading ? "Opening…" : "Preview HTML in new tab"}
+          </button>
         </div>
       </div>
 

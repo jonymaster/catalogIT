@@ -51,6 +51,45 @@ def _normalize_slug(raw: str) -> str:
     return s
 
 
+def _slugify_from_name(name: str) -> str:
+    raw = name.strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "_", raw)
+    s = re.sub(r"_+", "_", s).strip("_")
+    if not s:
+        s = "classification"
+    return s[:64]
+
+
+async def _allocate_unique_slug(
+    db: AsyncSession,
+    base: str,
+    *,
+    current_id: uuid.UUID | None = None,
+) -> str:
+    """Pick a slug matching ``_SLUG_RE`` based on ``base``, adding numeric suffixes if needed."""
+    column = ServiceClassification.slug
+    base = base[:64].rstrip("_") or "classification"
+    for i in range(1000):
+        if i == 0:
+            candidate = base[:64]
+        else:
+            suffix = f"_{i + 1}"
+            max_base = max(1, 64 - len(suffix))
+            candidate = (base[:max_base].rstrip("_") + suffix)[:64]
+        if not _SLUG_RE.match(candidate):
+            candidate = ("classification" + (suffix if i else ""))[:64]
+        query = select(ServiceClassification).where(column == candidate)
+        if current_id is not None:
+            query = query.where(ServiceClassification.id != current_id)
+        existing = await db.scalar(query)
+        if existing is None:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Could not allocate a unique slug.",
+    )
+
+
 @router.get("/", response_model=list[ServiceClassificationRead])
 async def list_service_classifications(db: AsyncSession = Depends(get_audited_db)):
     result = await db.execute(
@@ -65,14 +104,18 @@ async def create_service_classification(
     _user: User = Depends(_admin),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    slug = _normalize_slug(body.slug)
-    await ensure_unique_name(db, ServiceClassification, slug, attr="slug")
     name = body.name.strip()
     if not name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Name is required",
         )
+    raw_slug = body.slug.strip() if body.slug else ""
+    if raw_slug:
+        slug = _normalize_slug(raw_slug)
+        await ensure_unique_name(db, ServiceClassification, slug, attr="slug")
+    else:
+        slug = await _allocate_unique_slug(db, _slugify_from_name(name))
     await ensure_unique_name(db, ServiceClassification, name)
     row = ServiceClassification(
         slug=slug,

@@ -22,8 +22,8 @@ def render_mustache(template: str, data: dict[str, Any]) -> str:
 
 def render_templates(meta: dict[str, Any], data: dict[str, Any]) -> tuple[str, str, str]:
     subject_t = meta.get("email_subject_template") or "{{title}}"
-    html_t = meta.get("email_html_template") or "<p>{{body}}</p>"
-    text_t = meta.get("email_text_template") or "{{body}}"
+    html_t = meta.get("email_html_template") or "<p></p>"
+    text_t = meta.get("email_text_template") or ""
     subj = render_mustache(subject_t, data)
     html = render_mustache(html_t, data)
     text = render_mustache(text_t, data)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -13,6 +14,8 @@ class NotificationSettingsRead(BaseModel):
     renewal_email_subject_template: str | None = None
     renewal_email_html_template: str | None = None
     renewal_email_text_template: str | None = None
+    renewal_email_html_storage_key: str | None = None
+    renewal_email_template_asset_keys: dict[str, str] | None = None
     extra_recipient_ids: list[uuid.UUID] = []
     updated_at: datetime | None = None
 
@@ -29,7 +32,19 @@ class NotificationSettingsUpdate(BaseModel):
     renewal_email_subject_template: str | None = None
     renewal_email_html_template: str | None = None
     renewal_email_text_template: str | None = None
+    renewal_email_html_storage_key: str | None = None
+    renewal_email_template_asset_keys: dict[str, str] | None = None
     extra_recipient_ids: list[uuid.UUID] | None = None
+
+
+class NotificationEmailPreviewRequest(BaseModel):
+    sample_data: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotificationEmailPreviewResponse(BaseModel):
+    subject: str
+    html: str
+    text: str
 
 
 class RenewalDispatchResult(BaseModel):

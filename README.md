@@ -28,7 +28,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **SSO & Provisioning** — OIDC single sign-on (Okta) with SCIM 2.0 automatic user provisioning
 - **Role-Based Access** — admin and regular user roles with fine-grained permissions
 - **Audit Logging** — comprehensive change history with configurable retention policies
-- **Notifications** — renewal reminders and alerts via Gmail, Slack, Telegram, or webhooks
+- **Notifications** — renewal reminders and alerts via Gmail, Slack, Telegram, or webhooks ([email templates](docs/email-templates.md))
 - **File Attachments** — attach contracts and documents to services (S3-compatible storage)
 - **API Tokens** — programmatic access for automation and integrations
 - **Backup & Restore** — complete tooling for database and object storage backups
@@ -90,6 +90,7 @@ docker compose exec api alembic upgrade head
 
 | Topic | Guide |
 |-------|-------|
+| **Email templates** (subject, HTML upload, logos, preview) | [docs/email-templates.md](docs/email-templates.md) |
 | Integrations overview | [docs/integrations/README.md](docs/integrations/README.md) |
 | Gmail setup | [docs/integrations/gmail.md](docs/integrations/gmail.md) |
 | Slack setup | [docs/integrations/slack.md](docs/integrations/slack.md) |
@@ -100,7 +101,7 @@ docker compose exec api alembic upgrade head
 ## Operations
 
 - **Logging** — the API logs to stdout. Set `LOG_FORMAT=json` for structured JSON output. On AWS ECS, use the `awslogs` driver or FireLens to ship logs to CloudWatch.
-- **Renewal reminders** — configure Gmail integration under **Settings > Notifications**, then call `POST /api/internal/notifications/renewal-dispatch` with `X-Cron-Secret` header on a daily schedule.
+- **Renewal reminders** — connect Gmail under **Settings → Integrations**, edit templates under **Settings → Notifications** ([guide](docs/email-templates.md)), then call `POST /api/internal/notifications/renewal-dispatch` with the `X-Cron-Secret` header on a daily schedule.
 - **Audit retention** — rows older than `AUDIT_RETENTION_DAYS` (default 90) are purged via `POST /api/internal/audit-retention` with the same `X-Cron-Secret` header.
 - **Backups** — run `make backup-local` for a one-command database dump and bucket mirror. See [Backup & Restore](docs/operations/backup-and-restore.md) for production procedures.
 
@@ -116,8 +117,10 @@ catalogIT/
 │   ├── src/           # Components, pages, hooks, types
 │   └── Dockerfile
 ├── docs/
-│   ├── integrations/  # Gmail, Slack, Telegram, webhook guides
-│   └── operations/    # Backup and restore procedures
+│   ├── email-templates.md  # How to customize and upload email HTML
+│   ├── integrations/       # Gmail, Slack, Telegram, webhook guides
+│   └── operations/         # Backup and restore procedures
+├── email-templates/        # Canned HTML you can copy, edit, and upload in the app
 ├── branding/          # Logo assets (light/dark, horizontal/square)
 ├── scripts/           # Utility scripts (backup, etc.)
 ├── docker-compose.yml

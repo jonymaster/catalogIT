@@ -24,19 +24,6 @@ BILLABLE_SCHEDULES = {"annually", "monthly"}
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_RENEWAL_SUBJECT = "Renewal in {{days_before}} days: {{service_name}}"
-DEFAULT_RENEWAL_HTML = (
-    "<p>Hi {{owner_name}},</p>"
-    "<p>The service <strong>{{service_name}}</strong> renews on {{renewal_date}} "
-    "(in {{days_before}} days).</p>"
-    "<p>{{body}}</p>"
-)
-DEFAULT_RENEWAL_TEXT = (
-    "Hi {{owner_name}},\n\n"
-    "The service {{service_name}} renews on {{renewal_date}} (in {{days_before}} days).\n\n"
-    "{{body}}"
-)
-
 
 def _today_in_timezone(tz_name: str) -> date:
     try:
@@ -66,15 +53,6 @@ def _normalize_offsets(raw: list[int] | None) -> list[int]:
             seen.add(n)
             unique.append(n)
     return unique
-
-
-def _renewal_template_overrides(ngs: NotificationGlobalSettings) -> dict[str, Any]:
-    return {
-        "email_subject_template": ngs.renewal_email_subject_template
-        or DEFAULT_RENEWAL_SUBJECT,
-        "email_html_template": ngs.renewal_email_html_template or DEFAULT_RENEWAL_HTML,
-        "email_text_template": ngs.renewal_email_text_template or DEFAULT_RENEWAL_TEXT,
-    }
 
 
 async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
@@ -132,8 +110,6 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
     services = (await session.execute(q)).scalars().all()
     result.examined_services = len(services)
 
-    tpl_overrides = _renewal_template_overrides(ngs)
-
     for service in services:
         assert service.renewal_date is not None
         offsets = (
@@ -179,7 +155,6 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                 recipient_name = f"{recipient.first_name} {recipient.last_name}".strip() or recipient.email
                 data: dict[str, Any] = {
                     "title": f"Renewal in {days_before} days: {service.name}",
-                    "body": "Please review licensing and budget in CatalogIT.",
                     "service_name": service.name,
                     "renewal_date": service.renewal_date.isoformat(),
                     "days_before": str(days_before),
@@ -195,7 +170,6 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                             google_row,
                             recipient.email,
                             data,
-                            template_overrides=tpl_overrides,
                         )
                         session.add(
                             RenewalNotificationSent(

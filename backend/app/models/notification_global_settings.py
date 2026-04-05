@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Integer, String, Table, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -31,6 +31,10 @@ class NotificationGlobalSettings(Base):
     renewal_email_subject_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     renewal_email_html_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     renewal_email_text_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # MinIO object key for uploaded HTML (when set, overrides renewal_email_html_template for send/preview).
+    renewal_email_html_storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # CID name -> S3 object key for inline images (e.g. {"logo": "email-templates/.../logo.png"}).
+    renewal_email_template_asset_keys: Mapped[dict[str, str] | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

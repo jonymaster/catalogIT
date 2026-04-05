@@ -56,9 +56,6 @@ class GoogleMailIntegrationPatch(BaseModel):
     enabled: bool | None = None
     client_id: str | None = None
     client_secret: str | None = Field(None, description="If set, replaces OAuth client secret")
-    email_subject_template: str | None = None
-    email_html_template: str | None = None
-    email_text_template: str | None = None
 
 
 class EmailTemplatePreviewRequest(BaseModel):

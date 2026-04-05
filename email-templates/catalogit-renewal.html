@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <!--
+    CatalogIT canned template — copy, personalize, upload via Settings → Notifications.
+    Placeholders: {{owner_name}} {{service_name}} {{renewal_date}} {{days_before}} {{title}}
+    Logo: upload logo.png with this file; keep {{logo_block}} or use src="cid:logo" in your HTML.
+  -->
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <meta name="supported-color-schemes" content="light" />
+  <title>{{title}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f172a;padding:32px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.45);">
+          <!-- Top bar -->
+          <tr>
+            <td style="padding:0;background:#6366f1;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 50%,#a855f7 100%);">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="padding:20px 28px 16px 28px;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+                    <p style="margin:0;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;opacity:0.9;">CatalogIT</p>
+                    <p style="margin:8px 0 0 0;font-size:20px;font-weight:600;line-height:1.3;">Renewal reminder</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Optional logo row ({{logo_block}} or cid:logo when uploaded with assets) -->
+          <tr>
+            <td style="padding:24px 28px 0 28px;background-color:#ffffff;">
+              {{logo_block}}
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:20px 28px 28px 28px;background-color:#ffffff;color:#334155;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:16px;line-height:1.65;">
+              <p style="margin:0 0 16px 0;color:#0f172a;font-size:17px;font-weight:600;">Hi {{owner_name}},</p>
+              <p style="margin:0 0 16px 0;">
+                The service
+                <span style="color:#4f46e5;font-weight:600;">{{service_name}}</span>
+                renews on
+                <strong style="color:#0f172a;">{{renewal_date}}</strong>
+                (in <strong style="color:#0f172a;">{{days_before}}</strong> days).
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0;border-radius:8px;background-color:#f1f5f9;border:1px solid #e2e8f0;">
+                <tr>
+                  <td style="padding:14px 16px;font-size:14px;color:#475569;line-height:1.6;">
+                    Please review licensing and budget in CatalogIT.
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:20px 0 0 0;font-size:13px;color:#94a3b8;line-height:1.5;">
+                You are receiving this because you own or are subscribed to notifications for this service in CatalogIT.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 28px 20px 28px;background-color:#f8fafc;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.5;text-align:center;">
+                Sent by your IT service catalog
+              </p>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:16px 0 0 0;font-size:11px;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;text-align:center;">
+          &nbsp;
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

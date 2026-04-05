@@ -13,9 +13,6 @@ def default_metadata(channel: str) -> dict[str, Any]:
         return {
             "client_id": "",
             "google_email": "",
-            "email_subject_template": "{{title}}",
-            "email_html_template": "<p>{{body}}</p>",
-            "email_text_template": "{{body}}",
         }
     if channel == "slack":
         return {
@@ -43,6 +40,9 @@ def mask_metadata_for_read(channel: str, meta: dict[str, Any]) -> dict[str, Any]
     """Return metadata safe for API responses (no secrets)."""
     out = deepcopy(meta)
     # No secret keys in metadata by convention; client_secret lives in encrypted blob only
+    if channel == "google_mail":
+        for k in ("email_subject_template", "email_html_template", "email_text_template"):
+            out.pop(k, None)
     return out
 
 

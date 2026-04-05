@@ -25,9 +25,10 @@ After changing scopes in code, **reconnect Google** once so the new consent is g
 ## Steps
 
 1. In Google Cloud Console, create OAuth 2.0 credentials and add the redirect URI above.
-2. In CatalogIT **Settings → Integrations** (Gmail section): paste **Client ID** and **Client secret**, then scroll to **Email templates** (subject, HTML, optional plain text). Use `{{title}}`, `{{body}}`, `{{service_name}}`, `{{renewal_date}}`, etc. Click **Save**.
+2. In CatalogIT **Settings → Integrations** (Gmail section): paste **Client ID** and **Client secret**, then click **Save**.
 3. Click **Connect Google** and approve access. The sender address is taken from the connected account.
-4. Use **Preview templates** and **Send test email** to verify.
+4. Edit **email subject and templates** under **Settings → Notifications** (not on the Integrations page). See the [Email templates](../email-templates.md) guide. Use placeholders such as `{{service_name}}`, `{{renewal_date}}`, `{{owner_name}}`, etc.
+5. Use **Send test email** on the Integrations page to verify delivery. Use **Preview rendered email** on the Notifications page to preview the HTML.
 
 ## Troubleshooting
 

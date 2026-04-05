@@ -215,20 +215,13 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
         description="Catalog-wide labels for each service (for example Core SaaS, subscription, or internal). Shown on service records and used in dashboard views.",
         api_path="/api/service-classifications/",
         settings_path="/settings/reference-data/service-classifications",
-        search_fields=("slug", "name", "description"),
+        search_fields=("name", "description"),
         fields=(
             ReferenceFieldDefinition(
-                key="slug",
-                label="Slug",
-                required=True,
-                placeholder="e.g. core_saas, internal",
-                help_text="Stable identifier: lowercase letters, numbers, and underscores only. Used in dashboards and integrations.",
-            ),
-            ReferenceFieldDefinition(
                 key="name",
-                label="Display name",
+                label="Name",
                 required=True,
-                placeholder="e.g. Core SaaS",
+                placeholder="e.g. Core SaaS, Internal",
             ),
             ReferenceFieldDefinition(
                 key="description",

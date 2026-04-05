@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class ServiceClassificationCreate(BaseModel):
-    slug: str
+    slug: str | None = None
     name: str
     description: str | None = None
 

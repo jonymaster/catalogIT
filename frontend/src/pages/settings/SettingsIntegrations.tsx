@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
-import DOMPurify from "dompurify";
+import { Link, useSearchParams } from "react-router-dom";
 import client from "../../api/client";
 
 interface IntegrationChannel {
@@ -67,12 +66,6 @@ export function SettingsIntegrations() {
   const [slackChannelLabel, setSlackChannelLabel] = useState("");
   const [gClientId, setGClientId] = useState("");
   const [gSecret, setGSecret] = useState("");
-  const [gSubj, setGSubj] = useState("");
-  const [gHtml, setGHtml] = useState("");
-  const [gText, setGText] = useState("");
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [previewText, setPreviewText] = useState("");
-  const [previewSubj, setPreviewSubj] = useState("");
 
   const refresh = useCallback(async () => {
     setLoadError(null);
@@ -96,9 +89,6 @@ export function SettingsIntegrations() {
         }
         if (ch.channel === "google_mail") {
           setGClientId(ch.metadata.client_id ?? "");
-          setGSubj(ch.metadata.email_subject_template ?? "");
-          setGHtml(ch.metadata.email_html_template ?? "");
-          setGText(ch.metadata.email_text_template ?? "");
         }
       }
     } catch {
@@ -247,9 +237,6 @@ export function SettingsIntegrations() {
       await client.patch("/api/settings/integrations/google_mail", {
         client_id: gClientId || null,
         client_secret: gSecret || null,
-        email_subject_template: gSubj || null,
-        email_html_template: gHtml || null,
-        email_text_template: gText || null,
         enabled: true,
       });
       setGSecret("");
@@ -272,28 +259,6 @@ export function SettingsIntegrations() {
       window.location.href = r.data.authorization_url;
     } catch {
       setMessage({ type: "error", text: "Could not start Google OAuth." });
-    }
-  }
-
-  async function runPreview() {
-    try {
-      const r = await client.post<{
-        subject: string;
-        html: string;
-        text: string;
-      }>("/api/settings/integrations/google_mail/preview", {
-        sample_data: {
-          title: "CatalogIT",
-          body: "Sample notification body.",
-          service_name: "Example Service",
-          renewal_date: "2026-12-31",
-        },
-      });
-      setPreviewSubj(r.data.subject);
-      setPreviewHtml(r.data.html);
-      setPreviewText(r.data.text);
-    } catch {
-      setMessage({ type: "error", text: "Preview failed." });
     }
   }
 
@@ -635,7 +600,7 @@ export function SettingsIntegrations() {
           <ol className="mt-2 list-inside list-decimal space-y-1 text-gray-600">
             <li>Create an OAuth client in Google Cloud (desktop or web with redirect URI above).</li>
             <li>Enable Gmail API for the project.</li>
-            <li>Paste client ID and secret, save templates, then Connect.</li>
+            <li>Paste client ID and secret, save, then Connect.</li>
           </ol>
         </details>
         {google?.metadata.google_email && (
@@ -648,9 +613,11 @@ export function SettingsIntegrations() {
         )}
         <form onSubmit={saveGoogle} className="mt-4 space-y-3 max-w-2xl">
           <p className="text-sm text-gray-600">
-            OAuth credentials and email templates are configured on this page (below). Edit templates,
-            click <strong>Save</strong>, then use <strong>Preview templates</strong> or{" "}
-            <strong>Send test email</strong>.
+            OAuth credentials are configured below. Email subject and HTML templates are managed under{" "}
+            <Link to="/settings/notifications" className="font-medium text-gray-900 underline">
+              Settings → Notifications
+            </Link>
+            . After saving, use <strong>Send test email</strong> to verify delivery.
           </p>
           <label className="block text-sm text-gray-700">
             Client ID
@@ -670,40 +637,6 @@ export function SettingsIntegrations() {
               placeholder={google?.has_encrypted_secrets ? "(unchanged)" : ""}
             />
           </label>
-          <div className="border-t border-gray-200 pt-4">
-            <h4 className="text-sm font-medium text-gray-900">Email templates</h4>
-            <p className="mt-1 text-xs text-gray-500">
-              Mustache-style placeholders: <code className="text-xs">{"{{title}}"}</code>,{" "}
-              <code className="text-xs">{"{{body}}"}</code>, <code className="text-xs">{"{{service_name}}"}</code>,{" "}
-              <code className="text-xs">{"{{renewal_date}}"}</code>, etc. Save before sending a test.
-            </p>
-          </div>
-          <label className="block text-sm text-gray-700">
-            Subject template (Mustache)
-            <input
-              className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm font-mono text-xs"
-              value={gSubj}
-              onChange={(e) => setGSubj(e.target.value)}
-            />
-          </label>
-          <label className="block text-sm text-gray-700">
-            HTML body template
-            <textarea
-              className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-              rows={4}
-              value={gHtml}
-              onChange={(e) => setGHtml(e.target.value)}
-            />
-          </label>
-          <label className="block text-sm text-gray-700">
-            Plain text template (optional)
-            <textarea
-              className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-              rows={3}
-              value={gText}
-              onChange={(e) => setGText(e.target.value)}
-            />
-          </label>
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
@@ -718,13 +651,12 @@ export function SettingsIntegrations() {
             >
               Connect Google
             </button>
-            <button
-              type="button"
-              onClick={() => void runPreview()}
-              className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            <Link
+              to="/settings/notifications"
+              className="inline-flex items-center rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
             >
-              Preview templates
-            </button>
+              Edit email templates
+            </Link>
             <button
               type="button"
               onClick={() => void testChannel("google_mail")}
@@ -734,19 +666,6 @@ export function SettingsIntegrations() {
             </button>
           </div>
         </form>
-        {(previewSubj || previewHtml) && (
-          <div className="mt-4 rounded border border-gray-100 bg-gray-50 p-4 text-sm">
-            <p className="font-medium text-gray-800">Preview</p>
-            <p className="mt-1 text-gray-700">
-              <span className="text-gray-500">Subject:</span> {previewSubj}
-            </p>
-            <div
-              className="mt-2 border border-gray-200 bg-white p-2 text-xs max-w-none"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }}
-            />
-            <pre className="mt-2 whitespace-pre-wrap text-xs text-gray-600">{previewText}</pre>
-          </div>
-        )}
         <details className="mt-4 text-sm text-gray-600">
           <summary className="cursor-pointer font-medium text-gray-800">Troubleshooting</summary>
           <ul className="mt-2 list-inside list-disc space-y-1">

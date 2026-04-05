@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+import re
+import uuid
+
 import httpx
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,12 +14,23 @@ from app.config import get_settings
 from app.database import get_db
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
+from app.dependencies.storage import get_s3_client
 from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.oidc_config import OidcConfig
 from app.models.global_audit_event import GlobalAuditEvent
 from app.models.user import User
+from app.notifications.email_templates import (
+    collect_template_s3_keys,
+    delete_s3_keys,
+    preview_notification_email,
+)
 from app.schemas.audit import GlobalAuditEventRead, PaginatedGlobalAuditResponse
-from app.schemas.notifications import NotificationSettingsRead, NotificationSettingsUpdate
+from app.schemas.notifications import (
+    NotificationEmailPreviewRequest,
+    NotificationEmailPreviewResponse,
+    NotificationSettingsRead,
+    NotificationSettingsUpdate,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from app.schemas.oidc import OidcConfigRead, OidcConfigWrite, OidcTestResult
@@ -116,6 +131,18 @@ def _validate_renewal_offsets(days: list[int]) -> list[int]:
     return out
 
 
+def _normalize_asset_keys(raw: object) -> dict[str, str] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, str] = {}
+    for k, v in raw.items():
+        if isinstance(k, str) and isinstance(v, str) and v.strip():
+            out[k] = v.strip()
+    return out or None
+
+
 def _settings_to_read(row: NotificationGlobalSettings) -> NotificationSettingsRead:
     return NotificationSettingsRead(
         renewal_reminders_enabled=row.renewal_reminders_enabled,
@@ -124,9 +151,52 @@ def _settings_to_read(row: NotificationGlobalSettings) -> NotificationSettingsRe
         renewal_email_subject_template=row.renewal_email_subject_template,
         renewal_email_html_template=row.renewal_email_html_template,
         renewal_email_text_template=row.renewal_email_text_template,
+        renewal_email_html_storage_key=row.renewal_email_html_storage_key,
+        renewal_email_template_asset_keys=_normalize_asset_keys(row.renewal_email_template_asset_keys),
         extra_recipient_ids=[u.id for u in row.extra_recipients],
         updated_at=row.updated_at,
     )
+
+
+async def _get_notification_settings_row(
+    db: AsyncSession,
+) -> NotificationGlobalSettings | None:
+    result = await db.execute(
+        select(NotificationGlobalSettings)
+        .where(NotificationGlobalSettings.id == 1)
+        .options(selectinload(NotificationGlobalSettings.extra_recipients))
+    )
+    return result.scalar_one_or_none()
+
+
+_MAX_EMAIL_HTML_UPLOAD = 2 * 1024 * 1024
+_MAX_EMAIL_ASSET_UPLOAD = 10 * 1024 * 1024
+_ALLOWED_HTML_CT = frozenset(
+    {"text/html", "application/octet-stream", "text/plain", "application/xhtml+xml"}
+)
+_ALLOWED_IMAGE_CT = frozenset(
+    {
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "application/octet-stream",
+    }
+)
+
+
+def _sanitize_asset_filename(name: str) -> str:
+    base = os.path.basename(name or "asset")
+    base = re.sub(r'[\x00-\x1f"\\]', "", base)
+    return base or "asset.png"
+
+
+def _cid_from_filename(filename: str) -> str:
+    stem, _dot = os.path.splitext(filename)
+    stem = stem.strip() or "asset"
+    stem = re.sub(r"[^a-zA-Z0-9_-]", "_", stem)
+    return stem[:64] or "asset"
 
 
 @router.get("/notifications", response_model=NotificationSettingsRead)
@@ -134,7 +204,7 @@ async def get_notification_settings(
     _user: User = Depends(_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    row = await db.get(NotificationGlobalSettings, 1)
+    row = await _get_notification_settings_row(db)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -149,12 +219,13 @@ async def patch_notification_settings(
     _user: User = Depends(_admin),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    row = await db.get(NotificationGlobalSettings, 1)
+    row = await _get_notification_settings_row(db)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Notification settings not initialized",
         )
+    old_s3_keys = collect_template_s3_keys(row)
     data = body.model_dump(exclude_unset=True)
     if "renewal_offsets_days" in data:
         data["renewal_offsets_days"] = _validate_renewal_offsets(data["renewal_offsets_days"])
@@ -179,6 +250,118 @@ async def patch_notification_settings(
         setattr(row, key, value)
     await db.flush()
     await db.refresh(row)
+    new_s3_keys = collect_template_s3_keys(row)
+    await delete_s3_keys([k for k in old_s3_keys if k not in set(new_s3_keys)])
+    return _settings_to_read(row)
+
+
+@router.post(
+    "/notifications/email-preview",
+    response_model=NotificationEmailPreviewResponse,
+)
+async def preview_notification_email_endpoint(
+    body: NotificationEmailPreviewRequest,
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        subj, html, text = await preview_notification_email(db, body.sample_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return NotificationEmailPreviewResponse(subject=subj, html=html, text=text)
+
+
+@router.post("/notifications/email-template-upload", response_model=NotificationSettingsRead)
+async def upload_notification_email_template(
+    html: UploadFile = File(...),
+    assets: list[UploadFile] | None = File(None),
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    row = await _get_notification_settings_row(db)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification settings not initialized",
+        )
+    old_s3_keys = collect_template_s3_keys(row)
+    fname = (html.filename or "").lower()
+    if not fname.endswith((".html", ".htm")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="HTML upload must be a .html or .htm file.",
+        )
+    ct = (html.content_type or "").split(";")[0].strip().lower()
+    if ct and ct not in _ALLOWED_HTML_CT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported HTML content type: {html.content_type}",
+        )
+    html_bytes = await html.read()
+    if len(html_bytes) > _MAX_EMAIL_HTML_UPLOAD:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="HTML file exceeds maximum size (2 MB).",
+        )
+    if not html_bytes.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="HTML file is empty.")
+
+    asset_list = assets or []
+    asset_keys: dict[str, str] = {}
+    upload_uid = uuid.uuid4()
+    prefix = f"email-templates/renewal/{upload_uid}/"
+    html_key = prefix + "template.html"
+    cfg = get_settings()
+
+    async with get_s3_client() as s3:
+        await s3.put_object(
+            Bucket=cfg.MINIO_BUCKET_NAME,
+            Key=html_key,
+            Body=html_bytes,
+            ContentType="text/html; charset=utf-8",
+        )
+
+        for uf in asset_list:
+            raw = await uf.read()
+            if len(raw) > _MAX_EMAIL_ASSET_UPLOAD:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Asset {uf.filename} exceeds maximum size (10 MB).",
+                )
+            fn = _sanitize_asset_filename(uf.filename or "")
+            if not re.search(r"\.(png|jpe?g|gif|webp|svg)$", fn, re.I):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported asset type (use png, jpg, gif, webp, svg): {fn}",
+                )
+            act = (uf.content_type or "").split(";")[0].strip().lower()
+            if act and act not in _ALLOWED_IMAGE_CT:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported image content type for {fn}: {uf.content_type}",
+                )
+            cid = _cid_from_filename(fn)
+            if cid in asset_keys:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate asset CID after normalizing filename: {fn}",
+                )
+            akey = prefix + fn
+            await s3.put_object(
+                Bucket=cfg.MINIO_BUCKET_NAME,
+                Key=akey,
+                Body=raw,
+                ContentType=act or "application/octet-stream",
+            )
+            asset_keys[cid] = akey
+
+    row.renewal_email_html_storage_key = html_key
+    row.renewal_email_template_asset_keys = asset_keys or None
+    row.renewal_email_html_template = None
+    await db.flush()
+    await db.refresh(row)
+    new_keys = collect_template_s3_keys(row)
+    await delete_s3_keys([k for k in old_s3_keys if k not in set(new_keys)])
     return _settings_to_read(row)
 
 
