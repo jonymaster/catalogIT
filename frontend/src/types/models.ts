@@ -162,6 +162,35 @@ export interface AuditLogEntry {
   new_values: Record<string, unknown> | null;
 }
 
+export interface PaginatedHistoryResponse {
+  items: AuditLogEntry[];
+  page: number;
+  per_page: number;
+  total_count: number;
+  total_pages: number;
+}
+
+export interface GlobalAuditEventRow {
+  id: string;
+  category: string;
+  event_type: string;
+  entity_table: string | null;
+  entity_key: string | null;
+  actor: User | null;
+  occurred_at: string;
+  summary: string | null;
+  details: Record<string, unknown> | null;
+  request_id: string | null;
+}
+
+export interface PaginatedGlobalAudit {
+  items: GlobalAuditEventRow[];
+  page: number;
+  per_page: number;
+  total_count: number;
+  total_pages: number;
+}
+
 export interface OidcConfig {
   provider_name: string;
   issuer_url: string;
@@ -198,4 +227,12 @@ export interface Attachment {
   file_size: number;
   uploaded_by_id: string | null;
   created_at: string;
+}
+
+export interface PaginatedAttachments {
+  items: Attachment[];
+  page: number;
+  per_page: number;
+  total_count: number;
+  total_pages: number;
 }

@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.global_audit import record_global_audit_event
 from app.integrations.gmail_send import send_mail
 from app.models.integration_config import IntegrationConfig
 from app.models.notification_global_settings import NotificationGlobalSettings
@@ -208,6 +209,22 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                         )
                         await session.flush()
                     result.emails_sent += 1
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_email_sent",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary=f"Renewal reminder email sent for {service.name}",
+                        details={
+                            "channel": "email",
+                            "service_id": str(service.id),
+                            "user_id": str(recipient.id),
+                            "days_before": days_before,
+                            "renewal_date": service.renewal_date.isoformat(),
+                        },
+                    )
                 except IntegrityError:
                     logger.info(
                         "Duplicate renewal notification skipped (race) service=%s user=%s",
@@ -218,5 +235,21 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                     err = f"service={service.id} user={recipient.id}: {exc}"
                     logger.exception("Renewal email failed: %s", err)
                     result.errors.append(err[:500])
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_email_failed",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary="Renewal reminder email failed",
+                        details={
+                            "channel": "email",
+                            "service_id": str(service.id),
+                            "user_id": str(recipient.id),
+                            "days_before": days_before,
+                            "error": str(exc)[:500],
+                        },
+                    )
 
     return result

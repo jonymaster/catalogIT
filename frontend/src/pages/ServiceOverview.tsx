@@ -96,7 +96,11 @@ export function ServiceOverview() {
         <h2 className="mb-4 text-lg font-medium text-gray-900">
           Change History
         </h2>
-        <AuditTimeline tableName="services" recordId={service.id} />
+        <AuditTimeline
+          tableName="services"
+          recordId={service.id}
+          perPage={10}
+        />
       </div>
     </div>
   );

@@ -34,6 +34,7 @@ import { SettingsReferenceData } from "./pages/settings/SettingsReferenceData";
 import { SettingsReferenceDataHome } from "./pages/settings/SettingsReferenceDataHome";
 import { SettingsReferenceDataResource } from "./pages/settings/SettingsReferenceDataResource";
 import { SettingsNotifications } from "./pages/settings/SettingsNotifications";
+import { SettingsAuditLog } from "./pages/settings/SettingsAuditLog";
 
 export default function App() {
   return (
@@ -70,6 +71,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />}>
                   <Route index element={<Navigate to="oidc" replace />} />
                   <Route path="oidc" element={<SettingsOidc />} />
+                  <Route path="audit" element={<SettingsAuditLog />} />
                   <Route path="notifications" element={<SettingsNotifications />} />
                   <Route path="integrations" element={<SettingsIntegrations />} />
                   <Route path="scim" element={<SettingsScim />} />

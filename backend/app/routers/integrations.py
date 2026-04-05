@@ -13,6 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.global_audit import record_global_audit_event
 from app.dependencies.auth import get_current_user, require_role
 from app.dependencies.db import get_audited_db
 from app.database import get_db
@@ -284,11 +285,31 @@ async def test_integration(
         row.connection_status = "error"
         row.last_error = str(exc)[:2000]
         await db.flush()
+        await record_global_audit_event(
+            db,
+            category="notification",
+            event_type="integration_test_failed",
+            entity_table="integration_config",
+            entity_key=channel,
+            actor_user_id=_user.id,
+            summary=f"Integration test failed ({channel})",
+            details={"channel": channel, "error": str(exc)[:500]},
+        )
         return TestSendResponse(ok=False, detail=str(exc))
     row.connection_status = "connected"
     row.last_error = None
     row.last_success_at = datetime.now(timezone.utc)
     await db.flush()
+    await record_global_audit_event(
+        db,
+        category="notification",
+        event_type="integration_test_sent",
+        entity_table="integration_config",
+        entity_key=channel,
+        actor_user_id=_user.id,
+        summary=f"Integration test succeeded ({channel})",
+        details={"channel": channel},
+    )
     return TestSendResponse(ok=True, detail=None)
 
 

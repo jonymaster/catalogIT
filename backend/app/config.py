@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # Shared secret for POST /api/internal/notifications/renewal-dispatch (cron, k8s CronJob, etc.)
     CRON_SECRET: str = ""
 
+    # Logging: set to "json" for structured stdout (e.g. CloudWatch via Docker log driver).
+    LOG_FORMAT: str = Field(default="text")
+
+    # Global audit rows older than this many days are eligible for purge (see POST /api/internal/audit-retention).
+    AUDIT_RETENTION_DAYS: int = Field(default=90)
+
 
 @lru_cache
 def get_settings() -> Settings:

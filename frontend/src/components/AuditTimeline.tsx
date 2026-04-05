@@ -1,15 +1,23 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import client from "../api/client";
 import { useAuth } from "../context/useAuth";
-import type { AuditLogEntry } from "../types/models";
+import type { AuditLogEntry, PaginatedHistoryResponse } from "../types/models";
 import { formatDateTime } from "../utils/formatting";
 
 interface Props {
   tableName: string;
   recordId: string;
+  /** History entries per page (default 20). */
+  perPage?: number;
 }
 
+const DEFAULT_PER_PAGE = 10;
+
 function formatChange(entry: AuditLogEntry): string {
+  if (entry.table_name === "attachments") {
+    if (entry.action === "INSERT") return "Attachment added";
+    if (entry.action === "DELETE") return "Attachment removed";
+  }
   if (entry.action === "INSERT") return "Record created";
   if (entry.action === "DELETE") return "Record deleted";
 
@@ -30,19 +38,56 @@ const actionColors: Record<string, string> = {
   DELETE: "bg-red-100 text-red-800",
 };
 
-export function AuditTimeline({ tableName, recordId }: Props) {
+export function AuditTimeline({
+  tableName,
+  recordId,
+  perPage = DEFAULT_PER_PAGE,
+}: Props) {
   const { preferences } = useAuth();
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    client
-      .get<AuditLogEntry[]>(`/api/history/${tableName}/${recordId}`)
-      .then((r) => setEntries(r.data))
-      .finally(() => setLoading(false));
-  }, [tableName, recordId]);
+  const load = useCallback(
+    async (pageNum: number) => {
+      const params = new URLSearchParams();
+      params.set("page", String(pageNum));
+      params.set("per_page", String(perPage));
+      const r = await client.get<PaginatedHistoryResponse>(
+        `/api/history/${tableName}/${recordId}?${params.toString()}`,
+      );
+      setEntries(r.data.items);
+      setPage(r.data.page);
+      setTotalPages(r.data.total_pages);
+      setTotalCount(r.data.total_count);
+    },
+    [tableName, recordId, perPage],
+  );
 
-  if (loading) {
+  useEffect(() => {
+    setLoading(true);
+    load(1)
+      .catch(() => {
+        setEntries([]);
+        setTotalPages(0);
+        setTotalCount(0);
+      })
+      .finally(() => setLoading(false));
+  }, [load]);
+
+  async function goToPage(next: number) {
+    if (next < 1 || (totalPages > 0 && next > totalPages)) return;
+    setLoading(true);
+    try {
+      await load(next);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading && entries.length === 0) {
     return <p className="text-sm text-gray-500">Loading history...</p>;
   }
 
@@ -93,6 +138,37 @@ export function AuditTimeline({ tableName, recordId }: Props) {
           </li>
         ))}
       </ul>
+      {totalCount > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
+          <p className="text-xs text-gray-500">
+            {totalCount} entr{totalCount === 1 ? "y" : "ies"}
+            {totalPages > 0 && (
+              <>
+                {" "}
+                · Page {page} of {totalPages}
+              </>
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void goToPage(page - 1)}
+              disabled={page <= 1 || loading}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => void goToPage(page + 1)}
+              disabled={totalPages === 0 || page >= totalPages || loading}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

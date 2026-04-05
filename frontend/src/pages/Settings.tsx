@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 const tabs = [
   { to: "oidc", label: "OIDC" },
+  { to: "audit", label: "Audit log" },
   { to: "notifications", label: "Notifications" },
   { to: "integrations", label: "Integrations" },
   { to: "scim", label: "SCIM" },

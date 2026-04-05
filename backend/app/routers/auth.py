@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
+from app.dependencies.db import get_audited_db
+from app.global_audit import record_global_audit_event, record_global_audit_event_committed
 from app.dependencies.auth import get_current_user
 from app.models.oidc_config import OidcConfig
 from app.models.user import User
@@ -85,14 +87,42 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
 
     if not user or not user.password_hash:
+        await record_global_audit_event_committed(
+            category="security",
+            event_type="login_failure",
+            summary="Local login failed",
+            details={"method": "local", "reason": "invalid_credentials"},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if not _verify_password(body.password, user.password_hash):
+        await record_global_audit_event_committed(
+            category="security",
+            event_type="login_failure",
+            summary="Local login failed",
+            details={"method": "local", "reason": "invalid_credentials"},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if not user.is_active:
+        await record_global_audit_event_committed(
+            category="security",
+            event_type="login_failure",
+            summary="Local login failed",
+            details={"method": "local", "reason": "account_disabled"},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account disabled")
 
+    await record_global_audit_event(
+        db,
+        category="security",
+        event_type="login_success",
+        entity_table="users",
+        entity_key=str(user.id),
+        actor_user_id=user.id,
+        summary="Local login succeeded",
+        details={"method": "local"},
+    )
     return LoginResponse(
         access_token=_mint_jwt(user),
         must_reset_password=user.must_reset_password,
@@ -105,7 +135,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def reset_password(
     body: ResetPasswordRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_audited_db),
 ):
     if not current_user.password_hash:
         raise HTTPException(status_code=400, detail="Account uses OIDC login only")
@@ -120,6 +150,16 @@ async def reset_password(
     user.password_hash = _hash_password(body.new_password)
     user.must_reset_password = False
     await db.flush()
+    await record_global_audit_event(
+        db,
+        category="security",
+        event_type="password_changed",
+        entity_table="users",
+        entity_key=str(user.id),
+        actor_user_id=user.id,
+        summary="Password changed by user",
+        details={"method": "local_reset"},
+    )
 
 
 # ── Generic OIDC ─────────────────────────────────────────────────
@@ -184,6 +224,12 @@ async def oidc_callback(
 
     if token_resp.status_code != 200:
         logger.error("OIDC token exchange failed: %s %s", token_resp.status_code, token_resp.text)
+        await record_global_audit_event_committed(
+            category="security",
+            event_type="oidc_token_exchange_failed",
+            summary="OIDC token exchange failed",
+            details={"status_code": token_resp.status_code},
+        )
         raise HTTPException(status_code=502, detail=f"Token exchange failed: {token_resp.text}")
 
     token_data = token_resp.json()
@@ -240,6 +286,17 @@ async def oidc_callback(
             user.last_name = last_name
 
     await db.flush()
+
+    await record_global_audit_event(
+        db,
+        category="security",
+        event_type="oidc_login_success",
+        entity_table="users",
+        entity_key=str(user.id),
+        actor_user_id=user.id,
+        summary="OIDC login succeeded",
+        details={"method": "oidc"},
+    )
 
     settings = get_settings()
     frontend_url = settings.FRONTEND_URL.rstrip("/")

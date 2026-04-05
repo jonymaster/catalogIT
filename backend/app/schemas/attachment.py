@@ -17,3 +17,11 @@ class AttachmentRead(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class PaginatedAttachmentResponse(BaseModel):
+    items: list[AttachmentRead]
+    page: int
+    per_page: int
+    total_count: int
+    total_pages: int

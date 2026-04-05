@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -15,7 +15,7 @@ from app.models.attachment import Attachment
 from app.models.laptop import Laptop
 from app.models.service import Service
 from app.models.user import User
-from app.schemas.attachment import AttachmentRead
+from app.schemas.attachment import AttachmentRead, PaginatedAttachmentResponse
 
 router = APIRouter(prefix="/api/attachments", tags=["attachments"])
 
@@ -92,19 +92,54 @@ async def delete_attachment(
     await db.delete(attachment)
 
 
-@router.get("/{entity_type}/{entity_id}", response_model=list[AttachmentRead])
+@router.get("/{entity_type}/{entity_id}", response_model=PaginatedAttachmentResponse)
 async def list_attachments(
     entity_type: str,
     entity_id: uuid.UUID,
     db: AsyncSession = Depends(get_audited_db),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(5, ge=1, le=50),
 ):
     await _validate_entity(entity_type, entity_id, db)
+    filters = [
+        Attachment.entity_type == entity_type,
+        Attachment.entity_id == entity_id,
+    ]
+    count_stmt = select(func.count()).select_from(Attachment).where(*filters)
+    total_count = int((await db.execute(count_stmt)).scalar_one())
+
+    if total_count == 0:
+        return PaginatedAttachmentResponse(
+            items=[],
+            page=page,
+            per_page=per_page,
+            total_count=0,
+            total_pages=0,
+        )
+
+    total_pages = (total_count + per_page - 1) // per_page
+    if page > total_pages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Page out of range (max {total_pages})",
+        )
+
+    offset = (page - 1) * per_page
     result = await db.execute(
         select(Attachment)
-        .where(Attachment.entity_type == entity_type, Attachment.entity_id == entity_id)
+        .where(*filters)
         .order_by(Attachment.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
     )
-    return result.scalars().all()
+    items = list(result.scalars().all())
+    return PaginatedAttachmentResponse(
+        items=items,
+        page=page,
+        per_page=per_page,
+        total_count=total_count,
+        total_pages=total_pages,
+    )
 
 
 @router.post(

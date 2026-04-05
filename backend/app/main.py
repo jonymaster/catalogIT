@@ -10,6 +10,8 @@ from sqlalchemy import select
 
 from app.audit import register_audit_listeners
 from app.config import get_settings
+from app.logging_config import setup_logging
+from app.request_audit_middleware import RequestAuditMiddleware
 from app.database import async_session
 from app.models.service import Service
 from app.models.user import User
@@ -85,15 +87,22 @@ async def _seed_sample_data() -> None:
 
 
 def _run_migrations() -> None:
-    """Run alembic upgrade head so tables exist before the app starts."""
+    """Run alembic upgrade head so tables exist before the app starts.
+
+    On failure, raises so the process does not serve traffic with a mismatched schema.
+    """
     result = subprocess.run(
         ["alembic", "upgrade", "head"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
-        logger.error("Alembic migration failed:\n%s", result.stderr)
-    else:
-        logger.info("Alembic migrations applied")
+        detail = (result.stderr or result.stdout or "").strip() or "unknown error"
+        logger.error("Alembic migration failed:\n%s", detail)
+        raise RuntimeError(
+            f"Alembic migration failed (exit {result.returncode}): {detail}"
+        )
+    logger.info("Alembic migrations applied")
 
 
 @asynccontextmanager
@@ -109,6 +118,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
+    setup_logging()
     cfg = get_settings()
     app = FastAPI(title="CatalogIT", version="0.1.0", lifespan=lifespan)
 
@@ -119,6 +129,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestAuditMiddleware)
 
     register_audit_listeners()
 

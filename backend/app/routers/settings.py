@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,10 +16,13 @@ from app.dependencies.storage import get_s3_client
 from app.models.branding_config import BrandingConfig
 from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.oidc_config import OidcConfig
+from app.models.global_audit_event import GlobalAuditEvent
 from app.models.user import User
+from app.schemas.audit import GlobalAuditEventRead, PaginatedGlobalAuditResponse
 from app.schemas.branding import BrandingRead
 from app.schemas.notifications import NotificationSettingsRead, NotificationSettingsUpdate
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from app.schemas.oidc import OidcConfigRead, OidcConfigWrite, OidcTestResult
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -326,3 +329,60 @@ async def patch_notification_settings(
     await db.flush()
     await db.refresh(row)
     return _settings_to_read(row)
+
+
+@router.get("/audit-events", response_model=PaginatedGlobalAuditResponse)
+async def list_audit_events(
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    category: str | None = Query(
+        None,
+        description="Filter: data_change, security, notification, error",
+    ),
+):
+    filters = []
+    if category:
+        filters.append(GlobalAuditEvent.category == category)
+
+    count_stmt = select(func.count()).select_from(GlobalAuditEvent)
+    if filters:
+        count_stmt = count_stmt.where(*filters)
+    total_count = int((await db.execute(count_stmt)).scalar_one())
+
+    if total_count == 0:
+        return PaginatedGlobalAuditResponse(
+            items=[],
+            page=page,
+            per_page=per_page,
+            total_count=0,
+            total_pages=0,
+        )
+
+    total_pages = (total_count + per_page - 1) // per_page
+    if page > total_pages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Page out of range (max {total_pages})",
+        )
+
+    offset = (page - 1) * per_page
+    stmt = select(GlobalAuditEvent).options(selectinload(GlobalAuditEvent.actor))
+    if filters:
+        stmt = stmt.where(*filters)
+    stmt = (
+        stmt.order_by(GlobalAuditEvent.occurred_at.desc(), GlobalAuditEvent.id.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    result = await db.execute(stmt)
+    rows = list(result.scalars().all())
+    items = [GlobalAuditEventRead.from_orm_event(e) for e in rows]
+    return PaginatedGlobalAuditResponse(
+        items=items,
+        page=page,
+        per_page=per_page,
+        total_count=total_count,
+        total_pages=total_pages if total_count else 0,
+    )

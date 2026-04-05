@@ -10,7 +10,7 @@ from app.models.service_login import ServiceLogin
 from app.models.cost_record import CostRecord
 from app.models.service_history import ServiceHistoryEntry
 from app.models.laptop import Laptop
-from app.models.audit_log import AuditLog
+from app.models.global_audit_event import GlobalAuditEvent
 from app.models.oidc_config import OidcConfig
 from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
@@ -34,7 +34,7 @@ __all__ = [
     "CostRecord",
     "ServiceHistoryEntry",
     "Laptop",
-    "AuditLog",
+    "GlobalAuditEvent",
     "OidcConfig",
     "ApiToken",
     "Attachment",
