@@ -23,6 +23,9 @@ frontend/dist/
 .env.local
 .env.*.local
 
+# Local backup output (see scripts/backup-local.sh)
+backups/
+
 # IDE
 .vscode/
 .idea/

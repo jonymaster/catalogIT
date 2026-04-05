@@ -14,6 +14,10 @@ Enterprise web application for managing IT Services and Hardware.
 
 The API logs to **stdout**. Set `LOG_FORMAT=json` in the environment for structured JSON lines (see `.env.example`). On **AWS ECS**, use the task definition log configuration (for example the `awslogs` log driver) or FireLens to ship the container’s stdout to **CloudWatch Logs**—no AWS SDK is required inside the app. On a generic Docker host, use the default `json-file` driver or any supported logging driver; the same image applies everywhere.
 
+## Operations
+
+Durable application state lives in **PostgreSQL** (metadata) and **S3-compatible object storage** (attachment files; MinIO in Compose, often Amazon S3 in AWS). Full backup and restore procedures, ECS options, and a secrets checklist are documented in [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md). For local development with Docker Compose (`db` and `minio` running), run `make backup-local` to write a timestamped database dump and bucket mirror under `backups/` (see [scripts/backup-local.sh](scripts/backup-local.sh)).
+
 ## Local Development
 
 ### Prerequisites
@@ -64,5 +68,6 @@ catalogIT/
   backend/          # FastAPI application
   frontend/         # React (Vite) application
   docs/integrations/# Integration setup (OAuth, webhooks)
+  docs/operations/  # Backup and restore
   docker-compose.yml
 ```
