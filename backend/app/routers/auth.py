@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from jose import jwt
+from jose.exceptions import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -247,12 +248,16 @@ async def oidc_callback(
             raise HTTPException(status_code=502, detail="Failed to fetch OIDC JWKS")
         jwks = jwks_resp.json()
         try:
+            # OIDC id_tokens may include at_hash; python-jose needs the access_token to verify it.
+            oidc_decode_options = None if access_token else {"verify_at_hash": False}
             claims = jwt.decode(
                 id_token,
                 jwks,
                 algorithms=["RS256", "ES256"],
                 audience=oidc.client_id,
                 issuer=oidc.issuer_url.rstrip("/"),
+                access_token=access_token,
+                options=oidc_decode_options,
             )
         except JWTError as exc:
             logger.error("OIDC id_token verification failed: %s", exc)

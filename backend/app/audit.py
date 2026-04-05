@@ -73,11 +73,11 @@ def _serialize(instance) -> dict:
 def _entity_key(instance) -> str:
     insp = inspect(instance)
     if insp.identity is not None:
-        return ":".join(_serialize_value(x) for x in insp.identity)
+        return ":".join(str(_serialize_value(x)) for x in insp.identity)
     mapper = insp.mapper
     parts = []
     for col in mapper.primary_key:
-        parts.append(_serialize_value(getattr(instance, col.key, None)))
+        parts.append(str(_serialize_value(getattr(instance, col.key, None))))
     return ":".join(parts)
 
 
