@@ -14,6 +14,92 @@ interface Providers {
   oidc: OidcInfo | null;
 }
 
+const inputClassName =
+  "mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-colors focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10";
+
+function ProvidersLoading() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-14">
+      <div
+        className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-gray-900"
+        aria-hidden
+      />
+      <p className="text-sm text-gray-500">Loading sign-in options…</p>
+    </div>
+  );
+}
+
+interface LocalLoginFormProps {
+  email: string;
+  password: string;
+  error: string;
+  loading: boolean;
+  onEmailChange: (v: string) => void;
+  onPasswordChange: (v: string) => void;
+  onSubmit: (e: FormEvent) => void;
+  emailId: string;
+  passwordId: string;
+}
+
+function LocalLoginForm({
+  email,
+  password,
+  error,
+  loading,
+  onEmailChange,
+  onPasswordChange,
+  onSubmit,
+  emailId,
+  passwordId,
+}: LocalLoginFormProps) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <label
+          htmlFor={emailId}
+          className="block text-sm font-medium text-gray-700"
+        >
+          Email
+        </label>
+        <input
+          id={emailId}
+          type="email"
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          required
+          autoComplete="email"
+          className={inputClassName}
+        />
+      </div>
+      <div>
+        <label
+          htmlFor={passwordId}
+          className="block text-sm font-medium text-gray-700"
+        >
+          Password
+        </label>
+        <input
+          id={passwordId}
+          type="password"
+          value={password}
+          onChange={(e) => onPasswordChange(e.target.value)}
+          required
+          autoComplete="current-password"
+          className={inputClassName}
+        />
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gray-800 disabled:opacity-50"
+      >
+        {loading ? "Signing in…" : "Sign in"}
+      </button>
+    </form>
+  );
+}
+
 export function Login() {
   const { token, login, setToken } = useAuth();
   const navigate = useNavigate();
@@ -25,7 +111,12 @@ export function Login() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    client.get<Providers>("/auth/providers").then((r) => setProviders(r.data));
+    client.get<Providers>("/auth/providers").then((r) => {
+      setProviders(r.data);
+      if (r.data.oidc) {
+        setEmail("");
+      }
+    });
   }, []);
 
   if (token) {
@@ -54,9 +145,12 @@ export function Login() {
     }
   }
 
+  const oidc = providers?.oidc;
+  const showOidcFirst = !!oidc;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 px-4 py-12">
+      <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-xl ring-1 ring-black/5">
         <div className="mb-2 flex justify-center">
           <BrandMark align="center" />
         </div>
@@ -64,63 +158,69 @@ export function Login() {
           IT Service &amp; Hardware Management
         </p>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-            />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+        {providers === null && <ProvidersLoading />}
 
-        {providers?.oidc && (
+        {providers !== null && showOidcFirst && (
           <>
-            <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs text-gray-400">or</span>
-              <div className="h-px flex-1 bg-gray-200" />
-            </div>
             <button
+              type="button"
               onClick={login}
-              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="w-full rounded-xl bg-gray-900 px-4 py-3.5 text-center text-sm font-semibold text-white shadow-md transition-colors hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
             >
-              Sign in with {providers.oidc.provider_name || "SSO"}
+              Sign in with {oidc.provider_name || "SSO"}
             </button>
+            <p className="mt-3 text-center text-xs text-gray-500">
+              You will be redirected to your organization&apos;s sign-in page.
+            </p>
+
+            <details className="group mt-8 border-t border-gray-100 pt-6">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 [&::-webkit-details-marker]:hidden">
+                <span>Sign in with email and password</span>
+                <svg
+                  className="h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m19.5 8.25-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </summary>
+              <div className="mt-4">
+                <LocalLoginForm
+                  email={email}
+                  password={password}
+                  error={error}
+                  loading={loading}
+                  onEmailChange={setEmail}
+                  onPasswordChange={setPassword}
+                  onSubmit={handleLogin}
+                  emailId="login-email-oidc"
+                  passwordId="login-password-oidc"
+                />
+              </div>
+            </details>
           </>
+        )}
+
+        {providers !== null && !showOidcFirst && (
+          <LocalLoginForm
+            email={email}
+            password={password}
+            error={error}
+            loading={loading}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            onSubmit={handleLogin}
+            emailId="login-email"
+            passwordId="login-password"
+          />
         )}
       </div>
     </div>

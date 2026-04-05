@@ -323,14 +323,26 @@ export function Hardware() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Hardware</h1>
-        {canEdit && (
-          <Link
-            to="/hardware/new"
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            New Laptop
-          </Link>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {!loading && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={filtered.length === 0}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Export CSV
+            </button>
+          )}
+          {canEdit && (
+            <Link
+              to="/hardware/new"
+              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+            >
+              New Laptop
+            </Link>
+          )}
+        </div>
       </div>
       {loading ? (
         <p className="text-sm text-gray-500">Loading...</p>
@@ -344,14 +356,6 @@ export function Hardware() {
                 placeholder="Search hardware..."
               />
             </div>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              disabled={filtered.length === 0}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Export CSV
-            </button>
             <ColumnSelector
               columns={columns}
               visibleKeys={visibleKeys}
