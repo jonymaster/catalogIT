@@ -2,12 +2,13 @@
 #
 # Images (build and push before deploy):
 #   docker build -t jonymaster/catalogit-api:1.0.0 ./backend
-#   docker build -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 ./frontend
+#   docker build -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 .
 #
 # Copy .env.example to .env on the server and set at least:
 #   DATABASE_URL, JWT_SECRET, INTEGRATION_SECRET_KEY, SCIM_TOKEN,
 #   FRONTEND_URL, PUBLIC_BASE_URL (your public https URLs),
-#   MINIO_*, POSTGRES_*, CRON_SECRET, and turn off SEED_SAMPLE_DATA if desired.
+#   MINIO_*, POSTGRES_*, CRON_SECRET, DB_PATH, MINIO_DATA_PATH (host folders for volumes),
+#   and turn off SEED_SAMPLE_DATA if desired.
 #
 # After first start: docker compose -f docker-compose.server.yml exec api alembic upgrade head
 #
@@ -23,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: ${POSTGRES_DB:-catalogit}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ${DB_PATH:?Set DB_PATH to the host directory for PostgreSQL data}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-catalogit}"]
       interval: 5s
@@ -38,7 +39,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-catalogit}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
     volumes:
-      - minio_data:/data
+      - ${MINIO_DATA_PATH:?Set MINIO_DATA_PATH to the host directory for MinIO object storage}:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -81,7 +82,3 @@ services:
       CRON_SECRET: ${CRON_SECRET:-}
     depends_on:
       - api
-
-volumes:
-  pgdata:
-  minio_data:

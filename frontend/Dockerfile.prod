@@ -1,13 +1,17 @@
+# Build from repository root so `branding/` is in context and can be copied into the Vite public dir:
+#   docker build -f frontend/Dockerfile.prod -t catalogit-ui:tag .
 FROM node:20-alpine AS build
 
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
-COPY . .
+COPY frontend/ ./
+# Repo-root logos (see README); ensures /branding/*.png exists in dist even if public/ is incomplete in a checkout.
+COPY branding/ ./public/branding/
 RUN npm run build
 
 FROM nginx:1.27-alpine
 
-COPY nginx.prod.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.prod.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

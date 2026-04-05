@@ -1,0 +1,14 @@
+# Used when building the UI image with repo root as context:
+#   docker build -f frontend/Dockerfile.prod -t catalogit-ui:local .
+.git
+**/.venv
+**/node_modules
+frontend/dist
+backend/__pycache__
+**/__pycache__
+**/.pytest_cache
+pgdata
+data
+backups
+.coverage
+htmlcov
