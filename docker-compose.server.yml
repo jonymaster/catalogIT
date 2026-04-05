@@ -4,16 +4,31 @@
 #   docker build -t jonymaster/catalogit-api:1.0.0 ./backend
 #   docker build -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 .
 #
-# Copy .env.example to .env on the server and set at least:
+# Portainer: add the same variables in the stack Environment (Git deploy omits
+# gitignored `.env`). Local `docker compose` still substitutes ${...} from a
+# project `.env` if present.
+#
+# Copy `.env.example` to `.env` on the server (or set in Portainer) at least:
 #   DATABASE_URL, JWT_SECRET, INTEGRATION_SECRET_KEY, SCIM_TOKEN,
 #   FRONTEND_URL, PUBLIC_BASE_URL (your public https URLs),
-#   MINIO_*, POSTGRES_*, CRON_SECRET, DB_PATH, MINIO_DATA_PATH (host folders for volumes),
+#   MINIO_*, POSTGRES_*, CRON_SECRET, DB_PATH, MINIO_DATA_PATH (host dirs for volumes),
 #   and turn off SEED_SAMPLE_DATA if desired.
 #
 # After first start: docker compose -f docker-compose.server.yml exec api alembic upgrade head
 #
 # NPM: one hostname with path routing — "/" -> ui:80, "/api", "/auth", "/scim", "/docs",
 # "/openapi.json" -> api:8000 — so the browser keeps a single origin (matches frontend axios baseURL "/").
+#
+# UI keeps restarting? On the Portainer host run: docker logs <ui-container-name>
+#   - "exec format error" — image CPU arch does not match the host (e.g. arm64 image on
+#     amd64). Rebuild and push multi-arch or for your host: linux/amd64.
+#   - Ensure catalogit-ui is built from frontend/Dockerfile.prod (nginx on :80). A dev
+#     image (npm run dev, port 5173) does not match this compose file's ":80" mapping.
+#
+# API: "Could not import module app.main" — often the image runs as a non-root user but
+# /app/app is root-only (mode 0750). Fix the API Dockerfile: after COPY, run
+#   chown -R appuser:appuser /app   (or chmod -R a+rX /app)
+# Temporary workaround: set user: "0:0" on the api service (see comment there).
 
 services:
   db:
@@ -48,13 +63,35 @@ services:
 
   api:
     image: jonymaster/catalogit-api:${CATALOGIT_TAG:-1.0.0}
+    # If import fails for appuser, uncomment until the image is rebuilt with correct ownership:
+    # user: "0:0"
     restart: unless-stopped
     ports:
       - "${API_PUBLISH:-8000}:8000"
-    env_file:
-      - .env
     environment:
+      # Same keys as Application section in `.env` (explicit list — works without env_file for Portainer Git stacks).
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-8}
+      FRONTEND_URL: ${FRONTEND_URL}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      INTEGRATION_SECRET_KEY: ${INTEGRATION_SECRET_KEY}
+      SCIM_TOKEN: ${SCIM_TOKEN}
+      ADMIN_DEFAULT_PASSWORD: ${ADMIN_DEFAULT_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_EXTERNAL_ID: ${ADMIN_EXTERNAL_ID}
+      ADMIN_FIRST_NAME: ${ADMIN_FIRST_NAME}
+      ADMIN_LAST_NAME: ${ADMIN_LAST_NAME}
       SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      CRON_SECRET: ${CRON_SECRET}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-90}
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +99,7 @@ services:
         condition: service_healthy
 
   ui:
+    # Image must serve static files on container port 80 (Dockerfile.prod), not Vite dev.
     image: jonymaster/catalogit-ui:${CATALOGIT_TAG:-1.0.0}
     restart: unless-stopped
     ports:
