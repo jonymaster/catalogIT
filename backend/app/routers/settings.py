@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import httpx
-import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,14 +10,11 @@ from app.config import get_settings
 from app.database import get_db
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
-from app.dependencies.storage import get_s3_client
-from app.models.branding_config import BrandingConfig
 from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.oidc_config import OidcConfig
 from app.models.global_audit_event import GlobalAuditEvent
 from app.models.user import User
 from app.schemas.audit import GlobalAuditEventRead, PaginatedGlobalAuditResponse
-from app.schemas.branding import BrandingRead
 from app.schemas.notifications import NotificationSettingsRead, NotificationSettingsUpdate
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -28,151 +23,6 @@ from app.schemas.oidc import OidcConfigRead, OidcConfigWrite, OidcTestResult
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 _admin = require_role("admin")
-ALLOWED_LOGO_CONTENT_TYPES = {
-    "image/png",
-    "image/jpeg",
-    "image/svg+xml",
-    "image/webp",
-}
-MAX_LOGO_SIZE = 5 * 1024 * 1024
-
-
-def _branding_payload(config: BrandingConfig | None) -> BrandingRead:
-    logo_url = None
-    logo_filename = None
-    updated_at = None
-
-    if config and config.logo_storage_key:
-        logo_url = "/api/settings/branding/logo"
-        logo_filename = config.logo_filename
-        updated_at = config.updated_at
-
-    return BrandingRead(
-        logo_url=logo_url,
-        logo_filename=logo_filename,
-        updated_at=updated_at,
-    )
-
-
-async def _get_branding_config(db: AsyncSession) -> BrandingConfig | None:
-    return await db.get(BrandingConfig, 1)
-
-
-async def _get_or_create_branding_config(db: AsyncSession) -> BrandingConfig:
-    config = await _get_branding_config(db)
-    if config is None:
-        config = BrandingConfig(id=1)
-        db.add(config)
-        await db.flush()
-    return config
-
-
-async def _delete_branding_logo(config: BrandingConfig) -> None:
-    if not config.logo_storage_key:
-        return
-
-    settings = get_settings()
-    async with get_s3_client() as s3:
-        await s3.delete_object(
-            Bucket=settings.MINIO_BUCKET_NAME,
-            Key=config.logo_storage_key,
-        )
-
-    config.logo_filename = None
-    config.logo_content_type = None
-    config.logo_storage_key = None
-
-
-@router.get("/branding", response_model=BrandingRead)
-async def get_branding(
-    db: AsyncSession = Depends(get_db),
-):
-    config = await _get_branding_config(db)
-    return _branding_payload(config)
-
-
-@router.get("/branding/logo")
-async def get_branding_logo(
-    db: AsyncSession = Depends(get_db),
-):
-    config = await _get_branding_config(db)
-    if not config or not config.logo_storage_key or not config.logo_content_type:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Logo not configured",
-        )
-
-    settings = get_settings()
-    async with get_s3_client() as s3:
-        response = await s3.get_object(
-            Bucket=settings.MINIO_BUCKET_NAME,
-            Key=config.logo_storage_key,
-        )
-        body = await response["Body"].read()
-
-    return Response(content=body, media_type=config.logo_content_type)
-
-
-@router.post("/branding/logo", response_model=BrandingRead)
-async def upload_branding_logo(
-    file: UploadFile,
-    _user: User = Depends(_admin),
-    db: AsyncSession = Depends(get_audited_db),
-):
-    if file.content_type not in ALLOWED_LOGO_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "File type not allowed. Accepted types: "
-                + ", ".join(sorted(ALLOWED_LOGO_CONTENT_TYPES))
-            ),
-        )
-
-    contents = await file.read()
-    if len(contents) > MAX_LOGO_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds maximum size of {MAX_LOGO_SIZE // (1024 * 1024)} MB",
-        )
-
-    config = await _get_or_create_branding_config(db)
-    if config.logo_storage_key:
-        await _delete_branding_logo(config)
-
-    file_id = uuid.uuid4()
-    original_name = file.filename or "logo"
-    storage_key = f"branding/{file_id}_{original_name}"
-    settings = get_settings()
-
-    async with get_s3_client() as s3:
-        await s3.put_object(
-            Bucket=settings.MINIO_BUCKET_NAME,
-            Key=storage_key,
-            Body=contents,
-            ContentType=file.content_type,
-        )
-
-    config.logo_filename = original_name
-    config.logo_content_type = file.content_type
-    config.logo_storage_key = storage_key
-    await db.flush()
-    await db.refresh(config)
-    return _branding_payload(config)
-
-
-@router.delete("/branding/logo", response_model=BrandingRead)
-async def delete_branding_logo(
-    _user: User = Depends(_admin),
-    db: AsyncSession = Depends(get_audited_db),
-):
-    config = await _get_branding_config(db)
-    if not config or not config.logo_storage_key:
-        return _branding_payload(config)
-
-    await _delete_branding_logo(config)
-    await db.flush()
-    await db.refresh(config)
-    return _branding_payload(config)
 
 
 @router.get("/oidc", response_model=OidcConfigRead | None)

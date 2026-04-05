@@ -152,7 +152,7 @@ export function Login() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 px-4 py-12">
       <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white p-8 shadow-xl ring-1 ring-black/5">
         <div className="mb-2 flex justify-center">
-          <BrandMark align="center" />
+          <BrandMark align="center" className="[&_img]:max-h-16" />
         </div>
         <p className="mb-8 text-center text-sm text-gray-500">
           IT Service &amp; Hardware Management

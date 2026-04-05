@@ -16,7 +16,6 @@ from app.models.global_audit_event import GlobalAuditEvent
 from app.models.oidc_config import OidcConfig
 from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
-from app.models.branding_config import BrandingConfig
 from app.models.integration_config import IntegrationConfig
 from app.models.oauth_state import OAuthState
 from app.models.notification_global_settings import NotificationGlobalSettings, notification_extra_recipients
@@ -42,7 +41,6 @@ __all__ = [
     "OidcConfig",
     "ApiToken",
     "Attachment",
-    "BrandingConfig",
     "IntegrationConfig",
     "OAuthState",
     "NotificationGlobalSettings",

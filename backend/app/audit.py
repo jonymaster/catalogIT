@@ -44,7 +44,6 @@ AUDITED_TABLES: frozenset[str] = frozenset(
         "attachments",
         "service_history",
         "oidc_config",
-        "branding_config",
         "integration_config",
         "notification_global_settings",
         "users",
