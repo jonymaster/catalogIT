@@ -64,6 +64,20 @@ services:
     depends_on:
       - api
 
+  cron:
+    image: alpine/curl:latest
+    profiles: [cron]
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "0 6 * * * curl -sf -X POST -H 'X-Cron-Secret: $${CRON_SECRET}' http://api:8000/api/internal/notifications/renewal-dispatch >> /proc/1/fd/1 2>&1" > /etc/crontabs/root
+        crond -f -l 2
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+    depends_on:
+      - api
+
 volumes:
   pgdata:
   minio_data:

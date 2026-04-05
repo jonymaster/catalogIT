@@ -2,11 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Integer, String, Table, Text, func
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+notification_extra_recipients = Table(
+    "notification_extra_recipients",
+    Base.metadata,
+    Column("settings_id", Integer, ForeignKey("notification_global_settings.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class NotificationGlobalSettings(Base):
@@ -28,4 +35,9 @@ class NotificationGlobalSettings(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
+    )
+
+    extra_recipients: Mapped[list["User"]] = relationship(  # noqa: F821
+        secondary=notification_extra_recipients,
+        lazy="selectin",
     )

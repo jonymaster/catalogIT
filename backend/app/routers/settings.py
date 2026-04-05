@@ -19,6 +19,7 @@ from app.models.oidc_config import OidcConfig
 from app.models.user import User
 from app.schemas.branding import BrandingRead
 from app.schemas.notifications import NotificationSettingsRead, NotificationSettingsUpdate
+from sqlalchemy import select
 from app.schemas.oidc import OidcConfigRead, OidcConfigWrite, OidcTestResult
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -261,6 +262,19 @@ def _validate_renewal_offsets(days: list[int]) -> list[int]:
     return out
 
 
+def _settings_to_read(row: NotificationGlobalSettings) -> NotificationSettingsRead:
+    return NotificationSettingsRead(
+        renewal_reminders_enabled=row.renewal_reminders_enabled,
+        renewal_offsets_days=list(row.renewal_offsets_days),
+        calendar_timezone=row.calendar_timezone,
+        renewal_email_subject_template=row.renewal_email_subject_template,
+        renewal_email_html_template=row.renewal_email_html_template,
+        renewal_email_text_template=row.renewal_email_text_template,
+        extra_recipient_ids=[u.id for u in row.extra_recipients],
+        updated_at=row.updated_at,
+    )
+
+
 @router.get("/notifications", response_model=NotificationSettingsRead)
 async def get_notification_settings(
     _user: User = Depends(_admin),
@@ -272,7 +286,7 @@ async def get_notification_settings(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Notification settings not initialized",
         )
-    return row
+    return _settings_to_read(row)
 
 
 @router.patch("/notifications", response_model=NotificationSettingsRead)
@@ -290,8 +304,25 @@ async def patch_notification_settings(
     data = body.model_dump(exclude_unset=True)
     if "renewal_offsets_days" in data:
         data["renewal_offsets_days"] = _validate_renewal_offsets(data["renewal_offsets_days"])
+
+    extra_ids = data.pop("extra_recipient_ids", None)
+    if extra_ids is not None:
+        users = (
+            await db.execute(
+                select(User).where(User.id.in_(extra_ids), User.is_active.is_(True))
+            )
+        ).scalars().all()
+        found_ids = {u.id for u in users}
+        missing = [str(uid) for uid in extra_ids if uid not in found_ids]
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Users not found or inactive: {', '.join(missing)}",
+            )
+        row.extra_recipients = list(users)
+
     for key, value in data.items():
         setattr(row, key, value)
     await db.flush()
     await db.refresh(row)
-    return row
+    return _settings_to_read(row)

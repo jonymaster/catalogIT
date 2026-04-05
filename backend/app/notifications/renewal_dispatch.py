@@ -16,7 +16,10 @@ from app.models.integration_config import IntegrationConfig
 from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.renewal_notification_sent import RenewalNotificationSent
 from app.models.service import Service
+from app.models.user import User
 from app.schemas.notifications import RenewalDispatchResult
+
+BILLABLE_SCHEDULES = {"annually", "monthly"}
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,22 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
         result.skipped_reason = "no_global_offsets"
         return result
 
+    # Collect admin users and extra recipients for global notifications
+    admin_users = (
+        await session.execute(
+            select(User).where(
+                User.role == "admin",
+                User.is_active.is_(True),
+                User.receive_renewal_notifications.is_(True),
+            )
+        )
+    ).scalars().all()
+
+    extra_recipients = [
+        u for u in ngs.extra_recipients
+        if u.is_active and u.receive_renewal_notifications
+    ]
+
     q = (
         select(Service)
         .where(Service.renewal_date.is_not(None))
@@ -124,27 +143,39 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
         if not offsets:
             continue
 
+        # Build deduplicated recipient set: owners + admins + extra recipients
+        recipients_by_id: dict[uuid.UUID, Any] = {}
+        for owner in service.owners:
+            if owner.is_active and owner.receive_renewal_notifications:
+                recipients_by_id[owner.id] = owner
+
+        # Admins and extra recipients get notified for services with
+        # billing_schedule in (annually, monthly) or renewal_date set
+        schedule = (service.billing_schedule or "").strip().lower()
+        if schedule in BILLABLE_SCHEDULES or service.renewal_date is not None:
+            for user in admin_users:
+                recipients_by_id.setdefault(user.id, user)
+            for user in extra_recipients:
+                recipients_by_id.setdefault(user.id, user)
+
         for days_before in offsets:
             trigger = service.renewal_date - timedelta(days=days_before)
             if trigger != today:
                 continue
 
-            for owner in service.owners:
-                if not owner.is_active or not owner.receive_renewal_notifications:
-                    continue
-
+            for recipient in recipients_by_id.values():
                 existing = await session.scalar(
                     select(RenewalNotificationSent.id).where(
                         RenewalNotificationSent.service_id == service.id,
                         RenewalNotificationSent.renewal_date == service.renewal_date,
                         RenewalNotificationSent.days_before == days_before,
-                        RenewalNotificationSent.user_id == owner.id,
+                        RenewalNotificationSent.user_id == recipient.id,
                     )
                 )
                 if existing is not None:
                     continue
 
-                owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.email
+                recipient_name = f"{recipient.first_name} {recipient.last_name}".strip() or recipient.email
                 data: dict[str, Any] = {
                     "title": f"Renewal in {days_before} days: {service.name}",
                     "body": "Please review licensing and budget in CatalogIT.",
@@ -152,7 +183,8 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                     "renewal_date": service.renewal_date.isoformat(),
                     "days_before": str(days_before),
                     "days_until_renewal": str(days_before),
-                    "owner_name": owner_name,
+                    "owner_name": recipient_name,
+                    "recipient_name": recipient_name,
                 }
 
                 try:
@@ -160,7 +192,7 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                         await send_mail(
                             session,
                             google_row,
-                            owner.email,
+                            recipient.email,
                             data,
                             template_overrides=tpl_overrides,
                         )
@@ -170,7 +202,7 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                                 service_id=service.id,
                                 renewal_date=service.renewal_date,
                                 days_before=days_before,
-                                user_id=owner.id,
+                                user_id=recipient.id,
                                 channel="email",
                             )
                         )
@@ -180,10 +212,10 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                     logger.info(
                         "Duplicate renewal notification skipped (race) service=%s user=%s",
                         service.id,
-                        owner.id,
+                        recipient.id,
                     )
                 except Exception as exc:
-                    err = f"service={service.id} user={owner.id}: {exc}"
+                    err = f"service={service.id} user={recipient.id}: {exc}"
                     logger.exception("Renewal email failed: %s", err)
                     result.errors.append(err[:500])
 

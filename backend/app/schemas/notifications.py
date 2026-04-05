@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -12,6 +13,7 @@ class NotificationSettingsRead(BaseModel):
     renewal_email_subject_template: str | None = None
     renewal_email_html_template: str | None = None
     renewal_email_text_template: str | None = None
+    extra_recipient_ids: list[uuid.UUID] = []
     updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -27,6 +29,7 @@ class NotificationSettingsUpdate(BaseModel):
     renewal_email_subject_template: str | None = None
     renewal_email_html_template: str | None = None
     renewal_email_text_template: str | None = None
+    extra_recipient_ids: list[uuid.UUID] | None = None
 
 
 class RenewalDispatchResult(BaseModel):
