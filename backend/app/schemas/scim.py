@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# RFC 7643 Enterprise User Extension
+ENTERPRISE_USER_SCHEMA = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+ENTERPRISE_DEPARTMENT_PATH = f"{ENTERPRISE_USER_SCHEMA}:department"
 
 
 class ScimName(BaseModel):
@@ -15,6 +20,10 @@ class ScimEmail(BaseModel):
     primary: bool = True
 
 
+class ScimEnterpriseUser(BaseModel):
+    department: str | None = None
+
+
 class ScimUserResource(BaseModel):
     schemas: list[str] = ["urn:ietf:params:scim:schemas:core:2.0:User"]
     id: str
@@ -24,8 +33,23 @@ class ScimUserResource(BaseModel):
     emails: list[ScimEmail] = []
     active: bool = True
     externalId: str = ""
+    enterprise_user: ScimEnterpriseUser | None = Field(
+        default=None,
+        validation_alias=ENTERPRISE_USER_SCHEMA,
+        serialization_alias=ENTERPRISE_USER_SCHEMA,
+    )
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        # Ensures list/GET JSON uses the SCIM URI key for nested dumps (e.g. inside ListResponse).
+        serialize_by_alias=True,
+    )
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
+        kwargs.setdefault("by_alias", True)
+        kwargs.setdefault("exclude_none", True)
+        return super().model_dump(**kwargs)
 
 
 class ScimListResponse(BaseModel):
@@ -44,6 +68,13 @@ class ScimCreateUser(BaseModel):
     emails: list[ScimEmail] = []
     externalId: str = ""
     active: bool = True
+    enterprise_user: ScimEnterpriseUser | None = Field(
+        default=None,
+        validation_alias=ENTERPRISE_USER_SCHEMA,
+        serialization_alias=ENTERPRISE_USER_SCHEMA,
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ScimPatchOp(BaseModel):

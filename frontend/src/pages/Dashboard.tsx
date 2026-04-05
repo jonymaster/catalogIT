@@ -40,8 +40,7 @@ function matchesServiceSearch(service: Service, query: string) {
   return (
     service.name.toLowerCase().includes(query) ||
     cat.includes(query) ||
-    service.license_type.toLowerCase().includes(query) ||
-    service.status.toLowerCase().includes(query) ||
+    (service.service_status?.name ?? service.status).toLowerCase().includes(query) ||
     (service.vendor?.name ?? "").toLowerCase().includes(query) ||
     service.owners.some(
       (owner) =>

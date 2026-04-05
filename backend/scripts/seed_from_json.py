@@ -135,7 +135,7 @@ async def _seed_service_statuses(session: AsyncSession) -> None:
         ("Trial", "Service is being evaluated before broader adoption."),
     ]
     seeded_statuses = {
-        _normalize_status_name(row.get("status") or row.get("service_type"))
+        _normalize_status_name(row.get("status"))
         for row in _load("services.json")
     }
     status_rows = []
@@ -209,20 +209,18 @@ async def _seed_services(session: AsyncSession) -> None:
         if existing:
             continue
 
-        normalized_status = _normalize_status_name(r.get("status") or r.get("service_type"))
+        normalized_status = _normalize_status_name(r.get("status"))
 
         svc = Service(
             id=svc_id,
             name=r["name"],
             status=normalized_status,
-            license_type=r.get("classification", ""),
             billing_schedule=r.get("billing_schedule", ""),
             vendor_id=_uuid("vendor", r["vendor_id"]),
             category_id=_uuid("category", r["category_id"]),
             payment_method_id=_uuid("payment_method", r["payment_method_id"]),
             service_status_id=service_statuses.get(normalized_status.lower()),
             classification=r.get("classification"),
-            service_type=r.get("service_type"),
             scim_enabled=r.get("scim_enabled", False),
             criticality=r.get("criticality"),
             nonprofit_pricing=r.get("nonprofit_pricing", False),

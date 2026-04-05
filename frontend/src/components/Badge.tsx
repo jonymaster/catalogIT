@@ -49,11 +49,19 @@ export function CriticalityBadge({ value }: { value: string | null }) {
 const classificationColors: Record<string, BadgeColor> = {
   core_saas: "purple",
   subscription: "blue",
+  internal: "teal",
 };
 
 export function ClassificationBadge({ value }: { value: string | null }) {
   if (!value) return <span className="text-gray-400">--</span>;
-  const label = value === "core_saas" ? "Core SaaS" : value === "subscription" ? "Subscription" : value;
+  const label =
+    value === "core_saas"
+      ? "Core SaaS"
+      : value === "subscription"
+        ? "Subscription"
+        : value === "internal"
+          ? "Internal"
+          : value;
   return (
     <Badge color={classificationColors[value] ?? "gray"}>{label}</Badge>
   );

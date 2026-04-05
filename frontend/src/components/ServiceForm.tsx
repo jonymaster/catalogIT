@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { formatBillingSchedule } from "../service/serviceBilling";
+import {
+  SERVICE_FIELD_LABELS,
+  SERVICE_VIEW_SECTIONS,
+  type ServiceFieldKey,
+} from "../service/serviceViewLayout";
 import type {
   Service,
   User,
   Vendor,
   Category,
+  CostCenter,
   PaymentMethod,
   ServiceStatus,
 } from "../types/models";
@@ -17,53 +24,54 @@ interface Props {
 interface FormData {
   name: string;
   status: string;
-  license_type: string;
   billing_schedule: string;
   renewal_date: string;
   yearly_cost: string;
   sso_integrated: boolean;
-  automated_provisioning: boolean;
   notes: string;
   owner_ids: string[];
   vendor_id: string;
   category_id: string;
+  cost_center_id: string;
   payment_method_id: string;
   service_status_id: string;
   classification: string;
-  service_type: string;
   scim_enabled: boolean;
-  scim_notes: string;
   criticality: string;
   nonprofit_pricing: boolean;
   renewal_reminders_enabled: boolean;
   renewal_use_custom_offsets: boolean;
   renewal_offsets_input: string;
 }
-const CLASSIFICATION_OPTIONS = ["core_saas", "subscription"];
-const SERVICE_TYPE_OPTIONS = ["contract", "self_managed", "deprecated"];
-const BILLING_OPTIONS = ["monthly", "annually", "on_demand", "na"];
+
+const CLASSIFICATION_OPTIONS = ["core_saas", "subscription", "internal"];
+const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
+
+function classificationOptionLabel(value: string): string {
+  if (value === "core_saas") return "Core SaaS";
+  if (value === "subscription") return "Subscription";
+  if (value === "internal") return "Internal";
+  return value;
+}
 
 function toFormData(s?: Service): FormData {
   return {
     name: s?.name ?? "",
     status: s?.status ?? "Contract",
-    license_type: s?.license_type ?? "",
     billing_schedule: s?.billing_schedule ?? "",
     renewal_date: s?.renewal_date ?? "",
     yearly_cost: s?.yearly_cost != null ? String(s.yearly_cost) : "",
     sso_integrated: s?.sso_integrated ?? false,
-    automated_provisioning: s?.automated_provisioning ?? false,
     notes: s?.notes ?? "",
     owner_ids: s?.owners.map((o) => o.id) ?? [],
     vendor_id: s?.vendor_id ?? "",
     category_id: s?.category_id ?? "",
+    cost_center_id: s?.cost_center_id ?? "",
     payment_method_id: s?.payment_method_id ?? "",
     service_status_id: s?.service_status_id ?? "",
     classification: s?.classification ?? "",
-    service_type: s?.service_type ?? "",
     scim_enabled: s?.scim_enabled ?? false,
-    scim_notes: s?.scim_notes ?? "",
     criticality: s?.criticality ?? "",
     nonprofit_pricing: s?.nonprofit_pricing ?? false,
     renewal_reminders_enabled: s?.renewal_reminders_enabled ?? true,
@@ -86,6 +94,7 @@ export function ServiceForm({ initial }: Props) {
   const [users, setUsers] = useState<User[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([]);
 
@@ -94,12 +103,14 @@ export function ServiceForm({ initial }: Props) {
       client.get<User[]>("/api/settings/users/"),
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
+      client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
       client.get<ServiceStatus[]>("/api/service-statuses/"),
-    ]).then(([u, v, c, p, s]) => {
+    ]).then(([u, v, c, cc, p, s]) => {
       setUsers(u.data);
       setVendors(v.data);
       setCategories(c.data);
+      setCostCenters(cc.data);
       setPaymentMethods(p.data);
       setServiceStatuses(s.data);
     });
@@ -186,22 +197,19 @@ export function ServiceForm({ initial }: Props) {
     const payload = {
       name: form.name,
       status: form.status,
-      license_type: form.license_type,
       billing_schedule: form.billing_schedule,
       renewal_date: form.renewal_date || null,
       yearly_cost: form.yearly_cost ? Number(form.yearly_cost) : null,
       sso_integrated: form.sso_integrated,
-      automated_provisioning: form.automated_provisioning,
       notes: form.notes || null,
       owner_ids: form.owner_ids,
       vendor_id: form.vendor_id || null,
       category_id: form.category_id || null,
+      cost_center_id: form.cost_center_id || null,
       payment_method_id: form.payment_method_id || null,
       service_status_id: form.service_status_id || null,
       classification: form.classification || null,
-      service_type: form.service_type || null,
       scim_enabled: form.scim_enabled,
-      scim_notes: form.scim_notes || null,
       criticality: form.criticality || null,
       nonprofit_pricing: form.nonprofit_pricing,
       renewal_reminders_enabled: form.renewal_reminders_enabled,
@@ -229,325 +237,375 @@ export function ServiceForm({ initial }: Props) {
     "block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
   const labelCls = "block text-sm font-medium text-gray-700";
 
+  function renderFieldControl(key: ServiceFieldKey) {
+    switch (key) {
+      case "status":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.status}</label>
+            <select
+              className={inputCls}
+              value={selectedStatusValue}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.startsWith("legacy:")) {
+                  set("service_status_id", "");
+                  set("status", value.replace("legacy:", ""));
+                  return;
+                }
+
+                const selectedStatus = serviceStatuses.find(
+                  (status) => status.id === value,
+                );
+                set("service_status_id", value);
+                set("status", selectedStatus?.name ?? "");
+              }}
+            >
+              {serviceStatuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+              {hasLegacyStatusOption && (
+                <option value={`legacy:${form.status}`}>
+                  {form.status} (legacy value)
+                </option>
+              )}
+            </select>
+          </div>
+        );
+      case "owners":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.owners}</label>
+            <select
+              multiple
+              className={inputCls + " h-28"}
+              value={form.owner_ids}
+              onChange={(e) =>
+                set(
+                  "owner_ids",
+                  Array.from(e.target.selectedOptions, (o) => o.value),
+                )
+              }
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.first_name} {u.last_name} ({u.email})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Hold Ctrl/Cmd to select multiple
+            </p>
+          </div>
+        );
+      case "classification":
+        return (
+          <div>
+            <label className={labelCls}>
+              {SERVICE_FIELD_LABELS.classification}
+            </label>
+            <select
+              className={inputCls}
+              value={form.classification}
+              onChange={(e) => set("classification", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {CLASSIFICATION_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {classificationOptionLabel(o)}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "criticality":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.criticality}</label>
+            <select
+              className={inputCls}
+              value={form.criticality}
+              onChange={(e) => set("criticality", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {CRITICALITY_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "sso_integrated":
+        return (
+          <div className="flex items-end pb-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.sso_integrated}
+                onChange={(e) => set("sso_integrated", e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {SERVICE_FIELD_LABELS.sso_integrated}
+            </label>
+          </div>
+        );
+      case "scim_enabled":
+        return (
+          <div className="flex items-end pb-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.scim_enabled}
+                onChange={(e) => set("scim_enabled", e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {SERVICE_FIELD_LABELS.scim_enabled}
+            </label>
+          </div>
+        );
+      case "vendor":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.vendor}</label>
+            <select
+              className={inputCls}
+              value={form.vendor_id}
+              onChange={(e) => set("vendor_id", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "spending_category":
+        return (
+          <div>
+            <label className={labelCls}>
+              {SERVICE_FIELD_LABELS.spending_category}
+            </label>
+            <select
+              className={inputCls}
+              value={form.category_id}
+              onChange={(e) => set("category_id", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "cost_center":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.cost_center}</label>
+            <select
+              className={inputCls}
+              value={form.cost_center_id}
+              onChange={(e) => set("cost_center_id", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {costCenters.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "billing_schedule":
+        return (
+          <div>
+            <label className={labelCls}>
+              {SERVICE_FIELD_LABELS.billing_schedule}
+            </label>
+            <select
+              className={inputCls}
+              value={form.billing_schedule}
+              onChange={(e) => set("billing_schedule", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {BILLING_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {formatBillingSchedule(o)}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "renewal_reminders":
+        return (
+          <div className="col-span-full space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-sm font-medium text-gray-900">
+              {SERVICE_FIELD_LABELS.renewal_reminders}
+            </p>
+            <p className="text-xs text-gray-500">
+              Owners receive emails at the configured days before renewal (global
+              defaults in Settings → Notifications). Override the schedule for this
+              service only if needed.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.renewal_reminders_enabled}
+                onChange={(e) =>
+                  set("renewal_reminders_enabled", e.target.checked)
+                }
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Send renewal reminder emails for this service
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.renewal_use_custom_offsets}
+                onChange={(e) =>
+                  set("renewal_use_custom_offsets", e.target.checked)
+                }
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Use custom reminder offsets (instead of global defaults)
+            </label>
+            {form.renewal_use_custom_offsets && (
+              <div>
+                <label className={labelCls}>Custom days before renewal</label>
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={form.renewal_offsets_input}
+                  onChange={(e) =>
+                    set("renewal_offsets_input", e.target.value)
+                  }
+                  placeholder="30, 14, 7, 1"
+                />
+              </div>
+            )}
+          </div>
+        );
+      case "renewal_date":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.renewal_date}</label>
+            <input
+              type="date"
+              className={inputCls}
+              value={form.renewal_date}
+              onChange={(e) => set("renewal_date", e.target.value)}
+            />
+          </div>
+        );
+      case "yearly_cost":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.yearly_cost} ($)</label>
+            <input
+              type="number"
+              step="0.01"
+              className={inputCls}
+              value={form.yearly_cost}
+              onChange={(e) => set("yearly_cost", e.target.value)}
+            />
+          </div>
+        );
+      case "payment_method":
+        return (
+          <div>
+            <label className={labelCls}>
+              {SERVICE_FIELD_LABELS.payment_method}
+            </label>
+            <select
+              className={inputCls}
+              value={form.payment_method_id}
+              onChange={(e) => set("payment_method_id", e.target.value)}
+            >
+              <option value="">-- None --</option>
+              {paymentMethods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "nonprofit_pricing":
+        return (
+          <div className="flex items-end pb-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={form.nonprofit_pricing}
+                onChange={(e) => set("nonprofit_pricing", e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {SERVICE_FIELD_LABELS.nonprofit_pricing}
+            </label>
+          </div>
+        );
+      case "notes":
+        return (
+          <div className="col-span-full">
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.notes}</label>
+            <textarea
+              className={inputCls}
+              rows={4}
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+            />
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div>
-          <label className={labelCls}>Name *</label>
-          <input
-            required
-            className={inputCls}
-            value={form.name}
-            onChange={(e) => set("name", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className={labelCls}>Status</label>
-          <select
-            className={inputCls}
-            value={selectedStatusValue}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value.startsWith("legacy:")) {
-                set("service_status_id", "");
-                set("status", value.replace("legacy:", ""));
-                return;
-              }
-
-              const selectedStatus = serviceStatuses.find(
-                (status) => status.id === value,
-              );
-              set("service_status_id", value);
-              set("status", selectedStatus?.name ?? "");
-            }}
-          >
-            {serviceStatuses.map((status) => (
-              <option key={status.id} value={status.id}>
-                {status.name}
-              </option>
-            ))}
-            {hasLegacyStatusOption && (
-              <option value={`legacy:${form.status}`}>
-                {form.status} (legacy value)
-              </option>
-            )}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Classification</label>
-          <select
-            className={inputCls}
-            value={form.classification}
-            onChange={(e) => set("classification", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {CLASSIFICATION_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o === "core_saas" ? "Core SaaS" : "Subscription"}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Criticality</label>
-          <select
-            className={inputCls}
-            value={form.criticality}
-            onChange={(e) => set("criticality", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {CRITICALITY_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Vendor</label>
-          <select
-            className={inputCls}
-            value={form.vendor_id}
-            onChange={(e) => set("vendor_id", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {vendors.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Category</label>
-          <select
-            className={inputCls}
-            value={form.category_id}
-            onChange={(e) => set("category_id", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>License Type</label>
-          <input
-            className={inputCls}
-            value={form.license_type}
-            onChange={(e) => set("license_type", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className={labelCls}>Service Type</label>
-          <select
-            className={inputCls}
-            value={form.service_type}
-            onChange={(e) => set("service_type", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {SERVICE_TYPE_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o.replace("_", " ")}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Billing Schedule</label>
-          <select
-            className={inputCls}
-            value={form.billing_schedule}
-            onChange={(e) => set("billing_schedule", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {BILLING_OPTIONS.map((o) => (
-              <option key={o} value={o}>
-                {o.replace("_", " ")}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Renewal Date</label>
-          <input
-            type="date"
-            className={inputCls}
-            value={form.renewal_date}
-            onChange={(e) => set("renewal_date", e.target.value)}
-          />
-        </div>
-
-        <div className="sm:col-span-2 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-sm font-medium text-gray-900">Renewal reminders</p>
-          <p className="text-xs text-gray-500">
-            Owners receive emails at the configured days before renewal (global
-            defaults in Settings → Notifications). Override the schedule for this
-            service only if needed.
-          </p>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.renewal_reminders_enabled}
-              onChange={(e) =>
-                set("renewal_reminders_enabled", e.target.checked)
-              }
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Send renewal reminder emails for this service
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.renewal_use_custom_offsets}
-              onChange={(e) =>
-                set("renewal_use_custom_offsets", e.target.checked)
-              }
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Use custom reminder offsets (instead of global defaults)
-          </label>
-          {form.renewal_use_custom_offsets && (
-            <div>
-              <label className={labelCls}>Custom days before renewal</label>
-              <input
-                type="text"
-                className={inputCls}
-                value={form.renewal_offsets_input}
-                onChange={(e) =>
-                  set("renewal_offsets_input", e.target.value)
-                }
-                placeholder="30, 14, 7, 1"
-              />
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label className={labelCls}>Yearly Cost ($)</label>
-          <input
-            type="number"
-            step="0.01"
-            className={inputCls}
-            value={form.yearly_cost}
-            onChange={(e) => set("yearly_cost", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className={labelCls}>Payment Method</label>
-          <select
-            className={inputCls}
-            value={form.payment_method_id}
-            onChange={(e) => set("payment_method_id", e.target.value)}
-          >
-            <option value="">-- None --</option>
-            {paymentMethods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelCls}>Owners</label>
-          <select
-            multiple
-            className={inputCls + " h-28"}
-            value={form.owner_ids}
-            onChange={(e) =>
-              set(
-                "owner_ids",
-                Array.from(e.target.selectedOptions, (o) => o.value),
-              )
-            }
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.first_name} {u.last_name} ({u.email})
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-gray-500">Hold Ctrl/Cmd to select multiple</p>
-        </div>
-
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.sso_integrated}
-              onChange={(e) => set("sso_integrated", e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            SSO Integrated
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.automated_provisioning}
-              onChange={(e) => set("automated_provisioning", e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Automated Provisioning
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.scim_enabled}
-              onChange={(e) => set("scim_enabled", e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            SCIM Enabled
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.nonprofit_pricing}
-              onChange={(e) => set("nonprofit_pricing", e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Nonprofit Pricing
-          </label>
-        </div>
-      </div>
-
       <div>
-        <label className={labelCls}>SCIM Notes</label>
+        <label className={labelCls}>Name *</label>
         <input
-          className={inputCls}
-          value={form.scim_notes}
-          onChange={(e) => set("scim_notes", e.target.value)}
+          required
+          className={inputCls + " mt-1 max-w-xl"}
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
         />
       </div>
 
-      <div>
-        <label className={labelCls}>Notes</label>
-        <textarea
-          className={inputCls}
-          rows={3}
-          value={form.notes}
-          onChange={(e) => set("notes", e.target.value)}
-        />
-      </div>
+      {SERVICE_VIEW_SECTIONS.map((section) => (
+        <div key={section.id} className="space-y-4">
+          <h2 className="text-base font-semibold text-gray-900">
+            {section.title}
+          </h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {section.fields.map((key) => (
+              <div
+                key={key}
+                className={
+                  key === "notes" || key === "renewal_reminders"
+                    ? "col-span-full"
+                    : undefined
+                }
+              >
+                {renderFieldControl(key)}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
 
       <div className="flex gap-3">
         <button

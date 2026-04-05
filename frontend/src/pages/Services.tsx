@@ -13,6 +13,7 @@ import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
+import { formatBillingSchedule } from "../service/serviceBilling";
 import type { Service } from "../types/models";
 import { formatDateOnly } from "../utils/formatting";
 
@@ -86,6 +87,14 @@ function categoryLabel(service: Service): string {
   return service.category_rel?.name ?? "";
 }
 
+function costCenterLabel(service: Service): string {
+  return service.cost_center?.name ?? "";
+}
+
+function getServiceStatusLabel(service: Service): string {
+  return service.service_status?.name ?? service.status;
+}
+
 const columnDefinitions: ServiceColumnDefinition[] = [
   {
     key: "name",
@@ -99,15 +108,17 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     key: "status",
     label: "Status",
     filterType: "select",
-    getFilterValue: (service) => service.status,
-    getSortValue: (service) => service.status,
+    getFilterValue: (service) => getServiceStatusLabel(service),
+    getSortValue: (service) => getServiceStatusLabel(service),
     getFilterOptions: (services) =>
-      getUniqueOptions(services.map((service) => service.status)),
-    render: (service) => <StatusBadge status={service.status} />,
+      getUniqueOptions(services.map((service) => getServiceStatusLabel(service))),
+    render: (service) => (
+      <StatusBadge status={getServiceStatusLabel(service)} />
+    ),
   },
   {
-    key: "category",
-    label: "Category",
+    key: "spending_category",
+    label: "Spending Category",
     filterType: "select",
     getFilterValue: (service) => categoryLabel(service),
     getSortValue: (service) => categoryLabel(service),
@@ -116,13 +127,14 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     render: (service) => categoryLabel(service) || "--",
   },
   {
-    key: "license_type",
-    label: "License",
+    key: "cost_center",
+    label: "Cost Center",
     filterType: "select",
-    getFilterValue: (service) => service.license_type,
-    getSortValue: (service) => service.license_type,
+    getFilterValue: (service) => costCenterLabel(service) || "--",
+    getSortValue: (service) => costCenterLabel(service),
     getFilterOptions: (services) =>
-      getUniqueOptions(services.map((service) => service.license_type)),
+      getUniqueOptions(services.map((service) => costCenterLabel(service))),
+    render: (service) => costCenterLabel(service) || "--",
   },
   {
     key: "classification",
@@ -169,20 +181,29 @@ const columnDefinitions: ServiceColumnDefinition[] = [
         : "--",
   },
   {
+    key: "payment_method",
+    label: "Payment Method",
+    filterType: "select",
+    getFilterValue: (service) => service.payment_method?.name ?? "--",
+    getSortValue: (service) => service.payment_method?.name ?? "",
+    getFilterOptions: (services) =>
+      getUniqueOptions(
+        services.map((service) => service.payment_method?.name ?? "--"),
+      ),
+    render: (service) => service.payment_method?.name ?? "--",
+  },
+  {
     key: "billing_schedule",
     label: "Billing Schedule",
     filterType: "select",
     getFilterValue: (service) =>
-      service.billing_schedule.trim() ? service.billing_schedule.trim() : "--",
+      formatBillingSchedule(service.billing_schedule),
     getSortValue: (service) => service.billing_schedule ?? "",
     getFilterOptions: (services) =>
       getUniqueOptions(
-        services.map((service) =>
-          service.billing_schedule.trim() ? service.billing_schedule.trim() : "--",
-        ),
+        services.map((service) => formatBillingSchedule(service.billing_schedule)),
       ),
-    render: (service) =>
-      service.billing_schedule.trim() ? service.billing_schedule.trim() : "--",
+    render: (service) => formatBillingSchedule(service.billing_schedule),
   },
   {
     key: "renewal_date",
@@ -270,8 +291,9 @@ export function Services() {
         !q ||
         service.name.toLowerCase().includes(q) ||
         categoryLabel(service).toLowerCase().includes(q) ||
-        service.license_type.toLowerCase().includes(q) ||
-        service.status.toLowerCase().includes(q) ||
+        costCenterLabel(service).toLowerCase().includes(q) ||
+        getServiceStatusLabel(service).toLowerCase().includes(q) ||
+        (service.payment_method?.name ?? "").toLowerCase().includes(q) ||
         service.billing_schedule.toLowerCase().includes(q) ||
         (service.vendor?.name ?? "").toLowerCase().includes(q) ||
         service.owners.some(

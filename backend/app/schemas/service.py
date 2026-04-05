@@ -6,7 +6,9 @@ from datetime import date, datetime
 from pydantic import BaseModel
 
 from app.schemas.category import CategoryRead
+from app.schemas.cost_center import CostCenterRead
 from app.schemas.login_method import LoginMethodRead
+from app.schemas.payment_method import PaymentMethodRead
 from app.schemas.service_status import ServiceStatusRead
 from app.schemas.user import UserRead
 from app.schemas.vendor import VendorRead
@@ -24,24 +26,21 @@ class ServiceLoginRead(BaseModel):
 class ServiceCreate(BaseModel):
     name: str
     status: str = "Contract"
-    license_type: str = ""
     billing_schedule: str = ""
     renewal_date: date | None = None
     yearly_cost: float | None = None
     sso_integrated: bool = False
-    automated_provisioning: bool = False
     notes: str | None = None
     owner_ids: list[uuid.UUID] = []
     # New fields
     vendor_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    cost_center_id: uuid.UUID | None = None
     payment_method_id: uuid.UUID | None = None
     service_status_id: uuid.UUID | None = None
     contract_id: uuid.UUID | None = None
     classification: str | None = None
-    service_type: str | None = None
     scim_enabled: bool | None = None
-    scim_notes: str | None = None
     criticality: str | None = None
     nonprofit_pricing: bool = False
     renewal_reminders_enabled: bool = True
@@ -51,24 +50,21 @@ class ServiceCreate(BaseModel):
 class ServiceUpdate(BaseModel):
     name: str | None = None
     status: str | None = None
-    license_type: str | None = None
     billing_schedule: str | None = None
     renewal_date: date | None = None
     yearly_cost: float | None = None
     sso_integrated: bool | None = None
-    automated_provisioning: bool | None = None
     notes: str | None = None
     owner_ids: list[uuid.UUID] | None = None
     # New fields
     vendor_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    cost_center_id: uuid.UUID | None = None
     payment_method_id: uuid.UUID | None = None
     service_status_id: uuid.UUID | None = None
     contract_id: uuid.UUID | None = None
     classification: str | None = None
-    service_type: str | None = None
     scim_enabled: bool | None = None
-    scim_notes: str | None = None
     criticality: str | None = None
     nonprofit_pricing: bool | None = None
     is_active: bool | None = None
@@ -80,24 +76,21 @@ class ServiceRead(BaseModel):
     id: uuid.UUID
     name: str
     status: str
-    license_type: str
     billing_schedule: str
     renewal_date: date | None
     yearly_cost: float | None
     sso_integrated: bool
-    automated_provisioning: bool
     notes: str | None
     owners: list[UserRead]
     # New fields
     vendor_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    cost_center_id: uuid.UUID | None = None
     payment_method_id: uuid.UUID | None = None
     service_status_id: uuid.UUID | None = None
     contract_id: uuid.UUID | None = None
     classification: str | None = None
-    service_type: str | None = None
     scim_enabled: bool | None = None
-    scim_notes: str | None = None
     criticality: str | None = None
     nonprofit_pricing: bool = False
     is_active: bool = True
@@ -106,6 +99,8 @@ class ServiceRead(BaseModel):
     deprecated_at: datetime | None = None
     vendor: VendorRead | None = None
     category_rel: CategoryRead | None = None
+    cost_center: CostCenterRead | None = None
+    payment_method: PaymentMethodRead | None = None
     service_status: ServiceStatusRead | None = None
     logins: list[ServiceLoginRead] = []
     created_at: datetime

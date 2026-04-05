@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.category import Category
+from app.models.cost_center import CostCenter
 from app.models.contract import Contract
 from app.models.payment_method import PaymentMethod
 from app.models.service_status import ServiceStatus
@@ -62,6 +63,7 @@ async def _humanize_service_fks(
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     keys = {
         "category_id": (Category, lambda r: r.name),
+        "cost_center_id": (CostCenter, lambda r: r.name),
         "vendor_id": (Vendor, lambda r: r.name),
         "payment_method_id": (PaymentMethod, lambda r: r.name),
         "service_status_id": (ServiceStatus, lambda r: r.name),
@@ -113,6 +115,7 @@ def _friendly_service_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | N
     for src, dst in (
         ("vendor_id", "vendor"),
         ("category_id", "category"),
+        ("cost_center_id", "cost_center"),
         ("payment_method_id", "payment_method"),
         ("contract_id", "contract"),
     ):

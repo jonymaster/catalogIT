@@ -1,6 +1,7 @@
 from app.models.user import User
 from app.models.vendor import Vendor
 from app.models.category import Category
+from app.models.cost_center import CostCenter
 from app.models.login_method import LoginMethod
 from app.models.payment_method import PaymentMethod
 from app.models.service_status import ServiceStatus
@@ -24,6 +25,7 @@ __all__ = [
     "User",
     "Vendor",
     "Category",
+    "CostCenter",
     "LoginMethod",
     "PaymentMethod",
     "ServiceStatus",

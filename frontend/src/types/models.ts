@@ -35,6 +35,12 @@ export interface Category {
   description: string | null;
 }
 
+export interface CostCenter {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export interface LoginMethod {
   id: string;
   name: string;
@@ -104,24 +110,21 @@ export interface Service {
   id: string;
   name: string;
   status: string;
-  license_type: string;
   billing_schedule: string;
   renewal_date: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;
-  automated_provisioning: boolean;
   notes: string | null;
   owners: User[];
   // Normalized fields
   vendor_id: string | null;
   category_id: string | null;
+  cost_center_id: string | null;
   payment_method_id: string | null;
   service_status_id: string | null;
   contract_id: string | null;
   classification: string | null;
-  service_type: string | null;
   scim_enabled: boolean | null;
-  scim_notes: string | null;
   criticality: string | null;
   nonprofit_pricing: boolean;
   is_active: boolean;
@@ -130,6 +133,8 @@ export interface Service {
   deprecated_at: string | null;
   vendor: Vendor | null;
   category_rel: Category | null;
+  cost_center: CostCenter | null;
+  payment_method: PaymentMethod | null;
   service_status: ServiceStatus | null;
   logins: ServiceLogin[];
   created_at: string;

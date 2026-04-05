@@ -12,7 +12,10 @@ from app.database import get_db
 from app.dependencies.auth import require_scim_token
 from app.models.user import User
 from app.schemas.scim import (
+    ENTERPRISE_DEPARTMENT_PATH,
+    ENTERPRISE_USER_SCHEMA,
     ScimCreateUser,
+    ScimEnterpriseUser,
     ScimListResponse,
     ScimPatchRequest,
     ScimResourceType,
@@ -37,8 +40,23 @@ def _scim_error(status_code: int, detail: str) -> JSONResponse:
     )
 
 
+def _normalize_department(value: str | None) -> str | None:
+    if value is None:
+        return None
+    s = value.strip()
+    if not s:
+        return None
+    return s[:100]
+
+
 def _user_to_scim(user: User) -> ScimUserResource:
+    schemas = ["urn:ietf:params:scim:schemas:core:2.0:User"]
+    enterprise: ScimEnterpriseUser | None = None
+    if user.department:
+        schemas.append(ENTERPRISE_USER_SCHEMA)
+        enterprise = ScimEnterpriseUser(department=user.department)
     return ScimUserResource(
+        schemas=schemas,
         id=str(user.id),
         userName=user.email,
         name=ScimName(givenName=user.first_name, familyName=user.last_name),
@@ -46,6 +64,7 @@ def _user_to_scim(user: User) -> ScimUserResource:
         emails=[ScimEmail(value=user.email, primary=True)],
         active=user.is_active,
         externalId=user.external_id,
+        enterprise_user=enterprise,
     )
 
 
@@ -123,12 +142,18 @@ async def create_user(body: ScimCreateUser, db: AsyncSession = Depends(get_db)):
     if existing.scalar_one_or_none():
         return _scim_error(409, "User already exists")
 
+    dept = (
+        _normalize_department(body.enterprise_user.department)
+        if body.enterprise_user
+        else None
+    )
     user = User(
         external_id=body.externalId or str(uuid.uuid4()),
         email=email,
         first_name=body.name.givenName,
         last_name=body.name.familyName,
         display_name=body.displayName or None,
+        department=dept,
         is_active=body.active,
     )
     db.add(user)
@@ -155,6 +180,10 @@ async def replace_user(
     user.last_name = body.name.familyName
     user.display_name = body.displayName or None
     user.is_active = body.active
+    if body.enterprise_user is not None:
+        user.department = _normalize_department(body.enterprise_user.department)
+    else:
+        user.department = None
     if body.externalId:
         user.external_id = body.externalId
 
@@ -184,6 +213,10 @@ async def patch_user(
                 user.last_name = str(op.value)
             if op.path == "displayName":
                 user.display_name = str(op.value)
+            if op.path == ENTERPRISE_DEPARTMENT_PATH:
+                user.department = _normalize_department(
+                    str(op.value) if op.value is not None else None
+                )
             if not op.path and isinstance(op.value, dict):
                 if "active" in op.value:
                     user.is_active = bool(op.value["active"])
@@ -194,6 +227,15 @@ async def patch_user(
                         user.last_name = op.value["name"]["familyName"]
                 if "displayName" in op.value:
                     user.display_name = op.value["displayName"]
+                ext = op.value.get(ENTERPRISE_USER_SCHEMA)
+                if isinstance(ext, dict) and "department" in ext:
+                    user.department = _normalize_department(ext.get("department"))
+        elif operation == "add" and op.path == ENTERPRISE_DEPARTMENT_PATH:
+            user.department = _normalize_department(
+                str(op.value) if op.value is not None else None
+            )
+        elif operation == "remove" and op.path == ENTERPRISE_DEPARTMENT_PATH:
+            user.department = None
 
     await db.flush()
     return _user_to_scim(user)
