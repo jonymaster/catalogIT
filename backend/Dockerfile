@@ -16,6 +16,9 @@ RUN adduser --disabled-password --gecos "" appuser
 WORKDIR /app
 COPY --from=builder /app /app
 
+# Builder leaves source trees as root-only (e.g. mode 750/640); appuser must read /app/app and .venv.
+RUN chown -R appuser:appuser /app
+
 ENV PATH="/app/.venv/bin:$PATH"
 
 USER appuser
