@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.sqlalchemy_types import NaiveUTCDateTime
 
 
 class ApiToken(Base):
@@ -18,8 +19,8 @@ class ApiToken(Base):
     token_prefix: Mapped[str] = mapped_column(String(12))
     created_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(NaiveUTCDateTime, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(NaiveUTCDateTime, nullable=True)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_by = relationship("User", lazy="selectin")
