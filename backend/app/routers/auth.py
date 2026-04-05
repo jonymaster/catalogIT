@@ -122,6 +122,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         actor_user_id=user.id,
         summary="Local login succeeded",
         details={"method": "local"},
+        entity_label=user.email,
     )
     return LoginResponse(
         access_token=_mint_jwt(user),
@@ -159,6 +160,7 @@ async def reset_password(
         actor_user_id=user.id,
         summary="Password changed by user",
         details={"method": "local_reset"},
+        entity_label=user.email,
     )
 
 
@@ -296,6 +298,7 @@ async def oidc_callback(
         actor_user_id=user.id,
         summary="OIDC login succeeded",
         details={"method": "oidc"},
+        entity_label=(user.email or "").strip() or None,
     )
 
     settings = get_settings()

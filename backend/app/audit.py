@@ -12,6 +12,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session, UOWTransaction
 
+from app.audit_enrichment import finalize_details_sync
 from app.audit_redaction import redact_mapping, redact_serialized_row
 from app.models.global_audit_event import GlobalAuditEvent
 
@@ -115,6 +116,12 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
             instance,
             {"action": "INSERT", "old_values": None, "new_values": new_vals},
         )
+        details_final = finalize_details_sync(
+            session,
+            redact_mapping(ins_details),
+            user_id,
+            instance,
+        )
         session.add(
             GlobalAuditEvent(
                 category="data_change",
@@ -123,7 +130,7 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
                 entity_key=key,
                 actor_user_id=user_id,
                 summary=_summary_line(table, "INSERT"),
-                details=redact_mapping(ins_details),
+                details=details_final,
             )
         )
 
@@ -155,6 +162,12 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
             instance,
             {"action": "UPDATE", "old_values": old_vals, "new_values": new_vals},
         )
+        details_final = finalize_details_sync(
+            session,
+            redact_mapping(upd_details),
+            user_id,
+            instance,
+        )
         session.add(
             GlobalAuditEvent(
                 category="data_change",
@@ -163,7 +176,7 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
                 entity_key=key,
                 actor_user_id=user_id,
                 summary=_summary_line(table, "UPDATE"),
-                details=redact_mapping(upd_details),
+                details=details_final,
             )
         )
 
@@ -178,6 +191,12 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
             instance,
             {"action": "DELETE", "old_values": old_vals, "new_values": None},
         )
+        details_final = finalize_details_sync(
+            session,
+            redact_mapping(del_details),
+            user_id,
+            instance,
+        )
         session.add(
             GlobalAuditEvent(
                 category="data_change",
@@ -186,7 +205,7 @@ def _after_flush(session: Session, flush_context: UOWTransaction) -> None:
                 entity_key=key,
                 actor_user_id=user_id,
                 summary=_summary_line(table, "DELETE"),
-                details=redact_mapping(del_details),
+                details=details_final,
             )
         )
 

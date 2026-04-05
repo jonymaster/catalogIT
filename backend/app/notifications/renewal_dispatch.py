@@ -221,9 +221,11 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                             "channel": "email",
                             "service_id": str(service.id),
                             "user_id": str(recipient.id),
+                            "recipient_email": recipient.email,
                             "days_before": days_before,
                             "renewal_date": service.renewal_date.isoformat(),
                         },
+                        entity_label=service.name,
                     )
                 except IntegrityError:
                     logger.info(
@@ -247,9 +249,11 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                             "channel": "email",
                             "service_id": str(service.id),
                             "user_id": str(recipient.id),
+                            "recipient_email": recipient.email,
                             "days_before": days_before,
                             "error": str(exc)[:500],
                         },
+                        entity_label=service.name,
                     )
 
     return result

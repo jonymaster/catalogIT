@@ -294,6 +294,7 @@ async def test_integration(
             actor_user_id=_user.id,
             summary=f"Integration test failed ({channel})",
             details={"channel": channel, "error": str(exc)[:500]},
+            entity_label=f"Integration ({channel})",
         )
         return TestSendResponse(ok=False, detail=str(exc))
     row.connection_status = "connected"
@@ -309,6 +310,7 @@ async def test_integration(
         actor_user_id=_user.id,
         summary=f"Integration test succeeded ({channel})",
         details={"channel": channel},
+        entity_label=f"Integration ({channel})",
     )
     return TestSendResponse(ok=True, detail=None)
 

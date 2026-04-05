@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies.db import get_audited_db
+from app.history_display import humanize_audit_values
 from app.models.global_audit_event import GlobalAuditEvent
 from app.schemas.audit import AuditLogRead, PaginatedHistoryResponse
 
@@ -95,7 +96,13 @@ async def get_history(
     )
     result = await db.execute(stmt)
     rows = list(result.scalars().all())
-    items = [AuditLogRead.from_global_event(e, record_id) for e in rows]
+    items: list[AuditLogRead] = []
+    for e in rows:
+        read = AuditLogRead.from_global_event(e, record_id)
+        old, new = await humanize_audit_values(
+            db, e.entity_table, read.old_values, read.new_values
+        )
+        items.append(read.model_copy(update={"old_values": old, "new_values": new}))
     return PaginatedHistoryResponse(
         items=items,
         page=page,

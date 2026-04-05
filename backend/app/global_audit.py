@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit_enrichment import finalize_details_async
 from app.database import async_session
 from app.models.global_audit_event import GlobalAuditEvent
 from app.request_context import request_id_ctx
@@ -28,7 +28,14 @@ async def record_global_audit_event(
     summary: str | None = None,
     details: dict[str, Any] | None = None,
     request_id: str | None = None,
+    entity_label: str | None = None,
 ) -> None:
+    merged = await finalize_details_async(
+        db,
+        details,
+        actor_user_id,
+        entity_label=entity_label,
+    )
     db.add(
         GlobalAuditEvent(
             category=category,
@@ -37,7 +44,7 @@ async def record_global_audit_event(
             entity_key=entity_key,
             actor_user_id=actor_user_id,
             summary=summary,
-            details=details,
+            details=merged,
             request_id=_effective_request_id(request_id),
         )
     )
@@ -53,18 +60,26 @@ async def record_global_audit_event_committed(
     summary: str | None = None,
     details: dict[str, Any] | None = None,
     request_id: str | None = None,
+    entity_label: str | None = None,
 ) -> None:
     """Own session + commit; use when the caller session may be rolled back (e.g. error handler)."""
     async with async_session() as session:
-        await record_global_audit_event(
+        merged = await finalize_details_async(
             session,
-            category=category,
-            event_type=event_type,
-            entity_table=entity_table,
-            entity_key=entity_key,
-            actor_user_id=actor_user_id,
-            summary=summary,
-            details=details,
-            request_id=_effective_request_id(request_id),
+            details,
+            actor_user_id,
+            entity_label=entity_label,
+        )
+        session.add(
+            GlobalAuditEvent(
+                category=category,
+                event_type=event_type,
+                entity_table=entity_table,
+                entity_key=entity_key,
+                actor_user_id=actor_user_id,
+                summary=summary,
+                details=merged,
+                request_id=_effective_request_id(request_id),
+            )
         )
         await session.commit()
