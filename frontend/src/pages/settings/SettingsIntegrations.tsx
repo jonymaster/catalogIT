@@ -64,6 +64,7 @@ export function SettingsIntegrations() {
   const [slackClientId, setSlackClientId] = useState("");
   const [slackSecret, setSlackSecret] = useState("");
   const [slackChannelLabel, setSlackChannelLabel] = useState("");
+  const [slackResolving, setSlackResolving] = useState(false);
   const [gClientId, setGClientId] = useState("");
   const [gSecret, setGSecret] = useState("");
 
@@ -85,7 +86,9 @@ export function SettingsIntegrations() {
         }
         if (ch.channel === "slack") {
           setSlackClientId(ch.metadata.client_id ?? "");
-          setSlackChannelLabel(ch.metadata.default_channel_label ?? "");
+          setSlackChannelLabel(
+            ch.metadata.default_channel_id ?? ch.metadata.default_channel_label ?? "",
+          );
         }
         if (ch.channel === "google_mail") {
           setGClientId(ch.metadata.client_id ?? "");
@@ -215,18 +218,24 @@ export function SettingsIntegrations() {
   async function resolveSlackChannel(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
+    setSlackResolving(true);
     try {
-      await client.post("/api/settings/integrations/slack/resolve-channel", {
-        label: slackChannelLabel,
-      });
+      const r = await client.post<{ channel_id: string }>(
+        "/api/settings/integrations/slack/resolve-channel",
+        {
+          label: slackChannelLabel,
+        },
+      );
+      setSlackChannelLabel(r.data.channel_id);
       setMessage({ type: "success", text: "Channel resolved and saved." });
       await refresh();
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
       setMessage({
         type: "error",
-        text: err.response?.data?.detail ?? "Resolve failed.",
+        text: axiosDetail(e) ?? "Resolve failed.",
       });
+    } finally {
+      setSlackResolving(false);
     }
   }
 
@@ -525,16 +534,25 @@ export function SettingsIntegrations() {
           <label className="block flex-1 text-sm text-gray-700">
             Default channel (#name or ID)
             <input
-              className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+              className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-500"
               value={slackChannelLabel}
               onChange={(e) => setSlackChannelLabel(e.target.value)}
+              disabled={slackResolving}
             />
           </label>
           <button
             type="submit"
-            className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            disabled={slackResolving}
+            aria-busy={slackResolving}
+            className="inline-flex items-center gap-2 rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Resolve
+            {slackResolving && (
+              <span
+                className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                aria-hidden
+              />
+            )}
+            {slackResolving ? "Resolving…" : "Resolve"}
           </button>
         </form>
         {slack?.metadata.default_channel_id && (
