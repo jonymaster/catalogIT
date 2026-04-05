@@ -1,4 +1,5 @@
 import logging
+import subprocess
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
@@ -83,8 +84,21 @@ async def _seed_sample_data() -> None:
         logger.warning("Sample data seed skipped (run migrations first: alembic upgrade head)")
 
 
+def _run_migrations() -> None:
+    """Run alembic upgrade head so tables exist before the app starts."""
+    result = subprocess.run(
+        ["alembic", "upgrade", "head"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        logger.error("Alembic migration failed:\n%s", result.stderr)
+    else:
+        logger.info("Alembic migrations applied")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    _run_migrations()
     await _seed_admin()
     await _seed_sample_data()
     try:
