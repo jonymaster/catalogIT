@@ -47,7 +47,7 @@ export function SettingsScim() {
               </label>
               <div className="mt-1 flex items-center gap-2">
                 <code className="flex-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
-                  {window.location.origin}{status.endpoint_url}
+                  {status.endpoint_url}
                 </code>
               </div>
             </div>

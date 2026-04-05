@@ -89,9 +89,10 @@ class ScimStatus(BaseModel):
 @router.get("/scim", response_model=ScimStatus)
 async def get_scim_status(_user: User = Depends(_admin)):
     settings = get_settings()
+    base = settings.PUBLIC_BASE_URL.rstrip("/")
     return ScimStatus(
         enabled=bool(settings.SCIM_TOKEN),
-        endpoint_url="/scim/v2",
+        endpoint_url=f"{base}/scim/v2",
     )
 
 
