@@ -3,11 +3,12 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
+from app.models.api_token import ApiToken
 from app.models.user import User
 from app.schemas.user import UserRead, UserUpdate
 
@@ -54,3 +55,36 @@ async def update_user(
     await db.flush()
     await db.refresh(user)
     return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: uuid.UUID,
+    current_user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account",
+        )
+
+    if user.role == "admin":
+        result = await db.execute(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == "admin", User.id != user_id)
+        )
+        if result.scalar_one() == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the last admin",
+            )
+
+    await db.execute(delete(ApiToken).where(ApiToken.created_by_id == user_id))
+    await db.delete(user)
+    await db.flush()
