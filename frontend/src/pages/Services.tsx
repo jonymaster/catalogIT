@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { ClassificationBadge, CriticalityBadge } from "../components/Badge";
@@ -14,7 +14,8 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { formatBillingSchedule } from "../service/serviceBilling";
-import type { Service } from "../types/models";
+import type { Service, UserPreferences } from "../types/models";
+import { buildCsv, downloadCsvFile } from "../utils/csv";
 import { formatDateOnly } from "../utils/formatting";
 
 type FilterType = "text" | "select";
@@ -254,6 +255,31 @@ const columnDefinitions: ServiceColumnDefinition[] = [
 
 const ALL_COLUMN_KEYS = columnDefinitions.map((column) => column.key);
 
+function todayFilenameDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function getServiceExportValue(
+  service: Service,
+  key: string,
+  preferences: UserPreferences | null,
+): string {
+  if (key === "yearly_cost") {
+    return service.yearly_cost != null
+      ? `$${Number(service.yearly_cost).toLocaleString()}`
+      : "--";
+  }
+  if (key === "renewal_date") {
+    return formatDateOnly(service.renewal_date, preferences);
+  }
+  const def = columnDefinitions.find((column) => column.key === key);
+  return def ? def.getFilterValue(service) : "";
+}
+
 export function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -345,6 +371,27 @@ export function Services() {
       return sortState.direction === "asc" ? comparison : -comparison;
     });
   }, [filters, search, services, sortState]);
+
+  const handleExportCsv = useCallback(() => {
+    const known = new Set(columnDefinitions.map((column) => column.key));
+    const keysInOrder = visibleKeys.filter((key) => known.has(key));
+    if (keysInOrder.length === 0 || filtered.length === 0) {
+      return;
+    }
+    const headers = keysInOrder.map((key) => {
+      const def = columnDefinitions.find((column) => column.key === key);
+      return def?.label ?? key;
+    });
+    const rows = filtered.map((service) =>
+      keysInOrder.map((key) =>
+        getServiceExportValue(service, key, preferences),
+      ),
+    );
+    downloadCsvFile(
+      `services-${todayFilenameDate()}.csv`,
+      buildCsv(headers, rows),
+    );
+  }, [filtered, preferences, visibleKeys]);
 
   const hasActiveFilters = useMemo(() => {
     if (search.trim()) {
@@ -464,6 +511,14 @@ export function Services() {
                 </>
               )}
             </p>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={filtered.length === 0}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Export CSV
+            </button>
             <ColumnSelector
               columns={columns}
               visibleKeys={visibleKeys}

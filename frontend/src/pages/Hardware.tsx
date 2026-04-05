@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import {
@@ -13,6 +13,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import type { Laptop } from "../types/models";
+import { buildCsv, downloadCsvFile } from "../utils/csv";
 
 type FilterType = "text" | "select";
 
@@ -138,6 +139,14 @@ const columnDefinitions: HardwareColumnDefinition[] = [
 
 const ALL_COLUMN_KEYS = columnDefinitions.map((column) => column.key);
 
+function todayFilenameDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function Hardware() {
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,6 +231,28 @@ export function Hardware() {
       return sortState.direction === "asc" ? comparison : -comparison;
     });
   }, [filters, laptops, search, sortState]);
+
+  const handleExportCsv = useCallback(() => {
+    const known = new Set(columnDefinitions.map((column) => column.key));
+    const keysInOrder = visibleKeys.filter((key) => known.has(key));
+    if (keysInOrder.length === 0 || filtered.length === 0) {
+      return;
+    }
+    const headers = keysInOrder.map((key) => {
+      const def = columnDefinitions.find((column) => column.key === key);
+      return def?.label ?? key;
+    });
+    const rows = filtered.map((laptop) =>
+      keysInOrder.map((key) => {
+        const def = columnDefinitions.find((column) => column.key === key);
+        return def ? def.getFilterValue(laptop) : "";
+      }),
+    );
+    downloadCsvFile(
+      `hardware-${todayFilenameDate()}.csv`,
+      buildCsv(headers, rows),
+    );
+  }, [filtered, visibleKeys]);
 
   const columns = useMemo<Column<Laptop>[]>(() => {
     return columnDefinitions.map((column) => {
@@ -313,6 +344,14 @@ export function Hardware() {
                 placeholder="Search hardware..."
               />
             </div>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={filtered.length === 0}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Export CSV
+            </button>
             <ColumnSelector
               columns={columns}
               visibleKeys={visibleKeys}
