@@ -41,6 +41,8 @@ class LaptopRead(BaseModel):
     assigned_to_id: uuid.UUID | None
     assigned_to: UserRead | None
     notes: str | None
+    is_active: bool = True
+    archived_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

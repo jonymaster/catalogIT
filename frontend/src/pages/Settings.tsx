@@ -6,6 +6,7 @@ const tabs = [
   { to: "integrations", label: "Integrations" },
   { to: "notifications", label: "Notifications" },
   { to: "reference-data", label: "Reference Data" },
+  { to: "record-deletion", label: "Record Deletion" },
   { to: "tokens", label: "API Tokens" },
   { to: "api", label: "API Docs" },
 ];

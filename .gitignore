@@ -51,3 +51,9 @@ htmlcov/
 .coverage
 coverage.xml
 .claude/
+
+# Internal planning (local only; never commit)
+INTERNAL_TODO.md
+
+# Internal ideas (local only; never commit)
+IDEAS.md

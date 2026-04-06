@@ -36,7 +36,11 @@ def _sanitize_filename(name: str) -> str:
 
 
 async def _validate_entity(
-    entity_type: str, entity_id: uuid.UUID, db: AsyncSession
+    entity_type: str,
+    entity_id: uuid.UUID,
+    db: AsyncSession,
+    *,
+    for_write: bool = False,
 ) -> None:
     model = ALLOWED_ENTITY_TYPES.get(entity_type)
     if model is None:
@@ -49,6 +53,11 @@ async def _validate_entity(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{entity_type} {entity_id} not found",
+        )
+    if for_write and hasattr(entity, "is_active") and entity.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Archived {entity_type} is read-only for attachments",
         )
 
 
@@ -165,7 +174,7 @@ async def upload_attachment(
     user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    await _validate_entity(entity_type, entity_id, db)
+    await _validate_entity(entity_type, entity_id, db, for_write=True)
 
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(

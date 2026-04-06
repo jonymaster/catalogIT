@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   useParams,
   Link,
-  useNavigate,
   NavLink,
   Outlet,
 } from "react-router-dom";
@@ -17,7 +16,6 @@ const tabs = [
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { canEdit } = useAuth();
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,14 +27,6 @@ export function ServiceDetail() {
       .then((r) => setService(r.data))
       .finally(() => setLoading(false));
   }, [id]);
-
-  async function handleDelete() {
-    if (!id) return;
-    if (!window.confirm("Are you sure you want to delete this service?"))
-      return;
-    await client.delete(`/api/services/${id}`);
-    navigate("/services");
-  }
 
   if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!service)
@@ -64,12 +54,6 @@ export function ServiceDetail() {
             >
               Edit
             </Link>
-            <button
-              onClick={handleDelete}
-              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/40"
-            >
-              Delete
-            </button>
           </div>
         )}
       </div>
