@@ -1,7 +1,11 @@
 import axios from "axios";
 
+// Same-origin (path proxy) when unset; split hostnames (e.g. ECS) set VITE_API_BASE_URL at build time.
+const apiBase =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
+
 const client = axios.create({
-  baseURL: "/",
+  baseURL: apiBase || "/",
 });
 
 client.interceptors.request.use((config) => {

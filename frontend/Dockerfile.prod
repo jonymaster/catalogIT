@@ -12,6 +12,11 @@ RUN npm ci
 COPY frontend/ ./
 # Repo-root logos (see README); ensures /branding/*.png exists in dist even if public/ is incomplete in a checkout.
 COPY branding/ ./public/branding/
+
+# Optional: set when API is on another hostname (e.g. https://api-catalogit.example.org).
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 RUN npm run build
 
 FROM nginx:1.27-alpine
