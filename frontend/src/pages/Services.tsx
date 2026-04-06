@@ -287,6 +287,7 @@ function getServiceExportValue(
 
 export function Services() {
   const [services, setServices] = useState<Service[]>([]);
+  const [view, setView] = useState<"active" | "archived">("active");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<ServiceFilters>(() =>
@@ -309,11 +310,12 @@ export function Services() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    setLoading(true);
     client
-      .get<Service[]>("/api/services/")
+      .get<Service[]>("/api/services/", { params: { archived: view === "archived" } })
       .then((r) => setServices(r.data))
       .finally(() => setLoading(false));
-  }, []);
+  }, [view]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -483,6 +485,30 @@ export function Services() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Services</h1>
         <div className="flex shrink-0 items-center gap-2">
+          <div className="rounded-md border border-gray-300 dark:border-gray-700 p-0.5 flex">
+            <button
+              type="button"
+              onClick={() => setView("active")}
+              className={`px-3 py-1.5 text-sm rounded ${
+                view === "active"
+                  ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("archived")}
+              className={`px-3 py-1.5 text-sm rounded ${
+                view === "archived"
+                  ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
+            >
+              Archived
+            </button>
+          </div>
           {!loading && (
             <button
               type="button"
@@ -493,7 +519,7 @@ export function Services() {
               Export CSV
             </button>
           )}
-          {canEdit && (
+          {canEdit && view === "active" && (
             <Link
               to="/services/new"
               className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"

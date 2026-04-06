@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,18 @@ from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
 router = APIRouter(prefix="/api/services", tags=["services"])
 
 _writer = require_role("admin", "editor")
+_admin = require_role("admin")
+_ARCHIVED_SERVICE_EDITABLE_FIELDS = {"notes", "status", "service_status_id"}
+
+
+def _validate_archived_service_update_fields(update_data: dict[str, object]) -> None:
+    requested_fields = set(update_data.keys())
+    disallowed_fields = requested_fields - _ARCHIVED_SERVICE_EDITABLE_FIELDS
+    if disallowed_fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Archived services only allow updates to notes and status",
+        )
 
 
 async def _find_service_status_by_name(
@@ -67,8 +80,12 @@ async def _resolve_service_status(
 
 
 @router.get("/", response_model=list[ServiceRead])
-async def list_services(db: AsyncSession = Depends(get_audited_db)):
-    result = await db.execute(select(Service).order_by(Service.name))
+async def list_services(
+    archived: bool = Query(False),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    stmt = select(Service).where(Service.is_active.is_(not archived)).order_by(Service.name)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 
@@ -138,6 +155,9 @@ async def update_service(
 
     update_data = body.model_dump(exclude_unset=True)
 
+    if service.is_active is False:
+        _validate_archived_service_update_fields(update_data)
+
     ro = update_data.pop("renewal_offsets_days", ...)
     if ro is not ...:
         if ro is None or (isinstance(ro, list) and len(ro) == 0):
@@ -194,9 +214,52 @@ async def update_service(
 
 
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_service(service_id: uuid.UUID, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
+async def delete_service(
+    service_id: uuid.UUID,
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
     service = await db.get(Service, service_id)
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    if service.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Service must be archived before it can be deleted",
+        )
     await delete_entity_attachments("service", service_id, db)
     await db.delete(service)
+
+
+@router.post("/{service_id}/archive", response_model=ServiceRead)
+async def archive_service(
+    service_id: uuid.UUID,
+    _user: User = Depends(_writer),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    if service.is_active:
+        service.is_active = False
+        service.deprecated_at = datetime.utcnow()
+    await db.flush()
+    await db.refresh(service)
+    return service
+
+
+@router.post("/{service_id}/unarchive", response_model=ServiceRead)
+async def unarchive_service(
+    service_id: uuid.UUID,
+    _user: User = Depends(_writer),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    if service.is_active is False:
+        service.is_active = True
+        service.deprecated_at = None
+    await db.flush()
+    await db.refresh(service)
+    return service

@@ -8,14 +8,47 @@ export function ServiceEdit() {
   const { id } = useParams<{ id: string }>();
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     client
       .get<Service>(`/api/services/${id}`)
-      .then((r) => setService(r.data))
+      .then((r) => {
+        setService(r.data);
+        setStatus(r.data.status);
+        setNotes(r.data.notes ?? "");
+      })
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function saveArchivedMetadata(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!id) return;
+    setSaving(true);
+    try {
+      const response = await client.put<Service>(`/api/services/${id}`, {
+        status,
+        notes: notes.trim() || null,
+      });
+      setService(response.data);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleArchiveToggle() {
+    if (!id || !service) return;
+    const endpoint = service.is_active
+      ? `/api/services/${id}/archive`
+      : `/api/services/${id}/unarchive`;
+    const response = await client.post<Service>(endpoint);
+    setService(response.data);
+    setStatus(response.data.status);
+    setNotes(response.data.notes ?? "");
+  }
 
   if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!service)
@@ -33,9 +66,58 @@ export function ServiceEdit() {
         <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
           Edit {service.name}
         </h1>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={handleArchiveToggle}
+            className={
+              service.is_active
+                ? "rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                : "rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            }
+          >
+            {service.is_active ? "Archive" : "Unarchive"}
+          </button>
+        </div>
       </div>
       <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
-        <ServiceForm initial={service} />
+        {service.is_active ? (
+          <ServiceForm initial={service} />
+        ) : (
+          <form onSubmit={saveArchivedMetadata} className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Archived services support metadata-only updates.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Status
+              </label>
+              <input
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={4}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

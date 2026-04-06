@@ -147,6 +147,8 @@ export interface Laptop {
   assigned_to_id: string | null;
   assigned_to: User | null;
   notes: string | null;
+  is_active: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }

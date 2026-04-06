@@ -22,10 +22,15 @@ router = APIRouter(
 _writer = require_role("admin", "editor")
 
 
-async def _get_service(service_id: uuid.UUID, db: AsyncSession) -> Service:
+async def _get_service(service_id: uuid.UUID, db: AsyncSession, *, for_write: bool = False) -> Service:
     service = await db.get(Service, service_id)
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    if for_write and service.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Archived services are read-only for cost records",
+        )
     return service
 
 
@@ -98,7 +103,7 @@ async def create_cost_record(
     user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    await _get_service(service_id, db)
+    await _get_service(service_id, db, for_write=True)
     record = CostRecord(
         service_id=service_id,
         payment_method_id=body.payment_method_id,
@@ -127,7 +132,7 @@ async def update_cost_record(
     _user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    await _get_service(service_id, db)
+    await _get_service(service_id, db, for_write=True)
     record = await db.get(CostRecord, record_id)
     if not record or record.service_id != service_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
@@ -152,7 +157,7 @@ async def delete_cost_record(
     _user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    await _get_service(service_id, db)
+    await _get_service(service_id, db, for_write=True)
     record = await db.get(CostRecord, record_id)
     if not record or record.service_id != service_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")

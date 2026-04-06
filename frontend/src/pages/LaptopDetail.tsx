@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import client from "../api/client";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
@@ -20,7 +20,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function LaptopDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const { canEdit } = useAuth();
   const [laptop, setLaptop] = useState<Laptop | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,13 +31,6 @@ export function LaptopDetail() {
       .then((r) => setLaptop(r.data))
       .finally(() => setLoading(false));
   }, [id]);
-
-  async function handleDelete() {
-    if (!id) return;
-    if (!window.confirm("Are you sure you want to delete this laptop?")) return;
-    await client.delete(`/api/laptops/${id}`);
-    navigate("/hardware");
-  }
 
   if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   if (!laptop) return <p className="text-sm text-red-600">Laptop not found.</p>;
@@ -63,12 +55,6 @@ export function LaptopDetail() {
             >
               Edit
             </Link>
-            <button
-              onClick={handleDelete}
-              className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 dark:bg-red-950/40"
-            >
-              Delete
-            </button>
           </div>
         )}
       </div>
