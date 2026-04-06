@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -22,7 +23,7 @@ async def get_s3_client() -> AsyncGenerator:
         endpoint_url=cfg.MINIO_ENDPOINT,
         aws_access_key_id=cfg.MINIO_ACCESS_KEY,
         aws_secret_access_key=cfg.MINIO_SECRET_KEY,
-        region_name="us-east-1",
+        region_name=os.environ.get("AWS_REGION", "eu-west-1"),
         use_ssl=cfg.MINIO_USE_SSL,
     ) as s3:
         yield s3
