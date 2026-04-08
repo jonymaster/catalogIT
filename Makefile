@@ -1,6 +1,7 @@
 .PHONY: backup-local release github-release release-all
 
 TAG ?= 1.0.0
+BUILDER ?= catalogit-multiarch
 
 # Run from repo root with Docker Compose up (db + minio). Optional: BACKUP_DIR=/path ./scripts/backup-local.sh
 backup-local:
@@ -8,7 +9,10 @@ backup-local:
 
 # Build and push both UI and API images with buildx bake. Override tag with: make release TAG=1.0.1
 release:
-	@TAG=$(TAG) docker buildx bake --push
+	@docker buildx inspect $(BUILDER) >/dev/null 2>&1 || docker buildx create --name $(BUILDER) --driver docker-container --use
+	@docker buildx use $(BUILDER)
+	@docker buildx inspect --bootstrap >/dev/null
+	@TAG=$(TAG) docker buildx bake --builder $(BUILDER) --push
 
 # Create and push git tag, then publish GitHub release notes.
 github-release:
