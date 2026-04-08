@@ -10,12 +10,12 @@ target "ui" {
   context    = "."
   dockerfile = "frontend/Dockerfile.prod"
   tags       = ["jonymaster/catalogit-ui:${TAG}"]
-  platforms  = ["linux/amd64"]
+  platforms  = ["linux/amd64", "linux/arm64"]
 }
 
 target "api" {
   context    = "./backend"
   dockerfile = "Dockerfile"
   tags       = ["jonymaster/catalogit-api:${TAG}"]
-  platforms  = ["linux/amd64"]
+  platforms  = ["linux/amd64", "linux/arm64"]
 }

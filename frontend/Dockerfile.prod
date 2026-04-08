@@ -1,6 +1,6 @@
 # MUST use repository root as build context (not ./frontend), so COPY frontend/ and COPY branding/ work.
 #
-#   docker buildx build --platform linux/amd64 -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 --push .
+#   docker buildx build --platform linux/amd64,linux/arm64 -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 --push .
 #
 # Using `--push ./frontend` will fail: context has no `frontend/` or `branding/` subpaths.
 FROM node:20-alpine AS build

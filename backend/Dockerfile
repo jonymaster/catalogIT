@@ -1,6 +1,6 @@
 # Build context is ./backend (not the repo root).
 #
-#   docker buildx build --platform linux/amd64 -t jonymaster/catalogit-api:1.0.0 --push ./backend
+#   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.0.0 --push ./backend
 #
 # For local load only: add --load (single-platform) instead of --push.
 
