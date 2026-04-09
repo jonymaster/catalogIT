@@ -18,14 +18,18 @@ _session = get_session()
 @asynccontextmanager
 async def get_s3_client() -> AsyncGenerator:
     cfg = get_settings()
-    async with _session.create_client(
-        "s3",
-        endpoint_url=cfg.MINIO_ENDPOINT,
-        aws_access_key_id=cfg.MINIO_ACCESS_KEY,
-        aws_secret_access_key=cfg.MINIO_SECRET_KEY,
-        region_name=os.environ.get("AWS_REGION", "eu-west-1"),
-        use_ssl=cfg.MINIO_USE_SSL,
-    ) as s3:
+    kwargs: dict = {
+        "region_name": os.environ.get("AWS_REGION", "eu-west-1"),
+        "use_ssl": cfg.MINIO_USE_SSL,
+    }
+    # When explicit credentials are provided (local dev / self-hosted MinIO),
+    # pass them along with the custom endpoint.  When they are empty the SDK
+    # falls back to the default credential chain (EC2 instance role via IMDSv2).
+    if cfg.MINIO_ACCESS_KEY and cfg.MINIO_SECRET_KEY:
+        kwargs["endpoint_url"] = cfg.MINIO_ENDPOINT
+        kwargs["aws_access_key_id"] = cfg.MINIO_ACCESS_KEY
+        kwargs["aws_secret_access_key"] = cfg.MINIO_SECRET_KEY
+    async with _session.create_client("s3", **kwargs) as s3:
         yield s3
 
 
