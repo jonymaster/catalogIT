@@ -112,11 +112,14 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
 
     for service in services:
         assert service.renewal_date is not None
-        offsets = (
+        # If the service has a configured offsets list but it's empty/invalid,
+        # treat it as "inherit global offsets" rather than "send nothing".
+        service_offsets = (
             _normalize_offsets(list(service.renewal_offsets_days))
             if service.renewal_offsets_days is not None
-            else global_offsets
+            else []
         )
+        offsets = service_offsets or global_offsets
         if not offsets:
             continue
 
