@@ -142,8 +142,10 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
             trigger = service.renewal_date - timedelta(days=days_before)
             if trigger != today:
                 continue
+            result.eligible_windows += 1
 
             for recipient in recipients_by_id.values():
+                result.eligible_recipients += 1
                 existing = await session.scalar(
                     select(RenewalNotificationSent.id).where(
                         RenewalNotificationSent.service_id == service.id,
@@ -153,6 +155,7 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                     )
                 )
                 if existing is not None:
+                    result.skipped_existing += 1
                     continue
 
                 recipient_name = f"{recipient.first_name} {recipient.last_name}".strip() or recipient.email

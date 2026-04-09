@@ -52,5 +52,8 @@ class RenewalDispatchResult(BaseModel):
     timezone: str
     skipped_reason: str | None = None
     examined_services: int = 0
+    eligible_windows: int = 0
+    eligible_recipients: int = 0
+    skipped_existing: int = 0
     emails_sent: int = 0
     errors: list[str] = []
