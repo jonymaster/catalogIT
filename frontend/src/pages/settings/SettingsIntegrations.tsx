@@ -260,6 +260,19 @@ export function SettingsIntegrations() {
     }
   }
 
+  async function disconnectChannel(channel: string) {
+    if (!window.confirm(`Disconnect ${channel.replace("_", " ")}? This will clear all credentials and tokens.`))
+      return;
+    setMessage(null);
+    try {
+      await client.post(`/api/settings/integrations/${channel}/disconnect`);
+      setMessage({ type: "success", text: `${channel.replace("_", " ")} disconnected.` });
+      await refresh();
+    } catch (e: unknown) {
+      setMessage({ type: "error", text: axiosDetail(e) ?? "Disconnect failed." });
+    }
+  }
+
   async function connectGoogle() {
     setMessage(null);
     try {
@@ -382,6 +395,15 @@ export function SettingsIntegrations() {
             >
               Send test
             </button>
+            {webhook?.connection_status !== "not_configured" && (
+              <button
+                type="button"
+                onClick={() => void disconnectChannel("webhook")}
+                className="rounded border border-red-300 dark:border-red-700 px-3 py-1.5 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                Disconnect
+              </button>
+            )}
           </div>
         </form>
         <details className="mt-4 text-sm text-gray-600 dark:text-gray-300">
@@ -442,6 +464,15 @@ export function SettingsIntegrations() {
             >
               Send test
             </button>
+            {telegram?.connection_status !== "not_configured" && (
+              <button
+                type="button"
+                onClick={() => void disconnectChannel("telegram")}
+                className="rounded border border-red-300 dark:border-red-700 px-3 py-1.5 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                Disconnect
+              </button>
+            )}
           </div>
         </form>
       </section>
@@ -538,6 +569,15 @@ export function SettingsIntegrations() {
             >
               Connect Slack
             </button>
+            {slack?.connection_status !== "not_configured" && (
+              <button
+                type="button"
+                onClick={() => void disconnectChannel("slack")}
+                className="rounded border border-red-300 dark:border-red-700 px-3 py-1.5 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                Disconnect
+              </button>
+            )}
           </div>
         </form>
         <form onSubmit={resolveSlackChannel} className="mt-4 flex max-w-xl flex-wrap items-end gap-2">
@@ -682,6 +722,15 @@ export function SettingsIntegrations() {
             >
               Connect Google
             </button>
+            {google?.connection_status !== "not_configured" && (
+              <button
+                type="button"
+                onClick={() => void disconnectChannel("google_mail")}
+                className="rounded border border-red-300 dark:border-red-700 px-3 py-1.5 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                Disconnect
+              </button>
+            )}
             <Link
               to="/settings/notifications"
               className="inline-flex items-center rounded border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
