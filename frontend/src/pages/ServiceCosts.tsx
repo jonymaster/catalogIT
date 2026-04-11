@@ -10,6 +10,32 @@ const TYPE_LABELS: Record<string, string> = {
   budget: "Budget",
 };
 
+function recordTypeRowClass(recordType: string): string {
+  switch (recordType) {
+    case "actual":
+      return "border-l-4 border-l-emerald-500 bg-emerald-50/90 dark:border-l-emerald-400 dark:bg-emerald-950/35";
+    case "estimated":
+      return "border-l-4 border-l-amber-500 bg-amber-50/90 dark:border-l-amber-400 dark:bg-amber-950/35";
+    case "budget":
+      return "border-l-4 border-l-sky-600 bg-sky-50/90 dark:border-l-sky-400 dark:bg-sky-950/35";
+    default:
+      return "bg-white dark:bg-gray-900";
+  }
+}
+
+function recordTypeBadgeClass(recordType: string): string {
+  switch (recordType) {
+    case "actual":
+      return "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-100";
+    case "estimated":
+      return "bg-amber-100 text-amber-950 dark:bg-amber-900/60 dark:text-amber-50";
+    case "budget":
+      return "bg-sky-100 text-sky-950 dark:bg-sky-900/60 dark:text-sky-100";
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
+  }
+}
+
 export function ServiceCosts() {
   const { service } = useOutletContext<{ service: Service }>();
   const { canEdit } = useAuth();
@@ -84,17 +110,21 @@ export function ServiceCosts() {
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {records.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={recordTypeRowClass(r.record_type)}>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                     {r.fiscal_year}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                     {r.purchase_year ?? "--"}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
-                    {TYPE_LABELS[r.record_type] ?? r.record_type}
+                  <td className="whitespace-nowrap px-4 py-3 text-sm">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${recordTypeBadgeClass(r.record_type)}`}
+                    >
+                      {TYPE_LABELS[r.record_type] ?? r.record_type}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
                     ${Number(r.amount).toLocaleString(undefined, {

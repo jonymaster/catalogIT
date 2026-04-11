@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.dependencies.db import get_audited_db
 from app.models.category import Category
@@ -23,6 +24,7 @@ class CostRecordOut(BaseModel):
     service_name: str
     classification: str | None
     category_name: str | None
+    cost_center_name: str | None = None
     fiscal_year: int
     amount: float
     record_type: str
@@ -43,7 +45,12 @@ async def get_dashboard(db: AsyncSession = Depends(get_audited_db)):
     )
     records = cr_result.scalars().all()
 
-    svc_result = await db.execute(select(Service))
+    svc_result = await db.execute(
+        select(Service).options(
+            selectinload(Service.cost_center),
+            selectinload(Service.service_classification),
+        )
+    )
     services = {str(s.id): s for s in svc_result.scalars().all()}
 
     lap_result = await db.execute(select(Laptop))
@@ -65,6 +72,7 @@ async def get_dashboard(db: AsyncSession = Depends(get_audited_db)):
             cat_name = None
             if svc.category_id:
                 cat_name = categories.get(str(svc.category_id))
+            cc_name = svc.cost_center.name if svc.cost_center else None
             out.append(
                 CostRecordOut(
                     source="service",
@@ -77,6 +85,7 @@ async def get_dashboard(db: AsyncSession = Depends(get_audited_db)):
                         else None
                     ),
                     category_name=cat_name,
+                    cost_center_name=cc_name,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,
@@ -96,6 +105,7 @@ async def get_dashboard(db: AsyncSession = Depends(get_audited_db)):
                     service_name=label,
                     classification="hardware",
                     category_name="Hardware",
+                    cost_center_name=None,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,

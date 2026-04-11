@@ -7,6 +7,7 @@ import { Shell } from "./components/Shell";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
 import { ResetPassword } from "./pages/ResetPassword";
+import { CostsReport } from "./pages/CostsReport";
 import { Dashboard } from "./pages/Dashboard";
 import { Calendar } from "./pages/Calendar";
 import { Services } from "./pages/Services";
@@ -50,6 +51,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/costs" element={<CostsReport />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/services/new" element={<ServiceCreate />} />

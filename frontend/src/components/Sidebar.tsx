@@ -38,7 +38,12 @@ export function Sidebar() {
 
         <div className="my-3 h-px bg-gray-200 dark:bg-gray-700" />
         <NavLink to="/calendar" className={linkClass}>
-          Calendar
+          Renewal Calendar
+        </NavLink>
+
+        <div className="my-3 h-px bg-gray-200 dark:bg-gray-700" />
+        <NavLink to="/costs" className={linkClass}>
+          Costs
         </NavLink>
 
         {isAdmin && (
