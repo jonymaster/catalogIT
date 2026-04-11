@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.schemas.category import CategoryRead
 from app.schemas.cost_center import CostCenterRead
@@ -36,6 +36,15 @@ class ServiceCreate(BaseModel):
     nonprofit_pricing: bool = False
     renewal_reminders_enabled: bool = True
     renewal_offsets_days: list[int] | None = None
+    total_seats: int | None = None
+    assignee_ids: list[uuid.UUID] = []
+
+    @field_validator("total_seats")
+    @classmethod
+    def total_seats_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("total_seats must be at least 1 when set")
+        return v
 
 
 class ServiceUpdate(BaseModel):
@@ -61,6 +70,15 @@ class ServiceUpdate(BaseModel):
     is_active: bool | None = None
     renewal_reminders_enabled: bool | None = None
     renewal_offsets_days: list[int] | None = None
+    total_seats: int | None = None
+    assignee_ids: list[uuid.UUID] | None = None
+
+    @field_validator("total_seats")
+    @classmethod
+    def total_seats_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("total_seats must be at least 1 when set")
+        return v
 
 
 class ServiceRead(BaseModel):
@@ -73,6 +91,8 @@ class ServiceRead(BaseModel):
     sso_integrated: bool
     notes: str | None
     owners: list[UserRead]
+    assignees: list[UserRead]
+    total_seats: int | None = None
     # New fields
     vendor_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None

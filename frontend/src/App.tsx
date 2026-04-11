@@ -13,6 +13,7 @@ import { Services } from "./pages/Services";
 import { ServiceDetail } from "./pages/ServiceDetail";
 import { ServiceOverview } from "./pages/ServiceOverview";
 import { ServiceCosts } from "./pages/ServiceCosts";
+import { ServiceAssignments } from "./pages/ServiceAssignments";
 import { CostRecordCreate } from "./pages/CostRecordCreate";
 import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
@@ -55,6 +56,7 @@ export default function App() {
                 <Route path="/services/:id" element={<ServiceDetail />}>
                   <Route index element={<ServiceOverview />} />
                   <Route path="costs" element={<ServiceCosts />} />
+                  <Route path="assignments" element={<ServiceAssignments />} />
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />

@@ -18,6 +18,13 @@ service_owners = Table(
     Column("role", String(20), nullable=False, server_default="owner"),
 )
 
+service_assignments = Table(
+    "service_assignments",
+    Base.metadata,
+    Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Service(Base):
     __tablename__ = "services"
@@ -64,6 +71,7 @@ class Service(Base):
     deprecated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    total_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
@@ -71,6 +79,10 @@ class Service(Base):
     # --- Relationships ---
     owners: Mapped[list["User"]] = relationship(  # noqa: F821
         secondary=service_owners,
+        lazy="selectin",
+    )
+    assignees: Mapped[list["User"]] = relationship(  # noqa: F821
+        secondary=service_assignments,
         lazy="selectin",
     )
     vendor: Mapped["Vendor | None"] = relationship(lazy="selectin")  # noqa: F821

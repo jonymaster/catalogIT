@@ -52,7 +52,7 @@ export function LaptopForm({ initial }: Props) {
   const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>([]);
 
   useEffect(() => {
-    client.get<User[]>("/api/settings/users/").then((r) => setUsers(r.data));
+    client.get<User[]>("/api/users/").then((r) => setUsers(r.data));
   }, []);
 
   useEffect(() => {

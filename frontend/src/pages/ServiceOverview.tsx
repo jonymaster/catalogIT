@@ -59,6 +59,16 @@ function renderField(
             : "--"}
         </Field>
       );
+    case "total_seats": {
+      const occupied = service.assignees?.length ?? 0;
+      const cap = service.total_seats;
+      const second = cap != null ? String(cap) : "∞";
+      return (
+        <Field label="Seat usage">
+          {occupied} / {second}
+        </Field>
+      );
+    }
     case "classification":
       return (
         <Field label={SERVICE_FIELD_LABELS.classification}>

@@ -20,7 +20,7 @@ from app.routers import (
     api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
     hardware_locations, hardware_statuses, history, integrations, internal, laptop_cost_records,
     laptops, me, payment_methods, reference_data, service_classifications, service_statuses, services,
-    scim, settings, users, vendors,
+    scim, settings, user_directory, users, vendors,
 )
 from scripts.seed_from_json import SEED_DIR, seed_database
 
@@ -138,6 +138,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(me.router)
+    app.include_router(user_directory.router)
     app.include_router(scim.router)
     app.include_router(services.router)
     app.include_router(laptops.router)

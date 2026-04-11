@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useParams,
   Link,
@@ -12,6 +12,7 @@ import type { Service } from "../types/models";
 const tabs = [
   { to: ".", label: "Overview", end: true },
   { to: "costs", label: "Costs", end: false },
+  { to: "assignments", label: "Seats & assignments", end: false },
 ];
 
 export function ServiceDetail() {
@@ -22,10 +23,24 @@ export function ServiceDetail() {
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
+    setLoading(true);
     client
       .get<Service>(`/api/services/${id}`)
-      .then((r) => setService(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!cancelled) setService(r.data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const reloadService = useCallback(() => {
+    if (!id) return;
+    client.get<Service>(`/api/services/${id}`).then((r) => setService(r.data));
   }, [id]);
 
   if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
@@ -79,7 +94,7 @@ export function ServiceDetail() {
         </nav>
       </div>
 
-      <Outlet context={{ service }} />
+      <Outlet context={{ service, reloadService }} />
     </div>
   );
 }

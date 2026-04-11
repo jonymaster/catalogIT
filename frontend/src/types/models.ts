@@ -1,5 +1,13 @@
 export type ProvisioningSource = "local" | "scim" | "oidc";
 
+export interface UserDirectoryPage {
+  items: User[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
 export interface User {
   id: string;
   external_id: string;
@@ -128,6 +136,8 @@ export interface Service {
   sso_integrated: boolean;
   notes: string | null;
   owners: User[];
+  assignees: User[];
+  total_seats: number | null;
   // Normalized fields
   vendor_id: string | null;
   category_id: string | null;

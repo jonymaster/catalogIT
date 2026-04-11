@@ -34,6 +34,16 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserDirectoryPage(BaseModel):
+    """Paginated user list for directory pickers (e.g. service assignments)."""
+
+    items: list[UserRead]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+
+
 class UserCreate(BaseModel):
     email: str = Field(..., min_length=3, max_length=255)
     first_name: str = Field(..., min_length=1, max_length=255)

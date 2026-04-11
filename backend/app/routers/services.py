@@ -23,6 +23,14 @@ _admin = require_role("admin")
 _ARCHIVED_SERVICE_EDITABLE_FIELDS = {"notes", "status", "service_status_id"}
 
 
+def _ensure_seat_capacity(total_seats: int | None, assignee_count: int) -> None:
+    if total_seats is not None and assignee_count > total_seats:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Number of assignees ({assignee_count}) exceeds total seats ({total_seats})",
+        )
+
+
 def _validate_archived_service_update_fields(update_data: dict[str, object]) -> None:
     requested_fields = set(update_data.keys())
     disallowed_fields = requested_fields - _ARCHIVED_SERVICE_EDITABLE_FIELDS
@@ -107,6 +115,16 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
                 raise HTTPException(status_code=400, detail=f"User {uid} not found")
             owners.append(user)
 
+    assignees = []
+    if body.assignee_ids:
+        for uid in body.assignee_ids:
+            user = await db.get(User, uid)
+            if not user:
+                raise HTTPException(status_code=400, detail=f"User {uid} not found")
+            assignees.append(user)
+
+    _ensure_seat_capacity(body.total_seats, len(assignees))
+
     service_status = await _resolve_service_status(
         db,
         service_status_id=body.service_status_id,
@@ -123,6 +141,8 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         sso_integrated=body.sso_integrated,
         notes=body.notes,
         owners=owners,
+        assignees=assignees,
+        total_seats=body.total_seats,
         vendor_id=body.vendor_id,
         category_id=body.category_id,
         cost_center_id=body.cost_center_id,
@@ -166,6 +186,7 @@ async def update_service(
             service.renewal_offsets_days = ro
 
     owner_ids = update_data.pop("owner_ids", None)
+    assignee_ids = update_data.pop("assignee_ids", None)
     classification_id = (
         update_data.pop("classification_id", None) if "classification_id" in update_data else ...
     )
@@ -179,6 +200,15 @@ async def update_service(
                 raise HTTPException(status_code=400, detail=f"User {uid} not found")
             owners.append(user)
         service.owners = owners
+
+    if assignee_ids is not None:
+        assignees = []
+        for uid in assignee_ids:
+            user = await db.get(User, uid)
+            if not user:
+                raise HTTPException(status_code=400, detail=f"User {uid} not found")
+            assignees.append(user)
+        service.assignees = assignees
 
     if classification_id is not ...:
         if classification_id is None:
@@ -207,6 +237,8 @@ async def update_service(
 
     for field, value in update_data.items():
         setattr(service, field, value)
+
+    _ensure_seat_capacity(service.total_seats, len(service.assignees))
 
     await db.flush()
     await db.refresh(service)
