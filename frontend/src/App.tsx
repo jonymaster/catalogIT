@@ -37,6 +37,7 @@ import { SettingsReferenceDataResource } from "./pages/settings/SettingsReferenc
 import { SettingsNotifications } from "./pages/settings/SettingsNotifications";
 import { SettingsAuditLog } from "./pages/settings/SettingsAuditLog";
 import { SettingsRecordDeletion } from "./pages/settings/SettingsRecordDeletion";
+import { SettingsExport } from "./pages/settings/SettingsExport";
 
 export default function App() {
   return (
@@ -96,6 +97,7 @@ export default function App() {
                     />
                   </Route>
                   <Route path="record-deletion" element={<SettingsRecordDeletion />} />
+                  <Route path="export" element={<SettingsExport />} />
                   <Route path="tokens" element={<SettingsTokens />} />
                   <Route path="api" element={<SettingsApi />} />
                 </Route>

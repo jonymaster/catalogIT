@@ -21,6 +21,7 @@ from app.models.integration_config import IntegrationConfig
 from app.models.oauth_state import OAuthState
 from app.models.notification_global_settings import NotificationGlobalSettings, notification_extra_recipients
 from app.models.renewal_notification_sent import RenewalNotificationSent
+from app.models.admin_export_job import AdminExportJob
 
 __all__ = [
     "User",
@@ -49,4 +50,5 @@ __all__ = [
     "NotificationGlobalSettings",
     "notification_extra_recipients",
     "RenewalNotificationSent",
+    "AdminExportJob",
 ]

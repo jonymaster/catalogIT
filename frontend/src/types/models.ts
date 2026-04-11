@@ -1,5 +1,14 @@
 export type ProvisioningSource = "local" | "scim" | "oidc";
 
+export interface AdminExportJob {
+  id: string;
+  status: string;
+  include_attachments: boolean;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export interface UserDirectoryPage {
   items: User[];
   total: number;

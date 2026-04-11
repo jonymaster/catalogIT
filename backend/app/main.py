@@ -17,7 +17,7 @@ from app.models.service import Service
 from app.models.user import User
 from app.dependencies.storage import ensure_bucket
 from app.routers import (
-    api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
+    admin_export, api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
     hardware_locations, hardware_statuses, history, integrations, internal, laptop_cost_records,
     laptops, me, payment_methods, reference_data, service_classifications, service_statuses, services,
     scim, settings, user_directory, users, vendors,
@@ -162,6 +162,7 @@ def create_app() -> FastAPI:
     app.include_router(cost_records.router)
     app.include_router(laptop_cost_records.router)
     app.include_router(dashboard.router)
+    app.include_router(admin_export.router)
 
     @app.get("/health")
     async def health() -> dict:
