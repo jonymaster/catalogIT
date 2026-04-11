@@ -5,6 +5,8 @@ export interface UserInfo {
   sub: string;
   email: string;
   role: string;
+  /** From JWT; when true, user must complete /reset-password before using the app. */
+  must_reset_password?: boolean;
 }
 
 export interface AuthContextValue {

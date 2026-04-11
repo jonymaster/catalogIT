@@ -4,7 +4,7 @@ import client from "../api/client";
 import { useAuth } from "../context/useAuth";
 
 export function ResetPassword() {
-  const { token } = useAuth();
+  const { token, setToken } = useAuth();
   const navigate = useNavigate();
 
   const [oldPassword, setOldPassword] = useState("");
@@ -32,15 +32,24 @@ export function ResetPassword() {
 
     setLoading(true);
     try {
-      await client.post("/auth/reset-password", {
+      const res = await client.post<{
+        access_token: string;
+        must_reset_password: boolean;
+      }>("/auth/reset-password", {
         old_password: oldPassword,
         new_password: newPassword,
       });
+      setToken(res.data.access_token);
       navigate("/", { replace: true });
     } catch (err: unknown) {
+      const d = (err as { response?: { data?: { detail?: unknown } } })?.response
+        ?.data?.detail;
       const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || "Failed to reset password";
+        typeof d === "string"
+          ? d
+          : d && typeof d === "object" && "message" in d && typeof (d as { message: string }).message === "string"
+            ? (d as { message: string }).message
+            : "Failed to reset password";
       setError(msg);
     } finally {
       setLoading(false);

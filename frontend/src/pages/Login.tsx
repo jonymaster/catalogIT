@@ -101,7 +101,7 @@ function LocalLoginForm({
 }
 
 export function Login() {
-  const { token, login, setToken } = useAuth();
+  const { token, user, login, setToken } = useAuth();
   const navigate = useNavigate();
 
   const [providers, setProviders] = useState<Providers | null>(null);
@@ -120,6 +120,9 @@ export function Login() {
   }, []);
 
   if (token) {
+    if (user?.must_reset_password) {
+      return <Navigate to="/reset-password" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 
@@ -133,11 +136,7 @@ export function Login() {
         must_reset_password: boolean;
       }>("/auth/login", { email, password });
       setToken(res.data.access_token);
-      if (res.data.must_reset_password) {
-        navigate("/reset-password", { replace: true });
-      } else {
-        navigate("/", { replace: true });
-      }
+      navigate(res.data.must_reset_password ? "/reset-password" : "/", { replace: true });
     } catch {
       setError("Invalid credentials");
     } finally {

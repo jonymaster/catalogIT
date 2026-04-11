@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import { decodePayload } from "../context/auth-context";
 
 export function AuthCallback() {
   const [params] = useSearchParams();
@@ -11,8 +12,11 @@ export function AuthCallback() {
     const token = params.get("token");
     if (token) {
       setToken(token);
+      const payload = decodePayload(token);
+      navigate(payload?.must_reset_password ? "/reset-password" : "/", { replace: true });
+    } else {
+      navigate("/login", { replace: true });
     }
-    navigate("/", { replace: true });
   }, [params, setToken, navigate]);
 
   return (

@@ -45,6 +45,7 @@ def _mint_jwt(user: User) -> str:
         "sub": str(user.id),
         "email": user.email,
         "role": user.role,
+        "must_reset_password": user.must_reset_password,
         "iat": now,
         "exp": now + timedelta(hours=settings.JWT_EXPIRY_HOURS),
     }
@@ -133,7 +134,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 # ── Password reset ───────────────────────────────────────────────
 
-@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/reset-password", response_model=LoginResponse)
 async def reset_password(
     body: ResetPasswordRequest,
     current_user: User = Depends(get_current_user),
@@ -177,6 +178,11 @@ async def reset_password(
         summary="Password changed by user",
         details={"method": "local_reset"},
         entity_label=user.email,
+    )
+    await db.refresh(user)
+    return LoginResponse(
+        access_token=_mint_jwt(user),
+        must_reset_password=False,
     )
 
 
