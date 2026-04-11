@@ -139,8 +139,23 @@ async def reset_password(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_audited_db),
 ):
+    if current_user.provisioning_source in ("scim", "oidc"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "managed_user",
+                "message": "Your account is managed by your organization. Please contact your administrator.",
+            },
+        )
+
     if not current_user.password_hash:
-        raise HTTPException(status_code=400, detail="Account uses OIDC login only")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "managed_user",
+                "message": "Your account is managed by your organization. Please contact your administrator.",
+            },
+        )
 
     if not _verify_password(body.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
@@ -303,6 +318,7 @@ async def oidc_callback(
             email=email,
             first_name=first_name,
             last_name=last_name,
+            provisioning_source="oidc",
         )
         db.add(user)
     else:

@@ -59,6 +59,7 @@ async def _seed_admin() -> None:
                     role="admin",
                     password_hash=hashed,
                     must_reset_password=True,
+                    provisioning_source="local",
                 )
                 session.add(admin)
                 logger.info("Default admin account created")

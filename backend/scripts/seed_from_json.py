@@ -175,6 +175,7 @@ async def _seed_users(session: AsyncSession) -> None:
             display_name=r["name"],
             department=r.get("department"),
             role="viewer",
+            provisioning_source="local",
         ))
     await session.flush()
     print(f"  users: {len(rows)} processed")

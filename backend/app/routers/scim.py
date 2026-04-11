@@ -155,6 +155,7 @@ async def create_user(body: ScimCreateUser, db: AsyncSession = Depends(get_db)):
         display_name=body.displayName or None,
         department=dept,
         is_active=body.active,
+        provisioning_source="scim",
     )
     db.add(user)
     await db.flush()

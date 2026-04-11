@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import client from "../api/client";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
-import type { UserPreferences } from "../types/models";
+import type { User, UserPreferences } from "../types/models";
 
 const COMMON_LOCALES = [
   "en-US",
@@ -21,15 +21,44 @@ function getTimeZoneOptions() {
   return intlWithSupportedValues.supportedValuesOf?.("timeZone") ?? ["UTC"];
 }
 
+function formatApiError(err: unknown): string {
+  const ax = err as {
+    response?: { data?: { detail?: string | { message?: string; code?: string } } };
+  };
+  const d = ax.response?.data?.detail;
+  if (typeof d === "string") return d;
+  if (d && typeof d === "object" && typeof d.message === "string") return d.message;
+  return "Something went wrong.";
+}
+
 export function PersonalSettings() {
   const { preferences, preferencesLoading, setPreferences } = useAuth();
   const { showToast } = useToast();
+  const [profile, setProfile] = useState<User | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
   const [form, setForm] = useState<UserPreferences>({
     locale: null,
     timezone: null,
     theme: "light",
   });
-  const [saving, setSaving] = useState(false);
+
+  const [profileForm, setProfileForm] = useState({
+    email: "",
+    first_name: "",
+    last_name: "",
+    display_name: "",
+    department: "",
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+
+  const [pwd, setPwd] = useState({
+    old_password: "",
+    new_password: "",
+    confirm: "",
+  });
+  const [savingPwd, setSavingPwd] = useState(false);
 
   const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
   const browserLocale = navigator.language;
@@ -44,9 +73,37 @@ export function PersonalSettings() {
     });
   }, [preferences]);
 
-  async function handleSubmit(event: React.FormEvent) {
+  useEffect(() => {
+    let cancelled = false;
+    setProfileLoading(true);
+    client
+      .get<User>("/api/me/profile")
+      .then((r) => {
+        if (!cancelled) {
+          setProfile(r.data);
+          setProfileForm({
+            email: r.data.email,
+            first_name: r.data.first_name,
+            last_name: r.data.last_name,
+            display_name: r.data.display_name ?? "",
+            department: r.data.department ?? "",
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handlePreferencesSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setSaving(true);
+    setSavingPrefs(true);
     try {
       const response = await client.patch<UserPreferences>("/api/me/preferences", {
         locale: form.locale,
@@ -54,35 +111,247 @@ export function PersonalSettings() {
         theme: form.theme,
       });
       setPreferences(response.data);
-      showToast({ type: "success", text: "Personal settings updated." });
+      showToast({ type: "success", text: "Locale and appearance updated." });
     } catch {
-      showToast({ type: "error", text: "Failed to update personal settings." });
+      showToast({ type: "error", text: "Failed to update locale and appearance." });
     } finally {
-      setSaving(false);
+      setSavingPrefs(false);
     }
   }
 
-  function handleReset() {
-    setForm({
-      locale: preferences?.locale ?? null,
-      timezone: preferences?.timezone ?? null,
-      theme: preferences?.theme ?? "light",
-    });
+  async function handleProfileSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!profile || profile.provisioning_source !== "local") return;
+    setSavingProfile(true);
+    try {
+      const response = await client.patch<User>("/api/me/profile", {
+        email: profileForm.email.trim(),
+        first_name: profileForm.first_name.trim(),
+        last_name: profileForm.last_name.trim(),
+        display_name: profileForm.display_name.trim() || null,
+        department: profileForm.department.trim() || null,
+      });
+      setProfile(response.data);
+      showToast({ type: "success", text: "Profile updated." });
+    } catch (err) {
+      showToast({ type: "error", text: formatApiError(err) });
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
+  async function handlePasswordSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!profile || profile.provisioning_source !== "local") return;
+    if (pwd.new_password.length < 8) {
+      showToast({ type: "error", text: "Password must be at least 8 characters." });
+      return;
+    }
+    if (pwd.new_password !== pwd.confirm) {
+      showToast({ type: "error", text: "New passwords do not match." });
+      return;
+    }
+    setSavingPwd(true);
+    try {
+      await client.post("/auth/reset-password", {
+        old_password: pwd.old_password,
+        new_password: pwd.new_password,
+      });
+      setPwd({ old_password: "", new_password: "", confirm: "" });
+      showToast({ type: "success", text: "Password updated." });
+    } catch (err) {
+      showToast({ type: "error", text: formatApiError(err) });
+    } finally {
+      setSavingPwd(false);
+    }
+  }
+
+  const isLocal = profile?.provisioning_source === "local";
+  const isManaged = profile && !isLocal;
+
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-10">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Personal Settings</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Locale, timezone, and appearance for your account.
+          Profile, password, locale, timezone, and appearance.
         </p>
       </div>
 
+      {profileLoading ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading profile...</p>
+      ) : (
+        <>
+          {isLocal && (
+            <form
+              onSubmit={handleProfileSubmit}
+              className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
+            >
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Profile</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={profileForm.email}
+                    onChange={(e) =>
+                      setProfileForm((c) => ({ ...c, email: e.target.value }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    First name
+                  </label>
+                  <input
+                    required
+                    value={profileForm.first_name}
+                    onChange={(e) =>
+                      setProfileForm((c) => ({ ...c, first_name: e.target.value }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Last name
+                  </label>
+                  <input
+                    required
+                    value={profileForm.last_name}
+                    onChange={(e) =>
+                      setProfileForm((c) => ({ ...c, last_name: e.target.value }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Display name
+                  </label>
+                  <input
+                    value={profileForm.display_name}
+                    onChange={(e) =>
+                      setProfileForm((c) => ({ ...c, display_name: e.target.value }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Department
+                  </label>
+                  <input
+                    value={profileForm.department}
+                    onChange={(e) =>
+                      setProfileForm((c) => ({ ...c, department: e.target.value }))
+                    }
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={savingProfile}
+                className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+              >
+                {savingProfile ? "Saving..." : "Save profile"}
+              </button>
+            </form>
+          )}
+
+          {isManaged && (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-6 text-sm text-gray-700 dark:text-gray-300">
+              <p className="font-medium text-gray-900 dark:text-gray-100">Organization-managed profile</p>
+              <p className="mt-2">
+                Profile fields are managed by your organization. Please contact your administrator to change
+                name, email, or department.
+              </p>
+            </div>
+          )}
+
+          {isLocal && (
+            <form
+              onSubmit={handlePasswordSubmit}
+              className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
+            >
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Password</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Current password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={pwd.old_password}
+                  onChange={(e) =>
+                    setPwd((c) => ({ ...c, old_password: e.target.value }))
+                  }
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={pwd.new_password}
+                  onChange={(e) =>
+                    setPwd((c) => ({ ...c, new_password: e.target.value }))
+                  }
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Confirm new password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={pwd.confirm}
+                  onChange={(e) => setPwd((c) => ({ ...c, confirm: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={savingPwd}
+                className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+              >
+                {savingPwd ? "Updating..." : "Change password"}
+              </button>
+            </form>
+          )}
+
+          {isManaged && (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-6 text-sm text-amber-950 dark:text-amber-100">
+              <p className="font-medium">Password</p>
+              <p className="mt-2">
+                Your account is managed by your organization. Please contact your administrator to change your
+                password.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
       <form
-        onSubmit={handleSubmit}
+        onSubmit={handlePreferencesSubmit}
         className="space-y-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
       >
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Locale and appearance</h2>
         <div>
           <label
             htmlFor="locale"
@@ -182,15 +451,21 @@ export function PersonalSettings() {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={saving}
+            disabled={savingPrefs}
             className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save Settings"}
+            {savingPrefs ? "Saving..." : "Save locale and appearance"}
           </button>
           <button
             type="button"
-            onClick={handleReset}
-            disabled={saving}
+            onClick={() =>
+              setForm({
+                locale: preferences?.locale ?? null,
+                timezone: preferences?.timezone ?? null,
+                theme: preferences?.theme ?? "light",
+              })
+            }
+            disabled={savingPrefs}
             className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
           >
             Cancel

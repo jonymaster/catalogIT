@@ -1,3 +1,5 @@
+export type ProvisioningSource = "local" | "scim" | "oidc";
+
 export interface User {
   id: string;
   external_id: string;
@@ -11,6 +13,7 @@ export interface User {
   is_active: boolean;
   receive_renewal_notifications: boolean;
   role: string;
+  provisioning_source: ProvisioningSource;
   created_at: string;
   updated_at: string;
 }

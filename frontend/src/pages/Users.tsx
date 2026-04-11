@@ -4,12 +4,39 @@ import { Badge } from "../components/Badge";
 import { SearchInput } from "../components/SearchInput";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
-import type { User } from "../types/models";
+import type { ProvisioningSource, User } from "../types/models";
 
 const ROLES = ["admin", "editor", "viewer"] as const;
 
 function sameUserId(a: string | undefined, b: string) {
   return a !== undefined && a.toLowerCase() === b.toLowerCase();
+}
+
+function formatApiError(err: unknown): string {
+  const ax = err as {
+    response?: { data?: { detail?: string | { message?: string } } };
+  };
+  const d = ax.response?.data?.detail;
+  if (typeof d === "string") return d;
+  if (d && typeof d === "object" && typeof d.message === "string") return d.message;
+  return "Request failed.";
+}
+
+type UserDraft = {
+  role: string;
+  is_active: boolean;
+  receive_renewal_notifications: boolean;
+  email: string;
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  department: string;
+};
+
+function sourceBadge(src: ProvisioningSource) {
+  if (src === "local") return <Badge color="gray">Manual</Badge>;
+  if (src === "scim") return <Badge color="blue">SCIM</Badge>;
+  return <Badge color="purple">OIDC</Badge>;
 }
 
 export function Users() {
@@ -20,23 +47,32 @@ export function Users() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<
-    Record<
-      string,
-      {
-        role: string;
-        is_active: boolean;
-        receive_renewal_notifications: boolean;
-      }
-    >
-  >({});
+  const [drafts, setDrafts] = useState<Record<string, UserDraft>>({});
   const { showToast } = useToast();
 
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    email: "",
+    first_name: "",
+    last_name: "",
+    display_name: "",
+    department: "",
+    role: "viewer" as (typeof ROLES)[number],
+    password: "",
+    must_reset_password: false,
+  });
+  const [creating, setCreating] = useState(false);
+
+  const [pwdModalUser, setPwdModalUser] = useState<User | null>(null);
+  const [pwdForm, setPwdForm] = useState({ new_password: "", must_reset_password: false });
+  const [pwdSaving, setPwdSaving] = useState(false);
+
+  function loadUsers() {
+    return client.get<User[]>("/api/settings/users/").then((r) => setUsers(r.data));
+  }
+
   useEffect(() => {
-    client
-      .get<User[]>("/api/settings/users/")
-      .then((r) => setUsers(r.data))
-      .finally(() => setLoading(false));
+    loadUsers().finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
@@ -51,27 +87,17 @@ export function Users() {
     );
   }, [users, search]);
 
-  async function updateUser(userId: string, patch: Partial<User>) {
+  async function updateUser(userId: string, patch: Record<string, unknown>) {
     setSaving(userId);
     try {
-      const res = await client.patch<User>(
-        `/api/settings/users/${userId}`,
-        patch,
-      );
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? res.data : u)),
-      );
+      const res = await client.patch<User>(`/api/settings/users/${userId}`, patch);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? res.data : u)));
       showToast({ type: "success", text: "User updated." });
       return true;
     } catch (err: unknown) {
-      const detail =
-        err instanceof Object && "response" in err
-          ? (err as { response?: { data?: { detail?: string } } }).response
-              ?.data?.detail
-          : undefined;
       showToast({
         type: "error",
-        text: detail || "Failed to update user.",
+        text: formatApiError(err),
       });
       return false;
     } finally {
@@ -86,8 +112,12 @@ export function Users() {
       [user.id]: {
         role: user.role,
         is_active: user.is_active,
-        receive_renewal_notifications:
-          user.receive_renewal_notifications ?? true,
+        receive_renewal_notifications: user.receive_renewal_notifications ?? true,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        display_name: user.display_name ?? "",
+        department: user.department ?? "",
       },
     }));
   }
@@ -103,14 +133,24 @@ export function Users() {
 
   async function saveEditing(userId: string) {
     const draft = drafts[userId];
-    if (!draft) {
-      return;
+    if (!draft) return;
+
+    const u = users.find((x) => x.id === userId);
+    const patch: Record<string, unknown> = {
+      role: draft.role,
+      is_active: draft.is_active,
+      receive_renewal_notifications: draft.receive_renewal_notifications,
+    };
+    if (u?.provisioning_source === "local") {
+      patch.email = draft.email.trim();
+      patch.first_name = draft.first_name.trim();
+      patch.last_name = draft.last_name.trim();
+      patch.display_name = draft.display_name.trim() || null;
+      patch.department = draft.department.trim() || null;
     }
 
-    const succeeded = await updateUser(userId, draft);
-    if (succeeded) {
-      cancelEditing(userId);
-    }
+    const succeeded = await updateUser(userId, patch);
+    if (succeeded) cancelEditing(userId);
   }
 
   async function removeUser(user: User) {
@@ -127,33 +167,298 @@ export function Users() {
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
       showToast({ type: "success", text: "User deleted." });
     } catch (err: unknown) {
-      const detail =
-        err instanceof Object && "response" in err
-          ? (err as { response?: { data?: { detail?: string } } }).response
-              ?.data?.detail
-          : undefined;
       showToast({
         type: "error",
-        text: detail || "Failed to delete user.",
+        text: formatApiError(err),
       });
     } finally {
       setDeletingUserId(null);
     }
   }
 
+  async function submitCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (createForm.password.length < 8) {
+      showToast({ type: "error", text: "Password must be at least 8 characters." });
+      return;
+    }
+    setCreating(true);
+    try {
+      await client.post<User>("/api/settings/users/", {
+        email: createForm.email.trim(),
+        first_name: createForm.first_name.trim(),
+        last_name: createForm.last_name.trim(),
+        display_name: createForm.display_name.trim() || null,
+        department: createForm.department.trim() || null,
+        role: createForm.role,
+        password: createForm.password,
+        must_reset_password: createForm.must_reset_password,
+      });
+      await loadUsers();
+      setCreateOpen(false);
+      setCreateForm({
+        email: "",
+        first_name: "",
+        last_name: "",
+        display_name: "",
+        department: "",
+        role: "viewer",
+        password: "",
+        must_reset_password: false,
+      });
+      showToast({ type: "success", text: "User created." });
+    } catch (err: unknown) {
+      showToast({ type: "error", text: formatApiError(err) });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function submitAdminPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pwdModalUser) return;
+    if (pwdForm.new_password.length < 8) {
+      showToast({ type: "error", text: "Password must be at least 8 characters." });
+      return;
+    }
+    setPwdSaving(true);
+    try {
+      await client.post(`/api/settings/users/${pwdModalUser.id}/password`, {
+        new_password: pwdForm.new_password,
+        must_reset_password: pwdForm.must_reset_password,
+      });
+      setPwdModalUser(null);
+      setPwdForm({ new_password: "", must_reset_password: false });
+      showToast({ type: "success", text: "Password updated." });
+    } catch (err: unknown) {
+      showToast({ type: "error", text: formatApiError(err) });
+    } finally {
+      setPwdSaving(false);
+    }
+  }
+
+  function draftFor(userId: string, user: User): UserDraft {
+    return (
+      drafts[userId] ?? {
+        role: user.role,
+        is_active: user.is_active,
+        receive_renewal_notifications: user.receive_renewal_notifications ?? true,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        display_name: user.display_name ?? "",
+        department: user.department ?? "",
+      }
+    );
+  }
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Users</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Manage user roles and access.
           </p>
         </div>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          {users.length} user{users.length !== 1 ? "s" : ""}
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {users.length} user{users.length !== 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+          >
+            Add user
+          </button>
+        </div>
       </div>
+
+      {createOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-user-title"
+          >
+            <h2 id="create-user-title" className="text-lg font-medium text-gray-900 dark:text-gray-100">
+              Add user
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Creates a manually provisioned account (local password).
+            </p>
+            <form onSubmit={submitCreate} className="mt-4 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm((c) => ({ ...c, email: e.target.value }))}
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">First name</label>
+                  <input
+                    required
+                    value={createForm.first_name}
+                    onChange={(e) => setCreateForm((c) => ({ ...c, first_name: e.target.value }))}
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Last name</label>
+                  <input
+                    required
+                    value={createForm.last_name}
+                    onChange={(e) => setCreateForm((c) => ({ ...c, last_name: e.target.value }))}
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Display name</label>
+                  <input
+                    value={createForm.display_name}
+                    onChange={(e) => setCreateForm((c) => ({ ...c, display_name: e.target.value }))}
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Department</label>
+                  <input
+                    value={createForm.department}
+                    onChange={(e) => setCreateForm((c) => ({ ...c, department: e.target.value }))}
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Role</label>
+                  <select
+                    value={createForm.role}
+                    onChange={(e) =>
+                      setCreateForm((c) => ({
+                        ...c,
+                        role: e.target.value as (typeof ROLES)[number],
+                      }))
+                    }
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Initial password</label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm((c) => ({ ...c, password: e.target.value }))}
+                    className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2 sm:col-span-2">
+                  <input
+                    id="must_reset"
+                    type="checkbox"
+                    checked={createForm.must_reset_password}
+                    onChange={(e) =>
+                      setCreateForm((c) => ({ ...c, must_reset_password: e.target.checked }))
+                    }
+                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <label htmlFor="must_reset" className="text-sm text-gray-700 dark:text-gray-200">
+                    Require password change on first sign-in
+                  </label>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(false)}
+                  className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-50"
+                >
+                  {creating ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {pwdModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            role="dialog"
+            aria-modal="true"
+          >
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Set password</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{pwdModalUser.email}</p>
+            <form onSubmit={submitAdminPassword} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">New password</label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={pwdForm.new_password}
+                  onChange={(e) => setPwdForm((c) => ({ ...c, new_password: e.target.value }))}
+                  className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="adm_must_reset"
+                  type="checkbox"
+                  checked={pwdForm.must_reset_password}
+                  onChange={(e) =>
+                    setPwdForm((c) => ({ ...c, must_reset_password: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                />
+                <label htmlFor="adm_must_reset" className="text-sm text-gray-700 dark:text-gray-200">
+                  User must change password on next sign-in
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPwdModalUser(null)}
+                  className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pwdSaving}
+                  className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-50"
+                >
+                  {pwdSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
       ) : (
@@ -179,6 +484,9 @@ export function Users() {
                     Department
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Source
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Role
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -196,203 +504,235 @@ export function Users() {
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
                       No users found.
                     </td>
                   </tr>
                 )}
-                {filtered.map((user) => (
-                  <tr key={user.id}>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-                      {user.first_name} {user.last_name}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {user.email}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {user.department || "--"}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {editingUserId === user.id ? (
-                        <select
-                          value={drafts[user.id]?.role ?? user.role}
-                          disabled={saving === user.id}
-                          onChange={(e) =>
-                            setDrafts((current) => ({
-                              ...current,
-                              [user.id]: {
-                                role: e.target.value,
-                                is_active:
-                                  current[user.id]?.is_active ?? user.is_active,
-                                receive_renewal_notifications:
-                                  current[user.id]?.receive_renewal_notifications ??
-                                  user.receive_renewal_notifications ??
-                                  true,
-                              },
-                            }))
-                          }
-                          className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
-                        >
-                          {ROLES.map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-sm text-gray-700 dark:text-gray-200">{user.role}</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {editingUserId === user.id ? (
-                        <button
-                          type="button"
-                          disabled={saving === user.id}
-                          onClick={() =>
-                            setDrafts((current) => ({
-                              ...current,
-                              [user.id]: {
-                                role: current[user.id]?.role ?? user.role,
-                                is_active:
-                                  !(current[user.id]?.is_active ?? user.is_active),
-                                receive_renewal_notifications:
-                                  current[user.id]?.receive_renewal_notifications ??
-                                  user.receive_renewal_notifications ??
-                                  true,
-                              },
-                            }))
-                          }
-                          className="rounded-md transition-opacity disabled:opacity-50"
-                        >
-                          <Badge
-                            color={
-                              (drafts[user.id]?.is_active ?? user.is_active)
-                                ? "green"
-                                : "red"
-                            }
-                          >
-                            {(drafts[user.id]?.is_active ?? user.is_active)
-                              ? "Active"
-                              : "Inactive"}
-                          </Badge>
-                        </button>
-                      ) : (
-                        <Badge color={user.is_active ? "green" : "red"}>
-                          {user.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {editingUserId === user.id ? (
-                        <button
-                          type="button"
-                          disabled={saving === user.id}
-                          onClick={() =>
-                            setDrafts((current) => ({
-                              ...current,
-                              [user.id]: {
-                                role: current[user.id]?.role ?? user.role,
-                                is_active:
-                                  current[user.id]?.is_active ?? user.is_active,
-                                receive_renewal_notifications: !(
-                                  current[user.id]?.receive_renewal_notifications ??
-                                  user.receive_renewal_notifications ??
-                                  true
-                                ),
-                              },
-                            }))
-                          }
-                          className="rounded-md transition-opacity disabled:opacity-50"
-                        >
-                          <Badge
-                            color={
-                              (drafts[user.id]?.receive_renewal_notifications ??
-                                user.receive_renewal_notifications ??
-                                true)
-                                ? "green"
-                                : "gray"
-                            }
-                          >
-                            {(drafts[user.id]?.receive_renewal_notifications ??
-                              user.receive_renewal_notifications ??
-                              true)
-                              ? "On"
-                              : "Off"}
-                          </Badge>
-                        </button>
-                      ) : (
-                        <Badge
-                          color={
-                            user.receive_renewal_notifications ?? true
-                              ? "green"
-                              : "gray"
-                          }
-                        >
-                          {user.receive_renewal_notifications ?? true
-                            ? "On"
-                            : "Off"}
-                        </Badge>
-                      )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right ${
-                        editingUserId === user.id ? "" : "whitespace-nowrap"
-                      }`}
-                    >
-                      {editingUserId === user.id ? (
-                        <div className="flex flex-col items-end gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                          <button
-                            type="button"
-                            onClick={() => saveEditing(user.id)}
+                {filtered.map((user) => {
+                  const d = draftFor(user.id, user);
+                  const editing = editingUserId === user.id;
+                  const isLocal = user.provisioning_source === "local";
+                  return (
+                    <tr key={user.id}>
+                      <td className="max-w-[14rem] px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                        {editing && isLocal ? (
+                          <div className="flex flex-col gap-1">
+                            <input
+                              value={d.first_name}
+                              disabled={saving === user.id}
+                              onChange={(e) =>
+                                setDrafts((cur) => ({
+                                  ...cur,
+                                  [user.id]: { ...d, first_name: e.target.value },
+                                }))
+                              }
+                              className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs"
+                              placeholder="First"
+                            />
+                            <input
+                              value={d.last_name}
+                              disabled={saving === user.id}
+                              onChange={(e) =>
+                                setDrafts((cur) => ({
+                                  ...cur,
+                                  [user.id]: { ...d, last_name: e.target.value },
+                                }))
+                              }
+                              className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs"
+                              placeholder="Last"
+                            />
+                          </div>
+                        ) : (
+                          <span className="whitespace-nowrap">
+                            {user.first_name} {user.last_name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="max-w-[12rem] px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {editing && isLocal ? (
+                          <input
+                            type="email"
+                            value={d.email}
                             disabled={saving === user.id}
-                            className="inline-flex items-center gap-1 rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
-                          >
-                            <CheckIcon />
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => cancelEditing(user.id)}
+                            onChange={(e) =>
+                              setDrafts((cur) => ({
+                                ...cur,
+                                [user.id]: { ...d, email: e.target.value },
+                              }))
+                            }
+                            className="w-full min-w-[10rem] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs"
+                          />
+                        ) : (
+                          <span className="whitespace-nowrap">{user.email}</span>
+                        )}
+                      </td>
+                      <td className="max-w-[10rem] px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {editing && isLocal ? (
+                          <input
+                            value={d.department}
                             disabled={saving === user.id}
-                            className="inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                            onChange={(e) =>
+                              setDrafts((cur) => ({
+                                ...cur,
+                                [user.id]: { ...d, department: e.target.value },
+                              }))
+                            }
+                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs"
+                          />
+                        ) : (
+                          user.department || "--"
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">{sourceBadge(user.provisioning_source)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {editing ? (
+                          <select
+                            value={d.role}
+                            disabled={saving === user.id}
+                            onChange={(e) =>
+                              setDrafts((cur) => ({
+                                ...cur,
+                                [user.id]: { ...d, role: e.target.value },
+                              }))
+                            }
+                            className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm"
                           >
-                            <CloseIcon />
-                            Cancel
-                          </button>
+                            {ROLES.map((role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-sm text-gray-700 dark:text-gray-200">{user.role}</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {editing ? (
                           <button
                             type="button"
-                            onClick={() => removeUser(user)}
-                            disabled={
-                              saving === user.id ||
-                              deletingUserId === user.id ||
-                              sameUserId(currentUser?.sub, user.id)
+                            disabled={saving === user.id}
+                            onClick={() =>
+                              setDrafts((cur) => ({
+                                ...cur,
+                                [user.id]: { ...d, is_active: !d.is_active },
+                              }))
                             }
-                            title={
-                              sameUserId(currentUser?.sub, user.id)
-                                ? "You cannot delete your own account"
-                                : undefined
-                            }
-                            className="inline-flex items-center gap-1 rounded-md border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-md transition-opacity disabled:opacity-50"
                           >
-                            <TrashIcon />
-                            Delete
+                            <Badge color={d.is_active ? "green" : "red"}>
+                              {d.is_active ? "Active" : "Inactive"}
+                            </Badge>
                           </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEditing(user)}
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <PencilIcon />
-                          Edit
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        ) : (
+                          <Badge color={user.is_active ? "green" : "red"}>
+                            {user.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {editing ? (
+                          <button
+                            type="button"
+                            disabled={saving === user.id}
+                            onClick={() =>
+                              setDrafts((cur) => ({
+                                ...cur,
+                                [user.id]: {
+                                  ...d,
+                                  receive_renewal_notifications: !d.receive_renewal_notifications,
+                                },
+                              }))
+                            }
+                            className="rounded-md transition-opacity disabled:opacity-50"
+                          >
+                            <Badge
+                              color={d.receive_renewal_notifications ? "green" : "gray"}
+                            >
+                              {d.receive_renewal_notifications ? "On" : "Off"}
+                            </Badge>
+                          </button>
+                        ) : (
+                          <Badge
+                            color={user.receive_renewal_notifications ?? true ? "green" : "gray"}
+                          >
+                            {user.receive_renewal_notifications ?? true ? "On" : "Off"}
+                          </Badge>
+                        )}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right ${editing ? "" : "whitespace-nowrap"}`}
+                      >
+                        {editing ? (
+                          <div className="flex flex-col items-end gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                            <button
+                              type="button"
+                              onClick={() => saveEditing(user.id)}
+                              disabled={saving === user.id}
+                              className="inline-flex items-center gap-1 rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+                            >
+                              <CheckIcon />
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => cancelEditing(user.id)}
+                              disabled={saving === user.id}
+                              className="inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                            >
+                              <CloseIcon />
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeUser(user)}
+                              disabled={
+                                saving === user.id ||
+                                deletingUserId === user.id ||
+                                sameUserId(currentUser?.sub, user.id)
+                              }
+                              title={
+                                sameUserId(currentUser?.sub, user.id)
+                                  ? "You cannot delete your own account"
+                                  : undefined
+                              }
+                              className="inline-flex items-center gap-1 rounded-md border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <TrashIcon />
+                              Delete
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEditing(user)}
+                              className="inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
+                              <PencilIcon />
+                              Edit
+                            </button>
+                            {isLocal && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPwdModalUser(user);
+                                  setPwdForm({ new_password: "", must_reset_password: false });
+                                }}
+                                className="text-xs font-medium text-gray-600 underline dark:text-gray-400"
+                              >
+                                Set password
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
