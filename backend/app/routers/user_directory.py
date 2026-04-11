@@ -7,11 +7,12 @@ from math import ceil
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.models.user import User
-from app.schemas.user import UserDirectoryPage, UserRead
+from app.schemas.user import UserDirectoryPage, UserRead, user_read_from_orm
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -33,9 +34,13 @@ async def list_users_paginated(
     total_pages = max(1, ceil(total / per_page)) if total > 0 else 1
     offset = (page - 1) * per_page
     result = await db.execute(
-        select(User).order_by(User.email).offset(offset).limit(per_page)
+        select(User)
+        .options(selectinload(User.permission_rows))
+        .order_by(User.email)
+        .offset(offset)
+        .limit(per_page)
     )
-    items = result.scalars().all()
+    items = [user_read_from_orm(u) for u in result.scalars().all()]
     return UserDirectoryPage(
         items=items,
         total=total,
@@ -50,5 +55,7 @@ async def list_users_for_directory(
     _user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    result = await db.execute(select(User).order_by(User.email))
-    return result.scalars().all()
+    result = await db.execute(
+        select(User).options(selectinload(User.permission_rows)).order_by(User.email)
+    )
+    return [user_read_from_orm(u) for u in result.scalars().all()]

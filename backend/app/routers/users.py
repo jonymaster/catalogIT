@@ -6,17 +6,21 @@ import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.global_audit import record_global_audit_event
 from app.models.api_token import ApiToken
 from app.models.user import User
+from app.models.user_permission import UserPermission
+from app.permissions import ALLOWED_USER_PERMISSION_SLUGS
 from app.schemas.user import (
     AdminSetPasswordBody,
     UserCreate,
     UserRead,
     UserUpdate,
+    user_read_from_orm,
 )
 
 router = APIRouter(prefix="/api/settings/users", tags=["users"])
@@ -35,13 +39,34 @@ def _managed_user_detail() -> dict:
     }
 
 
+async def _replace_user_permissions(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    slugs: list[str],
+) -> None:
+    await db.execute(delete(UserPermission).where(UserPermission.user_id == user_id))
+    for slug in slugs:
+        if slug in ALLOWED_USER_PERMISSION_SLUGS:
+            db.add(UserPermission(user_id=user_id, permission=slug))
+
+
+async def _load_user_with_permissions(db: AsyncSession, user_id: uuid.UUID) -> User:
+    result = await db.execute(
+        select(User).options(selectinload(User.permission_rows)).where(User.id == user_id)
+    )
+    return result.scalar_one()
+
+
 @router.get("/", response_model=list[UserRead])
 async def list_users(
     _user: User = Depends(_admin),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    result = await db.execute(select(User).order_by(User.email))
-    return result.scalars().all()
+    result = await db.execute(
+        select(User).options(selectinload(User.permission_rows)).order_by(User.email)
+    )
+    users = result.scalars().all()
+    return [user_read_from_orm(u) for u in users]
 
 
 @router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -74,6 +99,9 @@ async def create_user(
     await db.flush()
     await db.refresh(user)
 
+    if body.role != "admin" and body.permissions:
+        await _replace_user_permissions(db, user.id, body.permissions)
+
     await record_global_audit_event(
         db,
         category="security",
@@ -85,7 +113,8 @@ async def create_user(
         details={"email": user.email},
         entity_label=user.email,
     )
-    return user
+    reloaded = await _load_user_with_permissions(db, user.id)
+    return user_read_from_orm(reloaded)
 
 
 @router.patch("/{user_id}", response_model=UserRead)
@@ -112,6 +141,7 @@ async def update_user(
         )
 
     data = body.model_dump(exclude_unset=True)
+    perms_in_body = data.pop("permissions", None)
     identity_keys = {"email", "first_name", "last_name", "display_name", "department"}
     if user.provisioning_source != "local":
         for k in list(data.keys()):
@@ -144,7 +174,15 @@ async def update_user(
 
     await db.flush()
     await db.refresh(user)
-    return user
+
+    if user.role == "admin":
+        await db.execute(delete(UserPermission).where(UserPermission.user_id == user.id))
+    elif perms_in_body is not None:
+        await _replace_user_permissions(db, user.id, perms_in_body)
+
+    await db.flush()
+    reloaded = await _load_user_with_permissions(db, user.id)
+    return user_read_from_orm(reloaded)
 
 
 @router.post("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)

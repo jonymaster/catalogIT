@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { userHasFinancialView } from "../context/auth-context";
 import { useAuth } from "../context/useAuth";
 
 const ROLE_HIERARCHY: Record<string, number> = {
@@ -31,4 +33,24 @@ export function ProtectedRoute({ requiredRole }: Props) {
   }
 
   return <Outlet />;
+}
+
+/** Renders children only when the user may access financial aggregates (admin or financial_view). */
+export function RequireFinancialView({ children }: { children: ReactNode }) {
+  const { token, user } = useAuth();
+  const location = useLocation();
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.must_reset_password && location.pathname !== "/reset-password") {
+    return <Navigate to="/reset-password" replace />;
+  }
+
+  if (!userHasFinancialView(user)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
 }

@@ -4,6 +4,7 @@ import { Badge } from "../components/Badge";
 import { SearchInput } from "../components/SearchInput";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
+import { PERMISSION_FINANCIAL_VIEW } from "../constants/permissions";
 import type { ProvisioningSource, User } from "../types/models";
 
 const ROLES = ["admin", "editor", "viewer"] as const;
@@ -31,6 +32,7 @@ type UserDraft = {
   last_name: string;
   display_name: string;
   department: string;
+  financial_view: boolean;
 };
 
 function sourceBadge(src: ProvisioningSource) {
@@ -60,6 +62,7 @@ export function Users() {
     role: "viewer" as (typeof ROLES)[number],
     password: "",
     must_reset_password: false,
+    financial_view: false,
   });
   const [creating, setCreating] = useState(false);
 
@@ -118,6 +121,7 @@ export function Users() {
         last_name: user.last_name,
         display_name: user.display_name ?? "",
         department: user.department ?? "",
+        financial_view: user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false,
       },
     }));
   }
@@ -147,6 +151,9 @@ export function Users() {
       patch.last_name = draft.last_name.trim();
       patch.display_name = draft.display_name.trim() || null;
       patch.department = draft.department.trim() || null;
+    }
+    if (draft.role !== "admin") {
+      patch.permissions = draft.financial_view ? [PERMISSION_FINANCIAL_VIEW] : [];
     }
 
     const succeeded = await updateUser(userId, patch);
@@ -184,7 +191,7 @@ export function Users() {
     }
     setCreating(true);
     try {
-      await client.post<User>("/api/settings/users/", {
+      const createBody: Record<string, unknown> = {
         email: createForm.email.trim(),
         first_name: createForm.first_name.trim(),
         last_name: createForm.last_name.trim(),
@@ -193,7 +200,11 @@ export function Users() {
         role: createForm.role,
         password: createForm.password,
         must_reset_password: createForm.must_reset_password,
-      });
+      };
+      if (createForm.role !== "admin") {
+        createBody.permissions = createForm.financial_view ? [PERMISSION_FINANCIAL_VIEW] : [];
+      }
+      await client.post<User>("/api/settings/users/", createBody);
       await loadUsers();
       setCreateOpen(false);
       setCreateForm({
@@ -205,6 +216,7 @@ export function Users() {
         role: "viewer",
         password: "",
         must_reset_password: false,
+        financial_view: false,
       });
       showToast({ type: "success", text: "User created." });
     } catch (err: unknown) {
@@ -248,6 +260,7 @@ export function Users() {
         last_name: user.last_name,
         display_name: user.display_name ?? "",
         department: user.department ?? "",
+        financial_view: user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false,
       }
     );
   }
@@ -339,12 +352,14 @@ export function Users() {
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Role</label>
                   <select
                     value={createForm.role}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const role = e.target.value as (typeof ROLES)[number];
                       setCreateForm((c) => ({
                         ...c,
-                        role: e.target.value as (typeof ROLES)[number],
-                      }))
-                    }
+                        role,
+                        financial_view: role === "admin" ? false : c.financial_view,
+                      }));
+                    }}
                     className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
                   >
                     {ROLES.map((r) => (
@@ -354,6 +369,23 @@ export function Users() {
                     ))}
                   </select>
                 </div>
+                {createForm.role !== "admin" && (
+                  <div className="sm:col-span-2">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={createForm.financial_view}
+                        onChange={(e) =>
+                          setCreateForm((c) => ({ ...c, financial_view: e.target.checked }))
+                        }
+                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-200">
+                        Financial view (IT Financial Report and dashboard cost data)
+                      </span>
+                    </label>
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-200">Initial password</label>
                   <input
@@ -490,6 +522,9 @@ export function Users() {
                     Role
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Financial view
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Status
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -504,7 +539,7 @@ export function Users() {
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                     >
                       No users found.
@@ -592,12 +627,17 @@ export function Users() {
                           <select
                             value={d.role}
                             disabled={saving === user.id}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const role = e.target.value;
                               setDrafts((cur) => ({
                                 ...cur,
-                                [user.id]: { ...d, role: e.target.value },
-                              }))
-                            }
+                                [user.id]: {
+                                  ...d,
+                                  role,
+                                  financial_view: role === "admin" ? false : d.financial_view,
+                                },
+                              }));
+                            }}
                             className="rounded-md border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm"
                           >
                             {ROLES.map((role) => (
@@ -608,6 +648,41 @@ export function Users() {
                           </select>
                         ) : (
                           <span className="text-sm text-gray-700 dark:text-gray-200">{user.role}</span>
+                        )}
+                      </td>
+                      <td className="max-w-[10rem] px-4 py-3">
+                        {user.role === "admin" && !editing ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : editing ? (
+                          d.role === "admin" ? (
+                            <span className="text-xs text-gray-400">—</span>
+                          ) : (
+                            <label className="flex cursor-pointer items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={d.financial_view}
+                                disabled={saving === user.id}
+                                onChange={(e) =>
+                                  setDrafts((cur) => ({
+                                    ...cur,
+                                    [user.id]: { ...d, financial_view: e.target.checked },
+                                  }))
+                                }
+                                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                              />
+                              <span className="text-xs text-gray-600 dark:text-gray-300">Granted</span>
+                            </label>
+                          )
+                        ) : (
+                          <Badge
+                            color={
+                              user.permissions?.includes(PERMISSION_FINANCIAL_VIEW)
+                                ? "blue"
+                                : "gray"
+                            }
+                          >
+                            {user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ? "Yes" : "No"}
+                          </Badge>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">

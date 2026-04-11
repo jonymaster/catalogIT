@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeSync } from "./components/ThemeSync";
 import { ToastProvider } from "./context/ToastContext";
-import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ProtectedRoute, RequireFinancialView } from "./components/ProtectedRoute";
 import { Shell } from "./components/Shell";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -51,7 +51,14 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/costs" element={<CostsReport />} />
+                <Route
+                  path="/costs"
+                  element={
+                    <RequireFinancialView>
+                      <CostsReport />
+                    </RequireFinancialView>
+                  }
+                />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/services/new" element={<ServiceCreate />} />

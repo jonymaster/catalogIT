@@ -24,6 +24,8 @@ export interface User {
   provisioning_source: ProvisioningSource;
   created_at: string;
   updated_at: string;
+  /** Global permission slugs (e.g. financial_view). */
+  permissions?: string[];
 }
 
 export interface UserPreferences {

@@ -17,6 +17,8 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.api_token import ApiToken
 from app.models.user import User
+from app.models.user_permission import UserPermission
+from app.permissions import PERMISSION_FINANCIAL_VIEW
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -75,6 +77,42 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
+    return user
+
+
+async def load_user_permission_slugs(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    result = await db.execute(select(UserPermission.permission).where(UserPermission.user_id == user_id))
+    return [row[0] for row in result.all()]
+
+
+async def ensure_financial_view_access(user: User, db: AsyncSession) -> None:
+    """Raise 403 unless the user may read financial aggregates (dashboard / costs)."""
+    if user.role == "admin":
+        return
+    if user.role not in ("editor", "viewer"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+    row = await db.execute(
+        select(UserPermission).where(
+            UserPermission.user_id == user.id,
+            UserPermission.permission == PERMISSION_FINANCIAL_VIEW,
+        )
+    )
+    if row.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+
+async def require_financial_view(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Allow admins; editors/viewers need financial_view in user_permissions."""
+    await ensure_financial_view_access(user, db)
     return user
 
 

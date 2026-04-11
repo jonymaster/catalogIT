@@ -15,7 +15,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout, canFinancialView } = useAuth();
   const isAdmin = user?.role === "admin";
 
   return (
@@ -41,10 +41,14 @@ export function Sidebar() {
           Renewal Calendar
         </NavLink>
 
-        <div className="my-3 h-px bg-gray-200 dark:bg-gray-700" />
-        <NavLink to="/costs" className={linkClass}>
-          Costs
-        </NavLink>
+        {canFinancialView && (
+          <>
+            <div className="my-3 h-px bg-gray-200 dark:bg-gray-700" />
+            <NavLink to="/costs" className={linkClass}>
+              Costs
+            </NavLink>
+          </>
+        )}
 
         {isAdmin && (
           <>

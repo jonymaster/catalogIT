@@ -3,13 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.dependencies.auth import get_current_user
 from app.database import get_db
 from app.dependencies.db import get_audited_db
 from app.global_audit import record_global_audit_event
 from app.models.user import User
-from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferencesUpdate, UserRead
+from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferencesUpdate, UserRead, user_read_from_orm
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 
@@ -19,10 +20,15 @@ async def get_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    user = await db.get(User, current_user.id)
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.permission_rows))
+        .where(User.id == current_user.id)
+    )
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
+    return user_read_from_orm(user)
 
 
 @router.patch("/profile", response_model=UserRead)
@@ -46,7 +52,13 @@ async def update_profile(
 
     data = body.model_dump(exclude_unset=True)
     if not data:
-        return user
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.permission_rows))
+            .where(User.id == user.id)
+        )
+        u = result.scalar_one()
+        return user_read_from_orm(u)
 
     if "email" in data and data["email"] is not None:
         new_email = data["email"].strip()
@@ -87,7 +99,13 @@ async def update_profile(
         details={k: data[k] for k in data if k != "password"},
         entity_label=user.email,
     )
-    return user
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.permission_rows))
+        .where(User.id == user.id)
+    )
+    u = result.scalar_one()
+    return user_read_from_orm(u)
 
 
 @router.get("/preferences", response_model=UserPreferencesRead)

@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.user_permission import UserPermission
 from app.models.vendor import Vendor
 from app.models.category import Category
 from app.models.cost_center import CostCenter
@@ -23,6 +24,7 @@ from app.models.renewal_notification_sent import RenewalNotificationSent
 
 __all__ = [
     "User",
+    "UserPermission",
     "Vendor",
     "Category",
     "CostCenter",

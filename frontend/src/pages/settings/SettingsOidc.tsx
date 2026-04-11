@@ -203,6 +203,18 @@ export function SettingsOidc() {
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          Information for your identity provider
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          In your identity provider, register the redirect (callback) URI. It is normally{" "}
+          <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+            http://your-ui-domain/auth/oidc/callback
+          </code>
+          , replacing <span className="font-mono text-xs">your-ui-domain</span> with the host where this UI is served (including scheme and port if needed).
+        </p>
+      </div>
     </form>
   );
 }

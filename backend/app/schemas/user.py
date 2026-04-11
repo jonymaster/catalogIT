@@ -5,7 +5,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.models.user import User as UserOrm
+from app.permissions import ALLOWED_USER_PERMISSION_SLUGS
 
 
 class Role(str, Enum):
@@ -30,6 +33,7 @@ class UserRead(BaseModel):
     provisioning_source: Literal["local", "scim", "oidc"]
     created_at: datetime
     updated_at: datetime
+    permissions: list[str] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -53,6 +57,17 @@ class UserCreate(BaseModel):
     role: Literal["admin", "editor", "viewer"] = "viewer"
     password: str = Field(..., min_length=8, max_length=256)
     must_reset_password: bool = False
+    permissions: list[str] | None = None
+
+    @field_validator("permissions")
+    @classmethod
+    def validate_permissions(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        unknown = [p for p in v if p not in ALLOWED_USER_PERMISSION_SLUGS]
+        if unknown:
+            raise ValueError(f"Unknown permission slugs: {unknown}")
+        return list(dict.fromkeys(v))
 
 
 class UserUpdate(BaseModel):
@@ -66,6 +81,17 @@ class UserUpdate(BaseModel):
     email: str | None = Field(None, max_length=255)
     first_name: str | None = Field(None, min_length=1, max_length=255)
     last_name: str | None = Field(None, min_length=1, max_length=255)
+    permissions: list[str] | None = None
+
+    @field_validator("permissions")
+    @classmethod
+    def validate_permissions(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        unknown = [p for p in v if p not in ALLOWED_USER_PERMISSION_SLUGS]
+        if unknown:
+            raise ValueError(f"Unknown permission slugs: {unknown}")
+        return list(dict.fromkeys(v))
 
 
 class MeProfileUpdate(BaseModel):
@@ -93,3 +119,9 @@ class UserPreferencesUpdate(BaseModel):
     locale: str | None = None
     timezone: str | None = None
     theme: Literal["light", "dark"] | None = None
+
+
+def user_read_from_orm(user: UserOrm) -> UserRead:
+    """Build UserRead including permission slugs from loaded ``permission_rows``."""
+    perms = [r.permission for r in user.permission_rows]
+    return UserRead.model_validate(user).model_copy(update={"permissions": perms})

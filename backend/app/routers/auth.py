@@ -20,7 +20,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.dependencies.db import get_audited_db
 from app.global_audit import record_global_audit_event, record_global_audit_event_committed
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, load_user_permission_slugs
 from app.models.oidc_config import OidcConfig
 from app.models.user import User
 from app.schemas.auth import LoginRequest, LoginResponse, ResetPasswordRequest
@@ -38,7 +38,7 @@ def _verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
-def _mint_jwt(user: User) -> str:
+def _mint_jwt(user: User, permission_slugs: list[str]) -> str:
     settings = get_settings()
     now = datetime.now(timezone.utc)
     payload = {
@@ -46,10 +46,17 @@ def _mint_jwt(user: User) -> str:
         "email": user.email,
         "role": user.role,
         "must_reset_password": user.must_reset_password,
+        "permissions": permission_slugs,
         "iat": now,
         "exp": now + timedelta(hours=settings.JWT_EXPIRY_HOURS),
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+async def _permission_slugs_for_jwt(db: AsyncSession, user: User) -> list[str]:
+    if user.role == "admin":
+        return []
+    return await load_user_permission_slugs(db, user.id)
 
 
 async def _get_oidc_config(db: AsyncSession) -> OidcConfig | None:
@@ -126,8 +133,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         details={"method": "local"},
         entity_label=user.email,
     )
+    perms = await _permission_slugs_for_jwt(db, user)
     return LoginResponse(
-        access_token=_mint_jwt(user),
+        access_token=_mint_jwt(user, perms),
         must_reset_password=user.must_reset_password,
     )
 
@@ -180,8 +188,9 @@ async def reset_password(
         entity_label=user.email,
     )
     await db.refresh(user)
+    perms = await _permission_slugs_for_jwt(db, user)
     return LoginResponse(
-        access_token=_mint_jwt(user),
+        access_token=_mint_jwt(user, perms),
         must_reset_password=False,
     )
 
@@ -350,6 +359,7 @@ async def oidc_callback(
         entity_label=(user.email or "").strip() or None,
     )
 
+    perms = await _permission_slugs_for_jwt(db, user)
     settings = get_settings()
     frontend_url = settings.FRONTEND_URL.rstrip("/")
-    return RedirectResponse(url=f"{frontend_url}/sso/callback?token={_mint_jwt(user)}")
+    return RedirectResponse(url=f"{frontend_url}/sso/callback?token={_mint_jwt(user, perms)}")

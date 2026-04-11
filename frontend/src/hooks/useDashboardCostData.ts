@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import client from "../api/client";
 import type { DashboardCostPayload } from "../types/dashboardCost";
+
+const EMPTY_DASHBOARD_COST: DashboardCostPayload = {
+  cost_records: [],
+  fiscal_years: [],
+};
 
 export function useDashboardCostData() {
   const [data, setData] = useState<DashboardCostPayload | null>(null);
@@ -16,8 +22,14 @@ export function useDashboardCostData() {
       .then((res) => {
         if (!cancelled) setData(res.data);
       })
-      .catch((e: Error) => {
-        if (!cancelled) setError(e);
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        if (axios.isAxiosError(e) && e.response?.status === 403) {
+          setData(EMPTY_DASHBOARD_COST);
+          setError(null);
+          return;
+        }
+        setError(e instanceof Error ? e : new Error(String(e)));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

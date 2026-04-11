@@ -77,7 +77,7 @@ function StatCard({
 }
 
 export function Dashboard() {
-  const { user } = useAuth();
+  const { user, canFinancialView } = useAuth();
   const navigate = useNavigate();
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
@@ -319,7 +319,7 @@ export function Dashboard() {
         />
       </div>
 
-      {hasCostData && (
+      {canFinancialView && hasCostData && (
         <>
           {/* Year selector */}
           <div className="mt-8 flex items-center gap-3">
