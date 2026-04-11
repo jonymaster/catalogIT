@@ -60,6 +60,9 @@ export function ServiceCosts() {
                   Fiscal Year
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Purchase Year
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Type
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -86,6 +89,9 @@ export function ServiceCosts() {
                 <tr key={r.id}>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                     {r.fiscal_year}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                    {r.purchase_year ?? "--"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                     {TYPE_LABELS[r.record_type] ?? r.record_type}

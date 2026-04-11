@@ -9,6 +9,8 @@ interface Props {
   width?: number;
   height?: number;
   color?: string;
+  /** Called with bar index when a bar is clicked (e.g. year columns on the dashboard). */
+  onBarClick?: (index: number) => void;
 }
 
 const fmt = (n: number) =>
@@ -19,6 +21,7 @@ export function BarChart({
   width = 600,
   height = 220,
   color = "#6366f1",
+  onBarClick,
 }: Props) {
   const max = Math.max(...data.map((d) => d.value), 1);
   const bw = Math.min(60, (width - 80) / data.length - 8);
@@ -61,7 +64,11 @@ export function BarChart({
           startX + i * ((width - startX - 10) / data.length) + 4;
         const y = 10 + chartH - bh;
         return (
-          <g key={i}>
+          <g
+            key={i}
+            className={onBarClick ? "cursor-pointer" : undefined}
+            onClick={() => onBarClick?.(i)}
+          >
             <rect
               x={x}
               y={y}

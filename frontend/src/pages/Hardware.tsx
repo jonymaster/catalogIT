@@ -103,6 +103,23 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     render: (laptop) => <StatusBadge status={laptop.status} />,
   },
   {
+    key: "hardware_location",
+    label: "Location",
+    filterType: "select",
+    getFilterValue: (laptop) =>
+      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+    getSortValue: (laptop) =>
+      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "",
+    getFilterOptions: (laptops) =>
+      getUniqueOptions(
+        laptops.map((laptop) =>
+          laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+        ),
+      ),
+    render: (laptop) =>
+      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+  },
+  {
     key: "cpu",
     label: "CPU",
     filterType: "text",
@@ -182,12 +199,14 @@ export function Hardware() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const nextRows = laptops.filter((laptop) => {
+      const locName = laptop.hardware_location?.name?.trim() ?? "";
       const matchesSearch =
         !q ||
         laptop.serial_number.toLowerCase().includes(q) ||
         laptop.model_name.toLowerCase().includes(q) ||
         laptop.cpu.toLowerCase().includes(q) ||
         laptop.status.toLowerCase().includes(q) ||
+        locName.toLowerCase().includes(q) ||
         getAssigneeName(laptop).toLowerCase().includes(q);
 
       if (!matchesSearch) {

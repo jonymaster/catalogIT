@@ -36,6 +36,8 @@ AUDITED_TABLES: frozenset[str] = frozenset(
         "cost_centers",
         "payment_methods",
         "service_statuses",
+        "hardware_statuses",
+        "hardware_locations",
         "service_classifications",
         "contracts",
         "cost_records",

@@ -8,7 +8,9 @@ import { StackedBar } from "../components/charts/StackedBar";
 import type { Service, Laptop } from "../types/models";
 
 interface CostRecordOut {
-  service_id: string;
+  source: "service" | "hardware";
+  service_id: string | null;
+  laptop_id: string | null;
   service_name: string;
   classification: string | null;
   category_name: string | null;
@@ -39,6 +41,7 @@ function classificationBarColor(slug: string | null): string {
   if (slug === "core_saas") return "#7c3aed";
   if (slug === "subscription") return "#3b82f6";
   if (slug === "internal") return "#0d9488";
+  if (slug === "hardware") return "#78716c";
   return "#64748b";
 }
 
@@ -237,16 +240,24 @@ export function Dashboard() {
   );
 
   const topSpenders = useMemo(() => {
-    const byService: Record<string, { name: string; classification: string | null; cost: number }> = {};
+    const byKey: Record<string, { name: string; classification: string | null; cost: number }> =
+      {};
     records
       .filter((r) => r.fiscal_year === dashYear)
       .forEach((r) => {
-        if (!byService[r.service_id]) {
-          byService[r.service_id] = { name: r.service_name, classification: r.classification, cost: 0 };
+        const k =
+          r.source === "hardware" && r.laptop_id
+            ? `h:${r.laptop_id}`
+            : r.service_id
+              ? `s:${r.service_id}`
+              : "";
+        if (!k) return;
+        if (!byKey[k]) {
+          byKey[k] = { name: r.service_name, classification: r.classification, cost: 0 };
         }
-        byService[r.service_id].cost += r.amount;
+        byKey[k].cost += r.amount;
       });
-    return Object.values(byService)
+    return Object.values(byKey)
       .sort((a, b) => b.cost - a.cost)
       .slice(0, 12);
   }, [records, dashYear]);
@@ -454,6 +465,10 @@ export function Dashboard() {
                 value: costByYear[y] ?? 0,
                 color: y === dashYear ? "#4f46e5" : "#c7d2fe",
               }))}
+              onBarClick={(i) => {
+                const y = years[i];
+                if (y !== undefined) setDashYear(y);
+              }}
             />
           </div>
 
@@ -479,7 +494,7 @@ export function Dashboard() {
                   ))}
                 </div>
               </div>
-              <StackedBar yearData={stackedData} />
+              <StackedBar yearData={stackedData} onYearClick={setDashYear} />
             </div>
           )}
 
@@ -487,7 +502,7 @@ export function Dashboard() {
           {topSpenders.length > 0 && (
             <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
               <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Top {Math.min(12, topSpenders.length)} services by cost -- {dashYear}
+                Top {Math.min(12, topSpenders.length)} spenders -- {dashYear}
               </h3>
               <BarChart
                 data={topSpenders.map((s) => ({
@@ -514,9 +529,11 @@ export function Dashboard() {
                     {years.map((y) => (
                       <th
                         key={y}
-                        className={`px-3 py-2 text-right text-xs font-medium uppercase ${
+                        scope="col"
+                        onClick={() => setDashYear(y)}
+                        className={`px-3 py-2 text-right text-xs font-medium uppercase transition-colors ${
                           y === dashYear ? "text-indigo-600" : "text-gray-500 dark:text-gray-400"
-                        }`}
+                        } cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800`}
                       >
                         {y}
                       </th>
@@ -539,11 +556,12 @@ export function Dashboard() {
                         {years.map((y) => (
                           <td
                             key={y}
+                            onClick={() => setDashYear(y)}
                             className={`px-3 py-2 text-right font-mono ${
                               y === dashYear
                                 ? "font-semibold text-gray-900 dark:text-gray-100"
                                 : "text-gray-500 dark:text-gray-400"
-                            }`}
+                            } cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50`}
                           >
                             {fmtFull(cat.byYr[y] ?? 0)}
                           </td>
@@ -569,7 +587,8 @@ export function Dashboard() {
                     {years.map((y) => (
                       <td
                         key={y}
-                        className="px-3 py-2 text-right font-mono text-gray-900 dark:text-gray-100"
+                        onClick={() => setDashYear(y)}
+                        className="cursor-pointer px-3 py-2 text-right font-mono text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       >
                         {fmtFull(costByYear[y] ?? 0)}
                       </td>

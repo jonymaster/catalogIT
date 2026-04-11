@@ -185,6 +185,52 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
             ),
         ),
     ),
+    "hardware-statuses": ReferenceResourceDefinition(
+        key="hardware-statuses",
+        label="Hardware Status",
+        plural_label="Hardware Statuses",
+        description="Lifecycle states for laptops and hardware (inventory, assigned, repair, etc.).",
+        api_path="/api/hardware-statuses/",
+        settings_path="/settings/reference-data/hardware-statuses",
+        search_fields=("name", "description"),
+        fields=(
+            ReferenceFieldDefinition(
+                key="name",
+                label="Name",
+                required=True,
+                placeholder="e.g. In Stock, Assigned, In Repair",
+            ),
+            ReferenceFieldDefinition(
+                key="description",
+                label="Description",
+                input_type="textarea",
+                placeholder="Optional guidance for when this status should be applied.",
+            ),
+        ),
+    ),
+    "hardware-locations": ReferenceResourceDefinition(
+        key="hardware-locations",
+        label="Hardware Location",
+        plural_label="Hardware Locations",
+        description="Physical sites or storage locations for hardware (offices, closets, etc.).",
+        api_path="/api/hardware-locations/",
+        settings_path="/settings/reference-data/hardware-locations",
+        search_fields=("name", "description"),
+        fields=(
+            ReferenceFieldDefinition(
+                key="name",
+                label="Name",
+                required=True,
+                placeholder="e.g. HQ – IT closet",
+            ),
+            ReferenceFieldDefinition(
+                key="description",
+                label="Description",
+                input_type="textarea",
+                placeholder="Optional notes about this site or storage area.",
+            ),
+        ),
+    ),
     "service-classifications": ReferenceResourceDefinition(
         key="service-classifications",
         label="Service Classification",

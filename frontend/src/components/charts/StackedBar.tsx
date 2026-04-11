@@ -14,6 +14,8 @@ interface Props {
   yearData: YearData[];
   width?: number;
   height?: number;
+  /** Called with fiscal year when a year column is clicked (dashboard). */
+  onYearClick?: (year: number) => void;
 }
 
 const fmt = (n: number) =>
@@ -23,6 +25,7 @@ export function StackedBar({
   yearData,
   width = 600,
   height = 240,
+  onYearClick,
 }: Props) {
   const max = Math.max(
     ...yearData.map((yd) =>
@@ -75,7 +78,11 @@ export function StackedBar({
         let cumH = 0;
         const total = yd.cats.reduce((s, c) => s + c.value, 0);
         return (
-          <g key={i}>
+          <g
+            key={i}
+            className={onYearClick ? "cursor-pointer" : undefined}
+            onClick={() => onYearClick?.(yd.year)}
+          >
             {yd.cats.map((c, ci) => {
               const bh = (c.value / max) * chartH;
               const y = 10 + chartH - cumH - bh;

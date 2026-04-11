@@ -46,7 +46,6 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 | Database | PostgreSQL 16 |
 | Auth | OIDC (Okta) + SCIM 2.0, local password fallback |
 | Storage | S3-compatible (MinIO locally, AWS S3 in production) |
-| Infrastructure | Docker Compose (local dev), AWS ECS (production) |
 
 ## Quick Start
 

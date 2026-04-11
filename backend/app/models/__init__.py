@@ -5,6 +5,8 @@ from app.models.cost_center import CostCenter
 from app.models.payment_method import PaymentMethod
 from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
+from app.models.hardware_status import HardwareStatus
+from app.models.hardware_location import HardwareLocation
 from app.models.contract import Contract
 from app.models.service import Service, service_owners
 from app.models.cost_record import CostRecord
@@ -27,6 +29,8 @@ __all__ = [
     "PaymentMethod",
     "ServiceClassification",
     "ServiceStatus",
+    "HardwareStatus",
+    "HardwareLocation",
     "Contract",
     "Service",
     "service_owners",

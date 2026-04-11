@@ -10,6 +10,7 @@ interface Props {
 
 interface FormData {
   fiscal_year: string;
+  purchase_year: string;
   amount: string;
   record_type: string;
   payment_method_id: string;
@@ -23,8 +24,16 @@ const RECORD_TYPE_OPTIONS = [
 ];
 
 function toFormData(r?: CostRecord): FormData {
+  const defaultFy = new Date().getFullYear();
+  const fy =
+    r?.fiscal_year != null
+      ? String(r.fiscal_year)
+      : r?.purchase_year != null
+        ? String(r.purchase_year)
+        : String(defaultFy);
   return {
-    fiscal_year: r?.fiscal_year != null ? String(r.fiscal_year) : String(new Date().getFullYear()),
+    fiscal_year: r?.fiscal_year != null ? String(r.fiscal_year) : fy,
+    purchase_year: r?.purchase_year != null ? String(r.purchase_year) : "",
     amount: r?.amount != null ? String(r.amount) : "",
     record_type: r?.record_type ?? "actual",
     payment_method_id: r?.payment_method_id ?? "",
@@ -35,6 +44,7 @@ function toFormData(r?: CostRecord): FormData {
 export function CostRecordForm({ serviceId, initial }: Props) {
   const navigate = useNavigate();
   const isEdit = !!initial;
+  const backHref = `/services/${serviceId}/costs`;
 
   const [form, setForm] = useState<FormData>(() => toFormData(initial));
   const [saving, setSaving] = useState(false);
@@ -47,6 +57,10 @@ export function CostRecordForm({ serviceId, initial }: Props) {
       .then((r) => setPaymentMethods(r.data));
   }, []);
 
+  useEffect(() => {
+    setForm(toFormData(initial));
+  }, [initial]);
+
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -56,27 +70,29 @@ export function CostRecordForm({ serviceId, initial }: Props) {
     setSaving(true);
     setError(null);
 
+    const purchaseYearParsed = form.purchase_year.trim()
+      ? Number(form.purchase_year)
+      : null;
+
     const payload = {
       fiscal_year: Number(form.fiscal_year),
       amount: Number(form.amount),
       record_type: form.record_type,
       payment_method_id: form.payment_method_id || null,
       notes: form.notes || null,
+      purchase_year: purchaseYearParsed,
     };
 
     try {
-      if (isEdit) {
+      if (isEdit && initial) {
         await client.put(
           `/api/services/${serviceId}/cost-records/${initial.id}`,
           payload,
         );
       } else {
-        await client.post(
-          `/api/services/${serviceId}/cost-records/`,
-          payload,
-        );
+        await client.post(`/api/services/${serviceId}/cost-records/`, payload);
       }
-      navigate(`/services/${serviceId}/costs`);
+      navigate(backHref);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Failed to save cost record";
@@ -107,6 +123,22 @@ export function CostRecordForm({ serviceId, initial }: Props) {
             className={inputCls}
             value={form.fiscal_year}
             onChange={(e) => set("fiscal_year", e.target.value)}
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Used for spending reports.
+          </p>
+        </div>
+
+        <div>
+          <label className={labelCls}>Purchase Year</label>
+          <input
+            type="number"
+            min={1900}
+            max={2100}
+            className={inputCls}
+            value={form.purchase_year}
+            onChange={(e) => set("purchase_year", e.target.value)}
+            placeholder="Optional"
           />
         </div>
 
@@ -180,7 +212,7 @@ export function CostRecordForm({ serviceId, initial }: Props) {
         </button>
         <button
           type="button"
-          onClick={() => navigate(`/services/${serviceId}/costs`)}
+          onClick={() => navigate(backHref)}
           className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
         >
           Cancel

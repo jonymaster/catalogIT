@@ -56,6 +56,18 @@ export interface ServiceStatus {
   description: string | null;
 }
 
+export interface HardwareStatus {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface HardwareLocation {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export interface ServiceClassification {
   id: string;
   slug: string;
@@ -79,10 +91,12 @@ export interface Contract {
 
 export interface CostRecord {
   id: string;
-  service_id: string;
+  service_id: string | null;
+  laptop_id: string | null;
   payment_method_id: string | null;
   payment_method_name: string | null;
   fiscal_year: number;
+  purchase_year: number | null;
   amount: number;
   record_type: "actual" | "estimated" | "budget";
   notes: string | null;
@@ -144,6 +158,10 @@ export interface Laptop {
   ram: string;
   storage_size: string;
   status: string;
+  hardware_status_id: string | null;
+  hardware_location_id: string | null;
+  hardware_status: HardwareStatus | null;
+  hardware_location: HardwareLocation | null;
   assigned_to_id: string | null;
   assigned_to: User | null;
   notes: string | null;
