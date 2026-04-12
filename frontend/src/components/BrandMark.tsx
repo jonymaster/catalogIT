@@ -1,15 +1,10 @@
 import { Link } from "react-router-dom";
 import { useHtmlHasDarkClass } from "../hooks/useHtmlDarkClass";
 
-/** Vite: join BASE_URL with public file path (works for `/` and `/app/` deploys). */
-function publicAsset(path: string): string {
-  return `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
-}
-
-const FULL_LIGHT = publicAsset("branding/transparent-light.png");
-const FULL_DARK = publicAsset("branding/transparent-dark.png");
-const SMALL_LIGHT = publicAsset("branding/small-light.png");
-const SMALL_DARK = publicAsset("branding/small-dark.png");
+import fullLight from "../assets/branding/transparent-light.png";
+import fullDark from "../assets/branding/transparent-dark.png";
+import smallLight from "../assets/branding/small-light.png";
+import smallDark from "../assets/branding/small-dark.png";
 
 const imgExpanded =
   "block h-10 w-auto max-w-[min(100%,12rem)] shrink-0 object-contain object-left";
@@ -25,11 +20,11 @@ export function BrandMark({ align = "left", className = "", collapsed = false }:
   const isDark = useHtmlHasDarkClass();
   const src = collapsed
     ? isDark
-      ? SMALL_DARK
-      : SMALL_LIGHT
+      ? smallDark
+      : smallLight
     : isDark
-      ? FULL_DARK
-      : FULL_LIGHT;
+      ? fullDark
+      : fullLight;
 
   const alignment =
     align === "center"

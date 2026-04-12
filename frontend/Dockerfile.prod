@@ -1,8 +1,8 @@
-# MUST use repository root as build context (not ./frontend), so COPY frontend/ and COPY branding/ work.
+# MUST use repository root as build context (not ./frontend), so COPY frontend/ works.
 #
 #   docker buildx build --platform linux/amd64,linux/arm64 -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 --push .
 #
-# Using `--push ./frontend` will fail: context has no `frontend/` or `branding/` subpaths.
+# Using `--push ./frontend` will fail: context has no `frontend/` subpath.
 FROM node:20-alpine AS build
 
 WORKDIR /app
@@ -10,8 +10,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
 COPY frontend/ ./
-# Repo-root logos (see README); ensures /branding/*.png exists in dist even if public/ is incomplete in a checkout.
-COPY branding/ ./public/branding/
+# Logos live in frontend/src/assets/branding (bundled under /assets/ in production).
 
 # Optional: set when API is on another hostname (e.g. https://api-catalogit.example.org).
 ARG VITE_API_BASE_URL
