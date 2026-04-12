@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import client from "../../api/client";
+import { useToast } from "../../context/useToast";
 import { PageTransition } from "../../components/PageTransition";
 import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
 
@@ -51,13 +52,10 @@ function axiosDetail(e: unknown): string | undefined {
 }
 
 export function SettingsIntegrations() {
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [meta, setMeta] = useState<Meta | null>(null);
   const [channels, setChannels] = useState<IntegrationChannel[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(
-    null,
-  );
 
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
@@ -71,7 +69,6 @@ export function SettingsIntegrations() {
   const [gSecret, setGSecret] = useState("");
 
   const refresh = useCallback(async () => {
-    setLoadError(null);
     try {
       const [m, list] = await Promise.all([
         client.get<Meta>("/api/settings/integrations/meta"),
@@ -97,9 +94,9 @@ export function SettingsIntegrations() {
         }
       }
     } catch {
-      setLoadError("Failed to load integrations.");
+      showToast({ type: "error", text: "Failed to load integrations." });
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     void refresh();
@@ -109,34 +106,33 @@ export function SettingsIntegrations() {
     const g = searchParams.get("google");
     const s = searchParams.get("slack");
     if (g === "connected") {
-      setMessage({ type: "success", text: "Google account connected." });
+      showToast({ type: "success", text: "Google account connected." });
       setSearchParams({}, { replace: true });
     }
     if (s === "connected") {
-      setMessage({ type: "success", text: "Slack workspace connected." });
+      showToast({ type: "success", text: "Slack workspace connected." });
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, showToast]);
 
   function ch(name: string): IntegrationChannel | undefined {
     return channels.find((c) => c.channel === name);
   }
 
   async function testChannel(channel: string) {
-    setMessage(null);
     try {
       const r = await client.post<{ ok: boolean; detail?: string }>(
         `/api/settings/integrations/${channel}/test`,
       );
       if (r.data.ok) {
-        setMessage({ type: "success", text: `Test sent (${channel}).` });
+        showToast({ type: "success", text: `Test sent (${channel}).` });
       } else {
-        setMessage({ type: "error", text: r.data.detail ?? "Test failed." });
+        showToast({ type: "error", text: r.data.detail ?? "Test failed." });
       }
       await refresh();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
-      setMessage({
+      showToast({
         type: "error",
         text: err.response?.data?.detail ?? "Test request failed.",
       });
@@ -145,7 +141,6 @@ export function SettingsIntegrations() {
 
   async function saveWebhook(e: FormEvent) {
     e.preventDefault();
-    setMessage(null);
     try {
       await client.patch("/api/settings/integrations/webhook", {
         url: webhookUrl || null,
@@ -153,10 +148,10 @@ export function SettingsIntegrations() {
         enabled: true,
       });
       setWebhookSecret("");
-      setMessage({ type: "success", text: "Webhook settings saved." });
+      showToast({ type: "success", text: "Webhook settings saved." });
       await refresh();
     } catch (e: unknown) {
-      setMessage({
+      showToast({
         type: "error",
         text:
           axiosDetail(e) ??
@@ -167,7 +162,6 @@ export function SettingsIntegrations() {
 
   async function saveTelegram(e: FormEvent) {
     e.preventDefault();
-    setMessage(null);
     try {
       await client.patch("/api/settings/integrations/telegram", {
         chat_id: tgChat || null,
@@ -175,10 +169,10 @@ export function SettingsIntegrations() {
         enabled: true,
       });
       setTgToken("");
-      setMessage({ type: "success", text: "Telegram settings saved." });
+      showToast({ type: "success", text: "Telegram settings saved." });
       await refresh();
     } catch (e: unknown) {
-      setMessage({
+      showToast({
         type: "error",
         text: axiosDetail(e) ?? "Save failed.",
       });
@@ -187,7 +181,6 @@ export function SettingsIntegrations() {
 
   async function saveSlack(e: FormEvent) {
     e.preventDefault();
-    setMessage(null);
     try {
       await client.patch("/api/settings/integrations/slack", {
         client_id: slackClientId || null,
@@ -195,10 +188,10 @@ export function SettingsIntegrations() {
         enabled: true,
       });
       setSlackSecret("");
-      setMessage({ type: "success", text: "Slack settings saved." });
+      showToast({ type: "success", text: "Slack settings saved." });
       await refresh();
     } catch (e: unknown) {
-      setMessage({
+      showToast({
         type: "error",
         text: axiosDetail(e) ?? "Save failed.",
       });
@@ -206,20 +199,18 @@ export function SettingsIntegrations() {
   }
 
   async function connectSlack() {
-    setMessage(null);
     try {
       const r = await client.post<{ authorization_url: string }>(
         "/api/integrations/slack/oauth/start",
       );
       window.location.href = r.data.authorization_url;
     } catch {
-      setMessage({ type: "error", text: "Could not start Slack OAuth." });
+      showToast({ type: "error", text: "Could not start Slack OAuth." });
     }
   }
 
   async function resolveSlackChannel(e: FormEvent) {
     e.preventDefault();
-    setMessage(null);
     setSlackResolving(true);
     try {
       const r = await client.post<{ channel_id: string }>(
@@ -229,10 +220,10 @@ export function SettingsIntegrations() {
         },
       );
       setSlackChannelLabel(r.data.channel_id);
-      setMessage({ type: "success", text: "Channel resolved and saved." });
+      showToast({ type: "success", text: "Channel resolved and saved." });
       await refresh();
     } catch (e: unknown) {
-      setMessage({
+      showToast({
         type: "error",
         text: axiosDetail(e) ?? "Resolve failed.",
       });
@@ -243,7 +234,6 @@ export function SettingsIntegrations() {
 
   async function saveGoogle(e: FormEvent) {
     e.preventDefault();
-    setMessage(null);
     try {
       await client.patch("/api/settings/integrations/google_mail", {
         client_id: gClientId || null,
@@ -251,10 +241,10 @@ export function SettingsIntegrations() {
         enabled: true,
       });
       setGSecret("");
-      setMessage({ type: "success", text: "Gmail integration settings saved." });
+      showToast({ type: "success", text: "Gmail integration settings saved." });
       await refresh();
     } catch (e: unknown) {
-      setMessage({
+      showToast({
         type: "error",
         text: axiosDetail(e) ?? "Save failed.",
       });
@@ -264,25 +254,23 @@ export function SettingsIntegrations() {
   async function disconnectChannel(channel: string) {
     if (!window.confirm(`Disconnect ${channel.replace("_", " ")}? This will clear all credentials and tokens.`))
       return;
-    setMessage(null);
     try {
       await client.post(`/api/settings/integrations/${channel}/disconnect`);
-      setMessage({ type: "success", text: `${channel.replace("_", " ")} disconnected.` });
+      showToast({ type: "success", text: `${channel.replace("_", " ")} disconnected.` });
       await refresh();
     } catch (e: unknown) {
-      setMessage({ type: "error", text: axiosDetail(e) ?? "Disconnect failed." });
+      showToast({ type: "error", text: axiosDetail(e) ?? "Disconnect failed." });
     }
   }
 
   async function connectGoogle() {
-    setMessage(null);
     try {
       const r = await client.post<{ authorization_url: string }>(
         "/api/integrations/google/oauth/start",
       );
       window.location.href = r.data.authorization_url;
     } catch {
-      setMessage({ type: "error", text: "Could not start Google OAuth." });
+      showToast({ type: "error", text: "Could not start Google OAuth." });
     }
   }
 
@@ -302,21 +290,6 @@ export function SettingsIntegrations() {
           deployment.
         </p>
       </div>
-
-      {loadError && (
-        <p className="rounded-md bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-800 dark:text-red-200">{loadError}</p>
-      )}
-      {message && (
-        <p
-          className={`rounded-md px-3 py-2 text-sm ${
-            message.type === "success"
-              ? "bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200"
-              : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
 
       {meta && !meta.secrets_encryption_configured && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">

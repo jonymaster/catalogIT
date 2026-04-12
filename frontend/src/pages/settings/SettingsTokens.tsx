@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import client from "../../api/client";
 import { useAuth } from "../../context/useAuth";
+import { useToast } from "../../context/useToast";
 import { formatDateTime } from "../../utils/formatting";
 import { PageTransition } from "../../components/PageTransition";
 
@@ -21,11 +22,11 @@ interface ApiTokenCreated extends ApiToken {
 
 export function SettingsTokens() {
   const { preferences } = useAuth();
+  const { showToast } = useToast();
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [modalToken, setModalToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -46,7 +47,6 @@ export function SettingsTokens() {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
-    setError(null);
     try {
       const res = await client.post<ApiTokenCreated>("/api/settings/tokens/", {
         name: name.trim(),
@@ -57,7 +57,7 @@ export function SettingsTokens() {
       dialogRef.current?.showModal();
       loadTokens();
     } catch {
-      setError("Failed to generate token.");
+      showToast({ type: "error", text: "Failed to generate token." });
     } finally {
       setCreating(false);
     }
@@ -118,10 +118,6 @@ export function SettingsTokens() {
           {creating ? "Generating..." : "Generate token"}
         </button>
       </form>
-
-      {error && (
-        <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-      )}
 
       {/* One-time token reveal modal */}
       <dialog

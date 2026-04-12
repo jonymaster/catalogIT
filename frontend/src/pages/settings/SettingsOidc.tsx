@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import client from "../../api/client";
+import { useToast } from "../../context/useToast";
 import { PageTransition } from "../../components/PageTransition";
 import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
 
@@ -30,13 +31,10 @@ const emptyConfig: OidcConfig = {
 };
 
 export function SettingsOidc() {
+  const { showToast } = useToast();
   const [config, setConfig] = useState<OidcConfig>(emptyConfig);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   useEffect(() => {
@@ -55,21 +53,24 @@ export function SettingsOidc() {
     e.preventDefault();
     setTesting(true);
     setTestResult(null);
-    setMessage(null);
     try {
       const res = await client.post<TestResult>(
         "/api/settings/oidc/test",
         config,
       );
-      setTestResult(res.data);
+      if (res.data.success) {
+        setTestResult(res.data);
+        showToast({ type: "success", text: "Connection successful." });
+      } else {
+        setTestResult(null);
+        showToast({
+          type: "error",
+          text: res.data.error || "Connection test failed.",
+        });
+      }
     } catch {
-      setTestResult({
-        success: false,
-        issuer: "",
-        authorization_endpoint: "",
-        token_endpoint: "",
-        error: "Request failed",
-      });
+      setTestResult(null);
+      showToast({ type: "error", text: "Request failed." });
     } finally {
       setTesting(false);
     }
@@ -78,12 +79,11 @@ export function SettingsOidc() {
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
     try {
       await client.put("/api/settings/oidc", config);
-      setMessage({ type: "success", text: "OIDC configuration saved." });
+      showToast({ type: "success", text: "OIDC configuration saved." });
     } catch {
-      setMessage({ type: "error", text: "Failed to save configuration." });
+      showToast({ type: "error", text: "Failed to save configuration." });
     } finally {
       setSaving(false);
     }
@@ -151,41 +151,20 @@ export function SettingsOidc() {
         </div>
       </div>
 
-      {testResult && (
-        <div
-          className={`rounded-md p-4 text-sm ${
-            testResult.success
-              ? "bg-green-50 dark:bg-green-950/40 text-green-800 dark:text-green-200"
-              : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200"
-          }`}
+      {testResult?.success && (
+        <details
+          className="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm text-green-800 dark:text-green-200"
+          open
         >
-          {testResult.success ? (
-            <div className="space-y-1">
-              <p className="font-medium">Connection successful</p>
-              <p>Issuer: {testResult.issuer}</p>
-              <p className="truncate">
-                Authorization: {testResult.authorization_endpoint}
-              </p>
-              <p className="truncate">
-                Token: {testResult.token_endpoint}
-              </p>
-            </div>
-          ) : (
-            <p>{testResult.error}</p>
-          )}
-        </div>
-      )}
-
-      {message && (
-        <p
-          className={`text-sm ${
-            message.type === "success"
-              ? "text-green-700 dark:text-green-300"
-              : "text-red-700 dark:text-red-300"
-          }`}
-        >
-          {message.text}
-        </p>
+          <summary className="cursor-pointer font-medium text-green-900 dark:text-green-100">
+            Endpoint details
+          </summary>
+          <div className="mt-3 space-y-1">
+            <p>Issuer: {testResult.issuer}</p>
+            <p className="break-all">Authorization: {testResult.authorization_endpoint}</p>
+            <p className="break-all">Token: {testResult.token_endpoint}</p>
+          </div>
+        </details>
       )}
 
       <div className="flex gap-3">

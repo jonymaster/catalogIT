@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
 import client from "../../api/client";
+import { useToast } from "../../context/useToast";
 import type { Column } from "../../components/DataTable";
 import { DataTable } from "../../components/DataTable";
 import { PageTransition } from "../../components/PageTransition";
@@ -89,6 +90,7 @@ function ResourceFieldInput({
 }
 
 export function SettingsReferenceDataResource() {
+  const { showToast } = useToast();
   const { resourceKey } = useParams<{ resourceKey: string }>();
   const { resources } = useOutletContext<{ resources: ReferenceDataResource[] }>();
   const resource = resources.find((item) => item.key === resourceKey);
@@ -100,10 +102,6 @@ export function SettingsReferenceDataResource() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [editingRecord, setEditingRecord] = useState<ReferenceDataRecord | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
@@ -119,7 +117,7 @@ export function SettingsReferenceDataResource() {
         setRecords(response.data);
       })
       .catch((error) => {
-        setMessage({
+        showToast({
           type: "error",
           text: extractErrorDetail(error, `Failed to load ${resource.plural_label.toLowerCase()}.`),
         });
@@ -127,7 +125,7 @@ export function SettingsReferenceDataResource() {
       .finally(() => {
         setLoading(false);
       });
-  }, [resource]);
+  }, [resource, showToast]);
 
   const filtered = useMemo(() => {
     if (!resource || !search.trim()) {
@@ -167,7 +165,6 @@ export function SettingsReferenceDataResource() {
     }
     setEditingRecord(null);
     setFormValues(buildEmptyForm(resource));
-    setMessage(null);
     dialogRef.current?.showModal();
   }
 
@@ -178,7 +175,6 @@ export function SettingsReferenceDataResource() {
     }
 
     setSaving(true);
-    setMessage(null);
 
     const payload = Object.fromEntries(
       resource.fields.map((field) => [
@@ -190,13 +186,13 @@ export function SettingsReferenceDataResource() {
     try {
       if (editingRecord) {
         await client.patch(`${resource.api_path}${editingRecord.id}`, payload);
-        setMessage({
+        showToast({
           type: "success",
           text: `${resource.label} updated.`,
         });
       } else {
         await client.post(resource.api_path, payload);
-        setMessage({
+        showToast({
           type: "success",
           text: `${resource.label} created.`,
         });
@@ -204,7 +200,7 @@ export function SettingsReferenceDataResource() {
       await reloadRecords();
       closeDialog();
     } catch (error) {
-      setMessage({
+      showToast({
         type: "error",
         text: extractErrorDetail(error, `Failed to save ${resource.label.toLowerCase()}.`),
       });
@@ -225,23 +221,22 @@ export function SettingsReferenceDataResource() {
     }
 
     setDeletingId(record.id);
-    setMessage(null);
     try {
       await client.delete(`${resource.api_path}${record.id}`);
       await reloadRecords();
-      setMessage({
+      showToast({
         type: "success",
         text: `${resource.label} deleted.`,
       });
     } catch (error) {
-      setMessage({
+      showToast({
         type: "error",
         text: extractErrorDetail(error, `Failed to delete ${resource.label.toLowerCase()}.`),
       });
     } finally {
       setDeletingId(null);
     }
-  }, [reloadRecords, resource]);
+  }, [reloadRecords, resource, showToast]);
 
   const columns = useMemo<Column<ReferenceDataRecord>[]>(() => {
     if (!resource) {
@@ -277,7 +272,6 @@ export function SettingsReferenceDataResource() {
                     ]),
                   ),
                 );
-                setMessage(null);
                 dialogRef.current?.showModal();
               }}
             >
@@ -322,16 +316,6 @@ export function SettingsReferenceDataResource() {
           Add {resource.label}
         </button>
       </div>
-
-      {message && (
-        <p
-          className={`text-sm ${
-            message.type === "success" ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
 
       <div className="max-w-sm">
         <SearchInput

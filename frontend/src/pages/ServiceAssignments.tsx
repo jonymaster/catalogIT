@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import client from "../api/client";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import type { Service, UserDirectoryPage } from "../types/models";
 
 const DIRECTORY_PAGE_SIZE = 50;
@@ -20,6 +21,7 @@ export function ServiceAssignments() {
     reloadService: () => void;
   }>();
   const { canEdit } = useAuth();
+  const { showToast } = useToast();
 
   const [manageOpen, setManageOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -32,7 +34,6 @@ export function ServiceAssignments() {
     () => new Set(),
   );
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
 
@@ -72,7 +73,6 @@ export function ServiceAssignments() {
 
   async function saveAssignments(ids: string[]) {
     setSaving(true);
-    setError(null);
     try {
       await client.put(`/api/services/${service.id}`, { assignee_ids: ids });
       reloadService();
@@ -89,7 +89,7 @@ export function ServiceAssignments() {
       } else if (err instanceof Error) {
         msg = err.message;
       }
-      setError(msg);
+      showToast({ type: "error", text: msg });
     } finally {
       setSaving(false);
     }
@@ -100,19 +100,18 @@ export function ServiceAssignments() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        setError(null);
       } else {
         if (
           service.total_seats != null &&
           next.size >= service.total_seats
         ) {
-          setError(
-            `Cannot assign more than ${service.total_seats} seat(s) for this service.`,
-          );
+          showToast({
+            type: "error",
+            text: `Cannot assign more than ${service.total_seats} seat(s) for this service.`,
+          });
           return prev;
         }
         next.add(id);
-        setError(null);
       }
       return next;
     });
@@ -123,7 +122,6 @@ export function ServiceAssignments() {
       const next = new Set(prev);
       if (allOnPageSelected) {
         pageUserIds.forEach((id) => next.delete(id));
-        setError(null);
         return next;
       }
       const cap = service.total_seats;
@@ -131,14 +129,14 @@ export function ServiceAssignments() {
         const wouldAdd = pageUserIds.filter((id) => !next.has(id));
         const room = cap - next.size;
         if (wouldAdd.length > room) {
-          setError(
-            `You can only assign up to ${cap} seat(s). Uncheck some users first or raise capacity on the service edit form.`,
-          );
+          showToast({
+            type: "error",
+            text: `You can only assign up to ${cap} seat(s). Uncheck some users first or raise capacity on the service edit form.`,
+          });
           return prev;
         }
       }
       pageUserIds.forEach((id) => next.add(id));
-      setError(null);
       return next;
     });
   }
@@ -171,12 +169,6 @@ export function ServiceAssignments() {
         </p>
       )}
 
-      {error && !manageOpen && (
-        <div className="rounded-md bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-700 dark:text-red-300">
-          {error}
-        </div>
-      )}
-
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -191,7 +183,6 @@ export function ServiceAssignments() {
                 );
                 setPage(1);
                 setDirectoryPage(null);
-                setError(null);
                 setManageOpen(true);
               }}
               disabled={saving}
@@ -255,12 +246,6 @@ export function ServiceAssignments() {
                 users per page.
               </p>
             </div>
-
-            {error && manageOpen && (
-              <div className="mx-4 mt-3 rounded-md bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-700 dark:text-red-300">
-                {error}
-              </div>
-            )}
 
             <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
               {directoryLoading && !directoryPage ? (
