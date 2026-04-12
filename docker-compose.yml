@@ -45,7 +45,8 @@ services:
     env_file:
       - .env
     environment:
-      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-true}
+      # When true, first startup on an empty DB loads bundled JSON from /app/sample_data (see backend/Dockerfile).
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
     depends_on:

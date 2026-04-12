@@ -1,0 +1,38 @@
+[
+  {
+    "date": "2025-06",
+    "service_id": 2,
+    "action_type": "optimization",
+    "description": "Slack workspace cleaned up inactive accounts; annual run rate reduced."
+  },
+  {
+    "date": "2025-11",
+    "service_id": 6,
+    "action_type": "change",
+    "description": "AWS cost anomaly alerts tuned; reserved instance coverage reviewed for production accounts."
+  },
+  {
+    "date": "2026-01",
+    "service_id": 5,
+    "action_type": "renewal",
+    "description": "Jamf renewal negotiated with modest uplift for additional device licenses."
+  },
+  {
+    "date": "2025-08",
+    "service_id": 11,
+    "action_type": "migration",
+    "description": "SSO application connected for admin roles."
+  },
+  {
+    "date": "2025-04",
+    "service_id": 12,
+    "action_type": "change",
+    "description": "Notion workspace consolidated; retired duplicate teamspaces."
+  },
+  {
+    "date": "2025-09",
+    "service_id": 13,
+    "action_type": "optimization",
+    "description": "Linear triage workflow rolled out for engineering intake."
+  }
+]

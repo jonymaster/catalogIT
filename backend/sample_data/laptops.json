@@ -7,7 +7,7 @@
     "storage_size": "512 GB SSD",
     "status": "Assigned",
     "assigned_to_user_seed_id": 3,
-    "notes": "Standard engineering image"
+    "notes": "Standard engineering image; hardware cost tracked on device"
   },
   {
     "serial_number": "C02FABRIC02",
@@ -17,7 +17,7 @@
     "storage_size": "1 TB SSD",
     "status": "Assigned",
     "assigned_to_user_seed_id": 4,
-    "notes": "Build machine — extra RAM"
+    "notes": "Build machine — extra RAM; CapEx in laptop cost record"
   },
   {
     "serial_number": "C02FABRIC03",
@@ -26,7 +26,7 @@
     "ram": "16 GB",
     "storage_size": "512 GB SSD",
     "status": "In Stock",
-    "notes": "Spare unassigned"
+    "notes": "Unassigned spare; refresh stock"
   },
   {
     "serial_number": "PF4DEMO001",
@@ -55,6 +55,6 @@
     "storage_size": "512 GB SSD",
     "status": "Loaned",
     "assigned_to_user_seed_id": 5,
-    "notes": "Short-term loan for contractor"
+    "notes": "Short-term loan for contractor; return by end of quarter"
   }
 ]

@@ -1,4 +1,4 @@
-# Build context is ./backend (not the repo root).
+# Build context is ./backend (not the repo root). ``sample_data/*.json`` is included for SEED_SAMPLE_DATA.
 #
 #   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.0.0 --push ./backend
 #
@@ -26,6 +26,8 @@ COPY --from=builder /app /app
 RUN chown -R appuser:appuser /app
 
 ENV PATH="/app/.venv/bin:$PATH"
+# Bundled JSON for ``SEED_SAMPLE_DATA=true`` (see ``scripts/seed_from_json.py``).
+ENV SEED_DIR=/app/sample_data
 
 USER appuser
 

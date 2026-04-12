@@ -1,0 +1,56 @@
+[
+  {
+    "serial_number": "C02FABRIC01",
+    "fiscal_year": 2024,
+    "amount": 2899,
+    "record_type": "actual",
+    "purchase_year": 2024,
+    "payment_method_id": 2,
+    "notes": "Apple Business; M3 Pro 14-inch standard engineering build"
+  },
+  {
+    "serial_number": "C02FABRIC02",
+    "fiscal_year": 2024,
+    "amount": 3349,
+    "record_type": "actual",
+    "purchase_year": 2024,
+    "payment_method_id": 2,
+    "notes": "Build machine — upgraded RAM and storage at purchase"
+  },
+  {
+    "serial_number": "C02FABRIC03",
+    "fiscal_year": 2025,
+    "amount": 1599,
+    "record_type": "actual",
+    "purchase_year": 2025,
+    "payment_method_id": 2,
+    "notes": "Pool spare; purchased for bench stock"
+  },
+  {
+    "serial_number": "PF4DEMO001",
+    "fiscal_year": 2024,
+    "amount": 2149,
+    "record_type": "actual",
+    "purchase_year": 2024,
+    "payment_method_id": 2,
+    "notes": "Lenovo channel; IT admin primary device"
+  },
+  {
+    "serial_number": "PF4DEMO002",
+    "fiscal_year": 2024,
+    "amount": 1999,
+    "record_type": "actual",
+    "purchase_year": 2024,
+    "payment_method_id": 2,
+    "notes": "ThinkPad X1 pool device"
+  },
+  {
+    "serial_number": "PF4DEMO003",
+    "fiscal_year": 2025,
+    "amount": 1689,
+    "record_type": "actual",
+    "purchase_year": 2025,
+    "payment_method_id": 2,
+    "notes": "T14 for short-term loaner; invoiced Q2 FY25"
+  }
+]

@@ -1,4 +1,6 @@
-"""Load seed data from data/seed/*.json into the local database.
+"""Load seed data from ``backend/sample_data/*.json`` into the local database.
+
+Override directory with env ``SEED_DIR`` (Docker image sets ``/app/sample_data``).
 
 Usage (from backend/):
     python -m scripts.seed_from_json
@@ -22,6 +24,7 @@ from app.database import async_session, engine
 from app.models import (
     Category,
     CostRecord,
+    Laptop,
     PaymentMethod,
     Service,
     ServiceClassification,
@@ -34,7 +37,7 @@ from app.models import (
 
 import os as _os
 
-_default_seed = Path(__file__).resolve().parent.parent.parent / "data" / "seed"
+_default_seed = Path(__file__).resolve().parent.parent / "sample_data"
 SEED_DIR = Path(_os.environ.get("SEED_DIR", str(_default_seed)))
 
 # Stable UUID namespace so repeated runs produce the same IDs
@@ -55,6 +58,10 @@ STATUS_NAME_MAP = {
 
 def _uuid(table: str, seed_id: int) -> uuid.UUID:
     return uuid.uuid5(NS, f"{table}:{seed_id}")
+
+
+def _laptop_id(serial_number: str) -> uuid.UUID:
+    return uuid.uuid5(NS, f"laptop:{serial_number.strip()}")
 
 
 def _load(name: str) -> list[dict]:
@@ -208,6 +215,7 @@ async def _seed_services(session: AsyncSession) -> None:
             name=r["name"],
             status=normalized_status,
             billing_schedule=r.get("billing_schedule", ""),
+            yearly_cost=r.get("yearly_cost"),
             vendor_id=_uuid("vendor", r["vendor_id"]),
             category_id=_uuid("category", r["category_id"]),
             payment_method_id=_uuid("payment_method", r["payment_method_id"]),
@@ -292,6 +300,74 @@ async def _seed_service_history(session: AsyncSession) -> None:
     print(f"  service_history: {len(rows)} processed")
 
 
+async def _seed_laptops(session: AsyncSession) -> None:
+    rows = _load("laptops.json")
+    if not rows:
+        print("  laptops: 0 processed")
+        return
+    user_rows = _load("users.json")
+    user_email_by_seed_id = {u["id"]: u["email"] for u in user_rows}
+    for r in rows:
+        serial = str(r["serial_number"]).strip()
+        if not serial:
+            continue
+        result = await session.execute(select(Laptop).where(Laptop.serial_number == serial))
+        if result.scalar_one_or_none():
+            continue
+        assigned_to_id = None
+        seed_uid = r.get("assigned_to_user_seed_id")
+        if seed_uid is not None:
+            email = user_email_by_seed_id.get(int(seed_uid))
+            if email:
+                ur = await session.execute(select(User).where(User.email == email))
+                u = ur.scalar_one_or_none()
+                if u:
+                    assigned_to_id = u.id
+        session.add(Laptop(
+            id=_laptop_id(serial),
+            serial_number=serial,
+            model_name=str(r.get("model_name") or "Laptop"),
+            cpu=str(r.get("cpu") or ""),
+            ram=str(r.get("ram") or ""),
+            storage_size=str(r.get("storage_size") or ""),
+            status=str(r.get("status") or "In Stock"),
+            assigned_to_id=assigned_to_id,
+            notes=r.get("notes"),
+        ))
+    await session.flush()
+    print(f"  laptops: {len(rows)} processed")
+
+
+async def _seed_laptop_cost_records(session: AsyncSession) -> None:
+    rows = _load("laptop_cost_records.json")
+    for r in rows:
+        serial = str(r["serial_number"]).strip()
+        if not serial:
+            continue
+        lap_id = _laptop_id(serial)
+        lap = await session.get(Laptop, lap_id)
+        if not lap:
+            continue
+        existing = await session.execute(select(CostRecord).where(CostRecord.laptop_id == lap_id))
+        if existing.scalar_one_or_none():
+            continue
+        pm_id = None
+        if r.get("payment_method_id") is not None:
+            pm_id = _uuid("payment_method", int(r["payment_method_id"]))
+        session.add(CostRecord(
+            service_id=None,
+            laptop_id=lap_id,
+            payment_method_id=pm_id,
+            fiscal_year=int(r["fiscal_year"]),
+            purchase_year=r.get("purchase_year"),
+            amount=r["amount"],
+            record_type=str(r["record_type"]),
+            notes=r.get("notes"),
+        ))
+    await session.flush()
+    print(f"  laptop_cost_records: {len(rows)} processed")
+
+
 async def seed_database() -> None:
     print(f"Seeding from {SEED_DIR} ...")
     async with async_session() as session:
@@ -304,6 +380,8 @@ async def seed_database() -> None:
             await _seed_services(session)
             await _seed_cost_records(session)
             await _seed_service_history(session)
+            await _seed_laptops(session)
+            await _seed_laptop_cost_records(session)
             await session.commit()
             print("Done.")
         except Exception:

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Bulk-load JSON seed files from this directory into a CatalogIT deployment via HTTP API.
+"""Bulk-load JSON seed files into a CatalogIT deployment via HTTP API.
 
-Reads the same shapes as ``backend/scripts/seed_from_json.py`` (vendors, categories,
-payment_methods, users, services, cost_records), plus optional ``laptops.json`` for
-``POST /api/laptops/``. ``service_history.json`` is not loaded (no public write API).
+Canonical seed files live in ``backend/sample_data/`` (this directory symlinks them for convenience).
+Same shapes as ``backend/scripts/seed_from_json.py`` (vendors, categories,
+payment_methods, users, services, cost_records, service_history, laptops, laptop_cost_records).
+``service_history.json`` is not loaded here (no public write API); use DB seed or admin paths for history.
 
 Users are processed **first** (match by email, or SCIM create when configured) so
 owner links and laptop assignees resolve before services and laptops are created.
@@ -190,6 +191,7 @@ def run(seed_dir: Path, client: ApiClient) -> int:
     services_rows = _load_json(seed_dir, "services.json")
     cost_rows = _load_json(seed_dir, "cost_records.json")
     laptops_rows = _load_json(seed_dir, "laptops.json")
+    laptop_cost_rows = _load_json(seed_dir, "laptop_cost_records.json")
 
     if client.dry_run:
         print("Dry run: no HTTP writes.")
@@ -407,6 +409,8 @@ def run(seed_dir: Path, client: ApiClient) -> int:
             "criticality": r.get("criticality"),
             "nonprofit_pricing": bool(r.get("nonprofit_pricing", False)),
         }
+        if r.get("yearly_cost") is not None:
+            body["yearly_cost"] = float(r["yearly_cost"])
         if classification_id:
             body["classification_id"] = classification_id
 
@@ -488,6 +492,46 @@ def run(seed_dir: Path, client: ApiClient) -> int:
                 laptop_by_serial[lk] = _pred_uuid("laptop", i)
             elif created and created.get("id"):
                 laptop_by_serial[lk] = str(created["id"])
+
+    # --- Laptop hardware cost records (optional laptop_cost_records.json)
+    if laptop_cost_rows:
+        print("Laptop cost records …")
+        for r in laptop_cost_rows:
+            serial = str(r.get("serial_number", "")).strip()
+            if not serial:
+                print("  [warn] laptop cost row missing serial_number; skip.", file=sys.stderr)
+                continue
+            lk = serial.lower()
+            lap_uuid = laptop_by_serial.get(lk)
+            if not lap_uuid:
+                print(
+                    f"  [warn] No laptop id for serial {serial!r}; skip cost row.",
+                    file=sys.stderr,
+                )
+                continue
+            if not client.dry_run:
+                existing_lc = client.get_json(f"/api/laptops/{lap_uuid}/cost-records/") or []
+                if existing_lc:
+                    print(f"  [skip] laptop already has cost record(s): {serial}")
+                    continue
+            fy = int(r["fiscal_year"])
+            rt = str(r["record_type"])
+            payload: dict[str, Any] = {
+                "fiscal_year": fy,
+                "amount": float(r["amount"]),
+                "record_type": rt,
+                "notes": r.get("notes"),
+            }
+            py = r.get("purchase_year")
+            if py is not None:
+                payload["purchase_year"] = int(py)
+            pm_seed = r.get("payment_method_id")
+            if pm_seed is not None:
+                pm_uuid = payment_seed_to_id.get(int(pm_seed))
+                if pm_uuid:
+                    payload["payment_method_id"] = pm_uuid
+            print(f"  Creating laptop cost record: {serial} FY{fy} {rt}")
+            client.post_json(f"/api/laptops/{lap_uuid}/cost-records/", payload)
 
     print("Done.")
     print(

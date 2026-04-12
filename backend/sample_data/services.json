@@ -10,7 +10,8 @@
     "owner_ids": [1, 2],
     "scim_enabled": true,
     "payment_method_id": 3,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 4800
   },
   {
     "id": 2,
@@ -23,7 +24,8 @@
     "owner_ids": [1],
     "scim_enabled": true,
     "payment_method_id": 1,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 11500
   },
   {
     "id": 3,
@@ -36,7 +38,8 @@
     "owner_ids": [2],
     "scim_enabled": false,
     "payment_method_id": 3,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 9200
   },
   {
     "id": 4,
@@ -49,49 +52,11 @@
     "owner_ids": [3],
     "scim_enabled": true,
     "payment_method_id": 3,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 5400
   },
   {
     "id": 5,
-    "name": "Fleet laptops - MacBook Pro 14",
-    "vendor_id": 7,
-    "classification": "internal",
-    "status": "contract",
-    "billing_schedule": "annually",
-    "category_id": 1,
-    "owner_ids": [1],
-    "scim_enabled": false,
-    "payment_method_id": 2,
-    "criticality": "High"
-  },
-  {
-    "id": 6,
-    "name": "Fleet laptops - ThinkPad X1 Carbon",
-    "vendor_id": 8,
-    "classification": "internal",
-    "status": "contract",
-    "billing_schedule": "annually",
-    "category_id": 1,
-    "owner_ids": [1],
-    "scim_enabled": false,
-    "payment_method_id": 2,
-    "criticality": "High"
-  },
-  {
-    "id": 7,
-    "name": "Loaner laptop pool",
-    "vendor_id": 7,
-    "classification": "internal",
-    "status": "self_managed",
-    "billing_schedule": "on_demand",
-    "category_id": 1,
-    "owner_ids": [1, 4],
-    "scim_enabled": false,
-    "payment_method_id": 2,
-    "criticality": "Medium"
-  },
-  {
-    "id": 8,
     "name": "Jamf Pro (MDM)",
     "vendor_id": 18,
     "classification": "core_saas",
@@ -101,10 +66,11 @@
     "owner_ids": [1],
     "scim_enabled": true,
     "payment_method_id": 2,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 15200
   },
   {
-    "id": 9,
+    "id": 6,
     "name": "Amazon Web Services",
     "vendor_id": 10,
     "classification": "subscription",
@@ -114,10 +80,11 @@
     "owner_ids": [2, 3],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 235000
   },
   {
-    "id": 10,
+    "id": 7,
     "name": "Datadog",
     "vendor_id": 9,
     "classification": "core_saas",
@@ -127,10 +94,11 @@
     "owner_ids": [3],
     "scim_enabled": false,
     "payment_method_id": 4,
-    "criticality": "High"
+    "criticality": "High",
+    "yearly_cost": 38000
   },
   {
-    "id": 11,
+    "id": 8,
     "name": "Zoom",
     "vendor_id": 11,
     "classification": "core_saas",
@@ -140,10 +108,11 @@
     "owner_ids": [5],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "High"
+    "criticality": "High",
+    "yearly_cost": 8000
   },
   {
-    "id": 12,
+    "id": 9,
     "name": "Figma",
     "vendor_id": 12,
     "classification": "core_saas",
@@ -153,10 +122,11 @@
     "owner_ids": [5],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "Medium"
+    "criticality": "Medium",
+    "yearly_cost": 7500
   },
   {
-    "id": 13,
+    "id": 10,
     "name": "1Password",
     "vendor_id": 13,
     "classification": "core_saas",
@@ -166,10 +136,11 @@
     "owner_ids": [1],
     "scim_enabled": true,
     "payment_method_id": 3,
-    "criticality": "Critical"
+    "criticality": "Critical",
+    "yearly_cost": 3000
   },
   {
-    "id": 14,
+    "id": 11,
     "name": "Cloudflare",
     "vendor_id": 14,
     "classification": "core_saas",
@@ -179,6 +150,49 @@
     "owner_ids": [2],
     "scim_enabled": true,
     "payment_method_id": 4,
-    "criticality": "High"
+    "criticality": "High",
+    "yearly_cost": 12500
+  },
+  {
+    "id": 12,
+    "name": "Notion",
+    "vendor_id": 16,
+    "classification": "core_saas",
+    "status": "contract",
+    "billing_schedule": "annually",
+    "category_id": 5,
+    "owner_ids": [3, 5],
+    "scim_enabled": true,
+    "payment_method_id": 2,
+    "criticality": "High",
+    "yearly_cost": 6800
+  },
+  {
+    "id": 13,
+    "name": "Linear",
+    "vendor_id": 17,
+    "classification": "core_saas",
+    "status": "contract",
+    "billing_schedule": "monthly",
+    "category_id": 4,
+    "owner_ids": [3],
+    "scim_enabled": false,
+    "payment_method_id": 1,
+    "criticality": "High",
+    "yearly_cost": 2600
+  },
+  {
+    "id": 14,
+    "name": "Jira Cloud",
+    "vendor_id": 5,
+    "classification": "core_saas",
+    "status": "contract",
+    "billing_schedule": "annually",
+    "category_id": 4,
+    "owner_ids": [3, 4],
+    "scim_enabled": true,
+    "payment_method_id": 2,
+    "criticality": "High",
+    "yearly_cost": 13200
   }
 ]

@@ -12,7 +12,7 @@
 #   DATABASE_URL, JWT_SECRET, INTEGRATION_SECRET_KEY, SCIM_TOKEN,
 #   FRONTEND_URL, PUBLIC_BASE_URL (your public https URLs),
 #   MINIO_*, POSTGRES_*, CRON_SECRET, DB_PATH, MINIO_DATA_PATH (host dirs for volumes),
-#   and turn off SEED_SAMPLE_DATA if desired.
+#   and set SEED_SAMPLE_DATA=false after first deploy if you do not want the bundled sample catalog.
 #
 # After first start: docker compose -f docker-compose.server.yml exec api alembic upgrade head
 #
