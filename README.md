@@ -1,20 +1,6 @@
-<p align="center">
-  <a href="https://github.com/jcoponet/catalogIT">
-    <img src="branding/logo-light.png" alt="CatalogIT" width="400" />
-  </a>
-</p>
+**Open-source IT service catalog and hardware inventory for modern teams.**
 
-<p align="center">
-  <strong>Open-source IT service catalog and hardware inventory for modern teams.</strong>
-</p>
-
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" /></a>
-  <img src="https://img.shields.io/badge/python-3.12+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.12+" />
-  <img src="https://img.shields.io/badge/react-19-61DAFB.svg?logo=react&logoColor=white" alt="React 19" />
-  <img src="https://img.shields.io/badge/postgres-16-4169E1.svg?logo=postgresql&logoColor=white" alt="PostgreSQL 16" />
-  <img src="https://img.shields.io/badge/docker-compose-2496ED.svg?logo=docker&logoColor=white" alt="Docker Compose" />
-</p>
+**[Live demo](https://catalog-it.jmartinuzzi.dev/)** — `admin@catalogit.local` / `admindemo` · sandbox resets every 12 hours
 
 ---
 
@@ -33,19 +19,45 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **API Tokens** — programmatic access for automation and integrations
 - **Backup & Restore** — complete tooling for database and object storage backups
 
+## Live demo
+
+A shared **[CatalogIT demo](https://catalog-it.jmartinuzzi.dev/)** is available so you can explore the app without installing anything.
+
+
+|             |                                                                                          |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| **URL**     | [https://catalog-it.jmartinuzzi.dev/](https://catalog-it.jmartinuzzi.dev/)               |
+| **Sign in** | Email **admin@catalogit.local** and password **admindemo**                             |
+| **Sandbox** | The instance refreshes on a **12-hour** schedule; **all data is reset** on each refresh. |
+
+
+Treat it as a throwaway environment: do not store real or sensitive information.
+
 ## Screenshots
 
-> Screenshots coming soon. Run the [Quick Start](#quick-start) to see CatalogIT in action.
+### Dashboard
+
+![Dashboard overview with all core IT numbers at hand](screenshots/Dashboard.png)
+
+### Services
+
+![Service catalog table with classifications, costs, and status](screenshots/Services.png)
+
+### Settings (SCIM)
+
+![Many settings including OIDC, SCIM integrations, notifications, API docs, and more](screenshots/Settings.png)
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | FastAPI, SQLAlchemy (async), Alembic, Uvicorn |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
-| Database | PostgreSQL 16 |
-| Auth | OIDC (Okta) + SCIM 2.0, local password fallback |
-| Storage | S3-compatible (MinIO locally, AWS S3 in production) |
+
+| Layer    | Technology                                          |
+| -------- | --------------------------------------------------- |
+| Backend  | FastAPI, SQLAlchemy (async), Alembic, Uvicorn       |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS            |
+| Database | PostgreSQL 16                                       |
+| Auth     | OIDC + SCIM 2.0, local password fallback            |
+| Storage  | S3-compatible (MinIO locally, AWS S3 in production) |
+
 
 ## Quick Start
 
@@ -72,16 +84,18 @@ docker compose up --build
 
 Once running:
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:5173 |
-| API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| MinIO Console | http://localhost:9001 |
+
+| Service            | URL                                                      |
+| ------------------ | -------------------------------------------------------- |
+| Frontend           | [http://localhost:5173](http://localhost:5173)           |
+| API                | [http://localhost:8000](http://localhost:8000)           |
+| API Docs (Swagger) | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| MinIO Console      | [http://localhost:9001](http://localhost:9001)           |
+
 
 ### Database migrations
 
-The API runs **`alembic upgrade head` automatically on startup**, so a manual step is usually unnecessary. To apply migrations yourself (for example if the container failed mid-boot):
+The API runs `**alembic upgrade head` automatically on startup**, so a manual step is usually unnecessary. To apply migrations yourself (for example if the container failed mid-boot):
 
 ```bash
 docker compose exec api alembic upgrade head
@@ -89,31 +103,35 @@ docker compose exec api alembic upgrade head
 
 ### Sample data (optional)
 
-CatalogIT can load **bundled demo data** on the **first** API startup when the database has **no services** yet (empty catalog). This is controlled by **`SEED_SAMPLE_DATA`** (see `.env.example`).
+CatalogIT can load **bundled demo data** on the **first** API startup when the database has **no services** yet (empty catalog). This is controlled by `**SEED_SAMPLE_DATA`** (see `.env.example`).
 
-| Location | Role |
-|----------|------|
-| **`backend/sample_data/*.json`** | Source files in the repo (vendors, categories, payment methods, users, services including **yearly cost**, fiscal **cost records**, **service history**, **laptops**, **laptop hardware costs**). |
-| **Docker API image** | Same JSON is copied to **`/app/sample_data`**; the container sets **`SEED_DIR`** to that path. |
-| **`placeholder data/`** | Symlinks to `backend/sample_data` plus **`bulk_load_api.py`** / **`purge_catalog_api.py`** for loading or clearing via the HTTP API (useful when you cannot run the DB seed script directly). |
+
+| Location                         | Role                                                                                                                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `**backend/sample_data/*.json`** | Source files in the repo (vendors, categories, payment methods, users, services including **yearly cost**, fiscal **cost records**, **service history**, **laptops**, **laptop hardware costs**). |
+| **Docker API image**             | Same JSON is copied to `**/app/sample_data`**; the container sets `**SEED_DIR`** to that path.                                                                                                    |
+| `**placeholder data/**`          | Symlinks to `backend/sample_data` plus `**bulk_load_api.py**` / `**purge_catalog_api.py**` for loading or clearing via the HTTP API (useful when you cannot run the DB seed script directly).     |
+
 
 **Local development:** set `SEED_SAMPLE_DATA=true` in `.env`, start the stack, log in with the bootstrap admin from `.env`, and explore the pre-filled catalog and hardware.
 
-**Production:** prefer `SEED_SAMPLE_DATA=false` after the first deploy if you do not want the demo catalog on new empty databases. The production compose file ([`docker-compose.server.yml`](docker-compose.server.yml)) defaults this to false.
+**Production:** prefer `SEED_SAMPLE_DATA=false` after the first deploy if you do not want the demo catalog on new empty databases. The production compose file (`[docker-compose.server.yml](docker-compose.server.yml)`) defaults this to false.
 
-**Releases:** multi-arch images are built with **`make release`** or **`docker buildx bake`** (see [`docker-bake.hcl`](docker-bake.hcl)); images are tagged with the release version and **`latest`**. For server deploys you can pin **`CATALOGIT_TAG`** (for example `1.1.1`) so `docker-compose.server.yml` pulls a specific tag instead of `latest`.
+**Releases:** multi-arch images are built with `**make release`** or `**docker buildx bake`** (see `[docker-bake.hcl](docker-bake.hcl)`); images are tagged with the release version and `**latest**`. For server deploys you can pin `**CATALOGIT_TAG**` (for example `1.1.1`) so `docker-compose.server.yml` pulls a specific tag instead of `latest`.
 
 ## Documentation
 
-| Topic | Guide |
-|-------|-------|
-| **Email templates** (subject, HTML upload, logos, preview) | [docs/email-templates.md](docs/email-templates.md) |
-| Integrations overview | [docs/integrations/README.md](docs/integrations/README.md) |
-| Gmail setup | [docs/integrations/gmail.md](docs/integrations/gmail.md) |
-| Slack setup | [docs/integrations/slack.md](docs/integrations/slack.md) |
-| Telegram setup | [docs/integrations/telegram.md](docs/integrations/telegram.md) |
-| Webhook setup | [docs/integrations/webhook.md](docs/integrations/webhook.md) |
-| Backup & Restore | [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) |
+
+| Topic                                                      | Guide                                                                          |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **Email templates** (subject, HTML upload, logos, preview) | [docs/email-templates.md](docs/email-templates.md)                             |
+| Integrations overview                                      | [docs/integrations/README.md](docs/integrations/README.md)                     |
+| Gmail setup                                                | [docs/integrations/gmail.md](docs/integrations/gmail.md)                       |
+| Slack setup                                                | [docs/integrations/slack.md](docs/integrations/slack.md)                       |
+| Telegram setup                                             | [docs/integrations/telegram.md](docs/integrations/telegram.md)                 |
+| Webhook setup                                              | [docs/integrations/webhook.md](docs/integrations/webhook.md)                   |
+| Backup & Restore                                           | [docs/operations/backup-and-restore.md](docs/operations/backup-and-restore.md) |
+
 
 ## Operations
 
@@ -140,6 +158,7 @@ catalogIT/
 │   └── operations/         # Backup and restore procedures
 ├── email-templates/        # Canned HTML you can copy, edit, and upload in the app
 ├── branding/          # Logo assets (light/dark, horizontal/square)
+├── screenshots/       # README screenshots (live demo)
 ├── scripts/           # Utility scripts (backup, etc.)
 ├── docker-compose.yml
 ├── docker-compose.server.yml  # Production-oriented stack (pinned images via CATALOGIT_TAG)
