@@ -79,11 +79,29 @@ Once running:
 | API Docs (Swagger) | http://localhost:8000/docs |
 | MinIO Console | http://localhost:9001 |
 
-### Running Migrations
+### Database migrations
+
+The API runs **`alembic upgrade head` automatically on startup**, so a manual step is usually unnecessary. To apply migrations yourself (for example if the container failed mid-boot):
 
 ```bash
 docker compose exec api alembic upgrade head
 ```
+
+### Sample data (optional)
+
+CatalogIT can load **bundled demo data** on the **first** API startup when the database has **no services** yet (empty catalog). This is controlled by **`SEED_SAMPLE_DATA`** (see `.env.example`).
+
+| Location | Role |
+|----------|------|
+| **`backend/sample_data/*.json`** | Source files in the repo (vendors, categories, payment methods, users, services including **yearly cost**, fiscal **cost records**, **service history**, **laptops**, **laptop hardware costs**). |
+| **Docker API image** | Same JSON is copied to **`/app/sample_data`**; the container sets **`SEED_DIR`** to that path. |
+| **`placeholder data/`** | Symlinks to `backend/sample_data` plus **`bulk_load_api.py`** / **`purge_catalog_api.py`** for loading or clearing via the HTTP API (useful when you cannot run the DB seed script directly). |
+
+**Local development:** set `SEED_SAMPLE_DATA=true` in `.env`, start the stack, log in with the bootstrap admin from `.env`, and explore the pre-filled catalog and hardware.
+
+**Production:** prefer `SEED_SAMPLE_DATA=false` after the first deploy if you do not want the demo catalog on new empty databases. The production compose file ([`docker-compose.server.yml`](docker-compose.server.yml)) defaults this to false.
+
+**Releases:** multi-arch images are built with **`make release`** or **`docker buildx bake`** (see [`docker-bake.hcl`](docker-bake.hcl)); images are tagged with the release version and **`latest`**. For server deploys you can pin **`CATALOGIT_TAG`** (for example `1.1.1`) so `docker-compose.server.yml` pulls a specific tag instead of `latest`.
 
 ## Documentation
 
@@ -111,6 +129,7 @@ catalogIT/
 ├── backend/           # FastAPI application
 │   ├── app/           # Source code (routers, models, schemas)
 │   ├── alembic/       # Database migrations
+│   ├── sample_data/   # Optional seed JSON (bundled in API image for SEED_SAMPLE_DATA)
 │   └── Dockerfile
 ├── frontend/          # React (Vite) application
 │   ├── src/           # Components, pages, hooks, types
@@ -123,7 +142,9 @@ catalogIT/
 ├── branding/          # Logo assets (light/dark, horizontal/square)
 ├── scripts/           # Utility scripts (backup, etc.)
 ├── docker-compose.yml
-├── Makefile
+├── docker-compose.server.yml  # Production-oriented stack (pinned images via CATALOGIT_TAG)
+├── docker-bake.hcl    # Multi-arch image build (API + UI; version + latest tags)
+├── Makefile           # e.g. make release — push images; make backup-local
 └── .env.example       # Environment variable template
 ```
 

@@ -1,20 +1,24 @@
 # Production-oriented stack for a host behind Nginx Proxy Manager (or similar).
 #
-# Images (build and push before deploy):
-#   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.1.1 -t jonymaster/catalogit-api:latest --push ./backend
-#   docker buildx build --platform linux/amd64,linux/arm64 -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.1.1 -t jonymaster/catalogit-ui:latest --push .
+# Images (pre-built multi-arch on Docker Hub). Build and push from the repo root:
+#   make release
+#   # or: TAG=1.1.1 docker buildx bake --push   (see docker-bake.hcl — publishes semver + :latest)
+#
+# Pin a release in production (optional): set CATALOGIT_TAG=1.1.1 in the environment.
+# Omit it or use `latest` to track the newest image (same tag `make release` updates).
 #
 # Portainer: add the same variables in the stack Environment (Git deploy omits
-# gitignored `.env`). Local `docker compose` still substitutes ${...} from a
-# project `.env` if present.
+# gitignored `.env`). Local `docker compose -f docker-compose.server.yml` substitutes
+# ${...} from a project `.env` when you pass `--env-file .env` or set variables in the shell.
 #
 # Copy `.env.example` to `.env` on the server (or set in Portainer) at least:
 #   DATABASE_URL, JWT_SECRET, INTEGRATION_SECRET_KEY, SCIM_TOKEN,
 #   FRONTEND_URL, PUBLIC_BASE_URL (your public https URLs),
 #   MINIO_*, POSTGRES_*, CRON_SECRET, DB_PATH, MINIO_DATA_PATH (host dirs for volumes),
-#   and set SEED_SAMPLE_DATA=false after first deploy if you do not want the bundled sample catalog.
+#   SEED_SAMPLE_DATA (default false — set true only on first boot if you want bundled sample_data).
 #
-# After first start: docker compose -f docker-compose.server.yml exec api alembic upgrade head
+# Migrations: the API container runs `alembic upgrade head` on startup (see app lifespan).
+# Manual `docker compose ... exec api alembic upgrade head` is only needed for one-off fixes.
 #
 # NPM: one hostname with path routing — "/" -> ui:80, "/api", "/auth", "/scim", "/docs",
 # "/openapi.json" -> api:8000 — so the browser keeps a single origin (matches frontend axios baseURL "/").
@@ -62,7 +66,7 @@ services:
       retries: 5
 
   api:
-    image: jonymaster/catalogit-api:latest
+    image: jonymaster/catalogit-api:${CATALOGIT_TAG:-latest}
     # If import fails for appuser, uncomment until the image is rebuilt with correct ownership:
     # user: "0:0"
     restart: unless-stopped
@@ -100,7 +104,7 @@ services:
 
   ui:
     # Image must serve static files on container port 80 (Dockerfile.prod), not Vite dev.
-    image: jonymaster/catalogit-ui:latest
+    image: jonymaster/catalogit-ui:${CATALOGIT_TAG:-latest}
     restart: unless-stopped
     ports:
       - "${UI_PUBLISH:-8080}:80"
