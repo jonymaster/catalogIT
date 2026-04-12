@@ -1,8 +1,8 @@
 # Production-oriented stack for a host behind Nginx Proxy Manager (or similar).
 #
 # Images (build and push before deploy):
-#   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.0.0 --push ./backend
-#   docker buildx build --platform linux/amd64,linux/arm64 -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.0.0 --push .
+#   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.1.1 -t jonymaster/catalogit-api:latest --push ./backend
+#   docker buildx build --platform linux/amd64,linux/arm64 -f frontend/Dockerfile.prod -t jonymaster/catalogit-ui:1.1.1 -t jonymaster/catalogit-ui:latest --push .
 #
 # Portainer: add the same variables in the stack Environment (Git deploy omits
 # gitignored `.env`). Local `docker compose` still substitutes ${...} from a

@@ -1,6 +1,6 @@
 # Build context is ./backend (not the repo root). ``sample_data/*.json`` is included for SEED_SAMPLE_DATA.
 #
-#   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.0.0 --push ./backend
+#   docker buildx build --platform linux/amd64,linux/arm64 -t jonymaster/catalogit-api:1.1.1 -t jonymaster/catalogit-api:latest --push ./backend
 #
 # For local load only: add --load (single-platform) instead of --push.
 

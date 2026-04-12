@@ -123,7 +123,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     setup_logging()
     cfg = get_settings()
-    app = FastAPI(title="CatalogIT", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="CatalogIT", version="1.1.1", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,

@@ -1,5 +1,5 @@
 variable "TAG" {
-  default = "1.0.0"
+  default = "1.1.1"
 }
 
 group "default" {
@@ -9,13 +9,19 @@ group "default" {
 target "ui" {
   context    = "."
   dockerfile = "frontend/Dockerfile.prod"
-  tags       = ["jonymaster/catalogit-ui:${TAG}"]
-  platforms  = ["linux/amd64", "linux/arm64"]
+  tags = [
+    "jonymaster/catalogit-ui:${TAG}",
+    "jonymaster/catalogit-ui:latest",
+  ]
+  platforms = ["linux/amd64", "linux/arm64"]
 }
 
 target "api" {
   context    = "./backend"
   dockerfile = "Dockerfile"
-  tags       = ["jonymaster/catalogit-api:${TAG}"]
-  platforms  = ["linux/amd64", "linux/arm64"]
+  tags = [
+    "jonymaster/catalogit-api:${TAG}",
+    "jonymaster/catalogit-api:latest",
+  ]
+  platforms = ["linux/amd64", "linux/arm64"]
 }
