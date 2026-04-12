@@ -15,13 +15,13 @@ interface Providers {
 }
 
 const inputClassName =
-  "mt-1 block w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 shadow-sm transition-colors focus:border-gray-900 dark:focus:border-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900/10 dark:focus:ring-gray-100/10";
+  "mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 shadow-sm transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
 
 function ProvidersLoading() {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14">
       <div
-        className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-gray-900 dark:border-t-gray-100"
+        className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-brand-600"
         aria-hidden
       />
       <p className="text-sm text-gray-500 dark:text-gray-400">Loading sign-in options…</p>
@@ -92,7 +92,7 @@ function LocalLoginForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-gray-900 dark:bg-gray-100 px-4 py-3 text-sm font-semibold text-white dark:text-gray-900 shadow-sm transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
       >
         {loading ? "Signing in…" : "Sign in"}
       </button>
@@ -164,7 +164,7 @@ export function Login() {
             <button
               type="button"
               onClick={login}
-              className="w-full rounded-xl bg-gray-900 dark:bg-gray-100 px-4 py-3.5 text-center text-sm font-semibold text-white dark:text-gray-900 shadow-md transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2"
+              className="w-full rounded-xl bg-brand-600 px-4 py-3.5 text-center text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
               Sign in with {oidc.provider_name || "SSO"}
             </button>

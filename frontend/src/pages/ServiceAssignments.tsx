@@ -177,7 +177,7 @@ export function ServiceAssignments() {
         </div>
       )}
 
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
             Assigned users
@@ -195,7 +195,7 @@ export function ServiceAssignments() {
                 setManageOpen(true);
               }}
               disabled={saving}
-              className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+              className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
               Manage user assignment
             </button>
@@ -242,7 +242,7 @@ export function ServiceAssignments() {
             aria-label="Close"
             onClick={() => !saving && setManageOpen(false)}
           />
-          <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg border border-gray-200 dark:border-gray-700 bg-white shadow-xl dark:bg-gray-900">
+          <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-gray-200 dark:border-gray-800 bg-white shadow-xl dark:bg-gray-900">
             <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
               <h2
                 id="manage-assignments-title"
@@ -373,7 +373,7 @@ export function ServiceAssignments() {
                 type="button"
                 disabled={saving || !modalDirty}
                 onClick={handleSaveModal}
-                className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save"}
               </button>

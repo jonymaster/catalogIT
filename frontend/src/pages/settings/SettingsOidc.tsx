@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import client from "../../api/client";
+import { PageTransition } from "../../components/PageTransition";
 import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
 
 interface OidcConfig {
@@ -89,9 +90,10 @@ export function SettingsOidc() {
   }
 
   return (
+    <PageTransition>
     <form
       onSubmit={handleSave}
-      className="max-w-xl space-y-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
+      className="max-w-xl space-y-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6"
     >
       <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
         OIDC Provider Configuration
@@ -141,7 +143,7 @@ export function SettingsOidc() {
             type="checkbox"
             checked={config.enabled}
             onChange={(e) => update("enabled", e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-900 accent-gray-900 focus:ring-gray-500 dark:accent-gray-100 dark:focus:ring-gray-400"
+            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 text-brand-600 accent-brand-600 focus:ring-2 focus:ring-brand-500/30"
           />
           <label htmlFor="enabled" className="text-sm font-medium text-gray-700 dark:text-gray-200">
             Enable OIDC login
@@ -198,7 +200,7 @@ export function SettingsOidc() {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save"}
         </button>
@@ -216,6 +218,7 @@ export function SettingsOidc() {
         </p>
       </div>
     </form>
+    </PageTransition>
   );
 }
 
@@ -245,7 +248,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
+        className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
       />
     </div>
   );

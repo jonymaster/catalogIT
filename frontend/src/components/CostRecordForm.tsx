@@ -103,7 +103,7 @@ export function CostRecordForm({ serviceId, initial }: Props) {
   }
 
   const inputCls =
-    "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400";
+    "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
   const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200";
 
   return (
@@ -202,7 +202,7 @@ export function CostRecordForm({ serviceId, initial }: Props) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {saving
             ? "Saving..."

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { PageTransition } from "../components/PageTransition";
 import { useAuth } from "../context/useAuth";
 import { BarChart } from "../components/charts/BarChart";
 import { SearchInput } from "../components/SearchInput";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import type { Service, Laptop } from "../types/models";
+import { DashboardSkeleton } from "../components/Skeleton";
 import {
   fmtFull,
   sumForYearAndClassification,
@@ -51,17 +53,24 @@ function StatCard({
   subtext,
   color,
   onClick,
+  stagger,
 }: {
   label: string;
   value: string | number;
   subtext?: string;
   color?: string;
   onClick?: () => void;
+  stagger?: 1 | 2 | 3 | 4 | 5 | 6;
 }) {
+  const staggerClass = stagger ? `animate-stagger-${stagger}` : "";
   return (
     <div
       onClick={onClick}
-      className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 ${onClick ? "cursor-pointer transition-shadow hover:shadow-md" : ""}`}
+      className={`rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm ${staggerClass} ${
+        onClick
+          ? "cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-brand-200 dark:hover:border-brand-800"
+          : ""
+      }`}
     >
       <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
         {label}
@@ -173,17 +182,13 @@ export function Dashboard() {
   );
 
   if (loading) {
-    return (
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
-        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const hasCostData = records.length > 0;
 
   return (
+    <PageTransition>
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -216,7 +221,7 @@ export function Dashboard() {
             />
           </div>
           {searchOpen && normalizedSearch && (
-            <div className="absolute left-0 top-full z-20 mt-3 w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-xl">
+            <div className="animate-scale-in absolute left-0 top-full z-20 mt-3 w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xl">
               <div className="space-y-4">
                 {serviceMatches.length > 0 && (
                   <div>
@@ -303,19 +308,23 @@ export function Dashboard() {
           label="Total Services"
           value={services.length}
           onClick={() => navigate("/services")}
+          stagger={1}
         />
         <StatCard
           label="Total Laptops"
           value={laptops.length}
           onClick={() => navigate("/hardware")}
+          stagger={2}
         />
         <StatCard
           label="Assigned Laptops"
           value={laptops.filter((l) => l.status === "Assigned").length}
+          stagger={3}
         />
         <StatCard
           label="In Stock"
           value={laptops.filter((l) => l.status === "In Stock").length}
+          stagger={4}
         />
       </div>
 
@@ -326,19 +335,21 @@ export function Dashboard() {
             <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Fiscal year:
             </span>
-            {years.map((y) => (
-              <button
-                key={y}
-                onClick={() => setDashYear(y)}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                  dashYear === y
-                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:bg-gray-700"
-                }`}
-              >
-                {y}
-              </button>
-            ))}
+            <div className="inline-flex gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+              {years.map((y) => (
+                <button
+                  key={y}
+                  onClick={() => setDashYear(y)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-150 ${
+                    dashYear === y
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Cost KPIs (actual records only — matches chart) */}
@@ -371,7 +382,7 @@ export function Dashboard() {
           )}
 
           {/* Total spend by year */}
-          <div className="mt-6 min-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+          <div className="mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
             <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Total spend by year (actual)
             </h3>
@@ -379,7 +390,7 @@ export function Dashboard() {
               data={years.map((y) => ({
                 label: String(y),
                 value: costByYear[y] ?? 0,
-                color: y === dashYear ? "#4f46e5" : "#c7d2fe",
+                color: y === dashYear ? "var(--color-brand-600)" : "var(--color-brand-200)",
               }))}
               onBarClick={(i) => {
                 const y = years[i];
@@ -388,7 +399,7 @@ export function Dashboard() {
             />
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 rounded-lg border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900 dark:bg-indigo-950/40 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50/80 p-5 dark:border-brand-900 dark:bg-brand-950/40 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 IT Financial Report
@@ -399,7 +410,7 @@ export function Dashboard() {
             </div>
             <Link
               to="/costs"
-              className="inline-flex shrink-0 items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+              className="inline-flex shrink-0 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
             >
               Open IT Financial Report
             </Link>
@@ -407,5 +418,6 @@ export function Dashboard() {
         </>
       )}
     </div>
+    </PageTransition>
   );
 }

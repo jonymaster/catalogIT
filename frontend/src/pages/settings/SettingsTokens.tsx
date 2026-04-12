@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type FormEvent } from "react";
 import client from "../../api/client";
 import { useAuth } from "../../context/useAuth";
 import { formatDateTime } from "../../utils/formatting";
+import { PageTransition } from "../../components/PageTransition";
 
 interface ApiToken {
   id: string;
@@ -85,12 +86,13 @@ export function SettingsTokens() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">API Tokens</h2>
 
       <form
         onSubmit={handleCreate}
-        className="flex items-end gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
+        className="flex items-end gap-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4"
       >
         <div className="flex-1">
           <label
@@ -105,13 +107,13 @@ export function SettingsTokens() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. CI pipeline"
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </div>
         <button
           type="submit"
           disabled={creating || !name.trim()}
-          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {creating ? "Generating..." : "Generate token"}
         </button>
@@ -124,7 +126,7 @@ export function SettingsTokens() {
       {/* One-time token reveal modal */}
       <dialog
         ref={dialogRef}
-        className="w-full max-w-lg rounded-lg border border-gray-200 dark:border-gray-700 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
+        className="w-full max-w-lg rounded-xl border border-gray-200 dark:border-gray-800 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
         onClose={() => { setModalToken(null); setCopied(false); }}
       >
         <div className="p-6 space-y-4">
@@ -151,7 +153,7 @@ export function SettingsTokens() {
             <button
               type="button"
               onClick={handleCloseModal}
-              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
             >
               Done
             </button>
@@ -162,7 +164,7 @@ export function SettingsTokens() {
       {tokens.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No API tokens yet.</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-950">
               <tr>
@@ -233,5 +235,6 @@ export function SettingsTokens() {
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }

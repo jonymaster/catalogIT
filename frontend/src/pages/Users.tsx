@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import client from "../api/client";
 import { Badge } from "../components/Badge";
+import { PageTransition } from "../components/PageTransition";
 import { SearchInput } from "../components/SearchInput";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
@@ -266,6 +267,7 @@ export function Users() {
   }
 
   return (
+    <PageTransition>
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -281,7 +283,7 @@ export function Users() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+            className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
             Add user
           </button>
@@ -424,7 +426,7 @@ export function Users() {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-50"
+                  className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {creating ? "Creating..." : "Create"}
                 </button>
@@ -481,7 +483,7 @@ export function Users() {
                 <button
                   type="submit"
                   disabled={pwdSaving}
-                  className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-50"
+                  className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {pwdSaving ? "Saving..." : "Save"}
                 </button>
@@ -502,7 +504,7 @@ export function Users() {
               placeholder="Search users..."
             />
           </div>
-          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-950">
                 <tr>
@@ -747,7 +749,7 @@ export function Users() {
                               type="button"
                               onClick={() => saveEditing(user.id)}
                               disabled={saving === user.id}
-                              className="inline-flex items-center gap-1 rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
                             >
                               <CheckIcon />
                               Save
@@ -814,6 +816,7 @@ export function Users() {
         </>
       )}
     </div>
+    </PageTransition>
   );
 }
 

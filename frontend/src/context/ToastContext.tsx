@@ -55,7 +55,7 @@ function ToastViewport({ toast }: { toast: ToastState | null }) {
     <div className="pointer-events-none fixed right-4 top-4 z-50">
       <div
         key={toast.id}
-        className={`min-w-72 rounded-lg border px-4 py-3 text-sm shadow-lg ${tone}`}
+        className={`min-w-72 animate-fade-in-up rounded-lg border px-4 py-3 text-sm shadow-lg ${tone}`}
       >
         {toast.text}
       </div>

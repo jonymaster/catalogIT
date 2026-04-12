@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import client from "../api/client";
 import { LaptopForm } from "../components/LaptopForm";
+import { PageTransition } from "../components/PageTransition";
+import { FormSkeleton } from "../components/Skeleton";
 import type { HardwareLocation, HardwareStatus, Laptop } from "../types/models";
 
 export function LaptopEdit() {
@@ -82,7 +84,7 @@ export function LaptopEdit() {
     setHardwareLocationId(response.data.hardware_location_id ?? "");
   }
 
-  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
+  if (loading) return <FormSkeleton />;
   if (!laptop)
     return <p className="text-sm text-red-600">Laptop not found.</p>;
 
@@ -93,6 +95,7 @@ export function LaptopEdit() {
   const rowGridCls = "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3";
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div>
         <Link
@@ -101,9 +104,14 @@ export function LaptopEdit() {
         >
           &larr; Back to {laptop.model_name}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          Edit {laptop.model_name}
-        </h1>
+        <div className="mt-2 flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {laptop.model_name}
+          </h1>
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+            Editing
+          </span>
+        </div>
         <div className="mt-3 flex gap-2">
           <button
             type="button"
@@ -118,7 +126,7 @@ export function LaptopEdit() {
           </button>
         </div>
       </div>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 border-l-4 border-l-brand-500 bg-white dark:bg-gray-900 p-6 shadow-sm">
         {laptop.is_active ? (
           <LaptopForm initial={laptop} />
         ) : (
@@ -183,7 +191,7 @@ export function LaptopEdit() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 disabled:opacity-50"
+              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save"}
             </button>
@@ -191,5 +199,6 @@ export function LaptopEdit() {
         )}
       </div>
     </div>
+    </PageTransition>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import client from "../api/client";
 import { CostRecordForm } from "../components/CostRecordForm";
+import { PageTransition } from "../components/PageTransition";
 import type { CostRecord } from "../types/models";
 
 export function CostRecordEdit() {
@@ -23,6 +24,7 @@ export function CostRecordEdit() {
     return <p className="text-sm text-red-600">Cost record not found.</p>;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div>
         <Link
@@ -35,9 +37,10 @@ export function CostRecordEdit() {
           Edit Cost Record
         </h1>
       </div>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <CostRecordForm serviceId={id} initial={record} />
       </div>
     </div>
+    </PageTransition>
   );
 }

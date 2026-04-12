@@ -140,7 +140,7 @@ export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
           }}
           className={`rounded-md p-1 transition-colors ${
             filterActive
-              ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+              ? "bg-brand-600 text-white"
               : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200"
           }`}
         >
@@ -175,7 +175,7 @@ export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
                     >
                       <input
                         type="checkbox"
-                        className="h-4 w-4 shrink-0 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
+                        className="h-4 w-4 shrink-0 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-brand-500/30"
                         checked={props.selectedValues.includes(option)}
                         onChange={() =>
                           props.onSelectedValuesChange(
@@ -196,7 +196,7 @@ export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
                 value={props.filterValue}
                 onChange={(event) => props.onFilterChange(event.target.value)}
                 placeholder={filterPlaceholder}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               />
             )}
             <div className="mt-3 flex justify-end gap-2">
@@ -210,7 +210,7 @@ export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
               <button
                 type="button"
                 onClick={closeMenu}
-                className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+                className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-700"
               >
                 Done
               </button>

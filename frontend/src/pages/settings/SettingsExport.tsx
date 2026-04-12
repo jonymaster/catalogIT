@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import client from "../../api/client";
 import type { AdminExportJob } from "../../types/models";
 import { useToast } from "../../context/useToast";
+import { PageTransition } from "../../components/PageTransition";
 
 const POLL_MS = 1500;
 
@@ -107,7 +108,8 @@ export function SettingsExport() {
             : "idle";
 
   return (
-    <div className="max-w-xl space-y-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+    <PageTransition>
+    <div className="max-w-xl space-y-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
       <div>
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Download all data</h2>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
@@ -138,7 +140,7 @@ export function SettingsExport() {
           type="button"
           disabled={busy}
           onClick={() => void handlePrepare()}
-          className="inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+          className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {busy ? "Preparing…" : "Prepare download"}
         </button>
@@ -168,5 +170,6 @@ export function SettingsExport() {
         ) : null}
       </div>
     </div>
+    </PageTransition>
   );
 }

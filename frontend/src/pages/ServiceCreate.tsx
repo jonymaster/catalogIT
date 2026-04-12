@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
+import { PageTransition } from "../components/PageTransition";
 import { ServiceForm } from "../components/ServiceForm";
 
 export function ServiceCreate() {
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div>
         <Link
@@ -15,9 +17,10 @@ export function ServiceCreate() {
           New Service
         </h1>
       </div>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <ServiceForm />
       </div>
     </div>
+    </PageTransition>
   );
 }

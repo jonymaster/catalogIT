@@ -66,7 +66,7 @@ export function ServiceCosts() {
         {canEdit && (
           <Link
             to={`/services/${service.id}/costs/new`}
-            className="rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+            className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
             Add Cost Record
           </Link>
@@ -78,7 +78,7 @@ export function ServiceCosts() {
           No cost records yet for this service.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-950">
               <tr>

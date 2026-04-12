@@ -3,6 +3,7 @@ import client from "../../api/client";
 import { useAuth } from "../../context/useAuth";
 import { formatDateTime } from "../../utils/formatting";
 import type { GlobalAuditEventRow, PaginatedGlobalAudit } from "../../types/models";
+import { PageTransition } from "../../components/PageTransition";
 
 const PER_PAGE = 50;
 
@@ -131,6 +132,7 @@ export function SettingsAuditLog() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Audit logs</h1>
@@ -165,7 +167,7 @@ export function SettingsAuditLog() {
       ) : items.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No events yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-950">
               <tr>
@@ -267,5 +269,6 @@ export function SettingsAuditLog() {
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }

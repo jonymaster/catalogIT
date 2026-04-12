@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import "./CostsReport.print.css";
 import { BarChart } from "../components/charts/BarChart";
+import { PageTransition } from "../components/PageTransition";
 import { StackedBar } from "../components/charts/StackedBar";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import {
@@ -335,6 +336,7 @@ export function CostsReport() {
   const hasData = filteredRecords.length > 0;
 
   return (
+    <PageTransition>
     <div className="costs-report costs-report-print text-gray-900 dark:text-gray-100">
       <style>{`
         @media print {
@@ -396,7 +398,7 @@ export function CostsReport() {
         </ul>
       </div>
 
-      <div className="print:hidden mt-6 space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+      <div className="print:hidden mt-6 space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <MultiStringSelect
             id="cr-cat"
@@ -424,7 +426,7 @@ export function CostsReport() {
                   onClick={() => setSource(val)}
                   className={`rounded-md px-3 py-1 text-xs font-medium ${
                     source === val
-                      ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                      ? "bg-brand-600 text-white"
                       : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                   }`}
                 >
@@ -479,7 +481,7 @@ export function CostsReport() {
               onClick={() => setComparisonMode(m)}
               className={`rounded-md px-3 py-1 text-xs font-medium ${
                 comparisonMode === m
-                  ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                  ? "bg-brand-600 text-white"
                   : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               }`}
             >
@@ -523,7 +525,7 @@ export function CostsReport() {
                   : "grid-cols-2 sm:grid-cols-4 print:grid-cols-4"
               }`}
             >
-              <div className="print-kpi-card rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+              <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                 <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   {RECORD_TYPE_LABELS[comparisonTypes[0]]} ({displayYear})
                 </p>
@@ -532,7 +534,7 @@ export function CostsReport() {
                 </p>
               </div>
               {!isOnlyActual && comparisonTypes[1] !== undefined && (
-                <div className="print-kpi-card rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+                <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                   <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {RECORD_TYPE_LABELS[comparisonTypes[1]]} ({displayYear})
                   </p>
@@ -541,7 +543,7 @@ export function CostsReport() {
                   </p>
                 </div>
               )}
-              <div className="print-kpi-card rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+              <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                 <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   YoY {RECORD_TYPE_LABELS[comparisonTypes[0]]} ({displayYear})
                 </p>
@@ -558,7 +560,7 @@ export function CostsReport() {
                 </p>
               </div>
               {!isOnlyActual && comparisonTypes[1] !== undefined && (
-                <div className="print-kpi-card rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
+                <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                   <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     YoY {RECORD_TYPE_LABELS[comparisonTypes[1]]} ({displayYear})
                   </p>
@@ -589,7 +591,7 @@ export function CostsReport() {
                 onClick={() => setFocusYear(y)}
                 className={`mr-1 rounded px-2 py-0.5 text-xs font-medium ${
                   displayYear === y
-                    ? "bg-indigo-600 text-white"
+                    ? "bg-brand-600 text-white"
                     : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
                 }`}
               >
@@ -599,7 +601,7 @@ export function CostsReport() {
           </div>
 
           {isOnlyActual ? (
-            <div className="print-chart-card mt-6 min-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 print:break-inside-avoid">
+            <div className="print-chart-card mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
               <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 Total spend by year (actual)
               </h2>
@@ -617,7 +619,7 @@ export function CostsReport() {
             </div>
           ) : (
             <div className="mt-6 grid gap-4 lg:grid-cols-2 print:grid-cols-1">
-              <div className="print-chart-card min-h-[280px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 print:break-inside-avoid">
+              <div className="print-chart-card min-h-[280px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
                 <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {RECORD_TYPE_LABELS[comparisonTypes[0]]} — total by year
                 </h2>
@@ -634,7 +636,7 @@ export function CostsReport() {
                 />
               </div>
               {comparisonTypes[1] !== undefined && (
-                <div className="print-chart-card min-h-[280px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 print:break-inside-avoid">
+                <div className="print-chart-card min-h-[280px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
                   <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     {RECORD_TYPE_LABELS[comparisonTypes[1]]} — total by year
                   </h2>
@@ -655,7 +657,7 @@ export function CostsReport() {
           )}
 
           {categoryNamesForStackA.length > 0 && (
-            <div className="print-chart-card mt-4 min-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 print:break-inside-avoid">
+            <div className="print-chart-card mt-4 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {isOnlyActual
@@ -689,7 +691,7 @@ export function CostsReport() {
           )}
 
           {!isOnlyActual && categoryNamesForStackB.length > 0 && comparisonTypes[1] !== undefined && (
-            <div className="print-chart-card mt-4 min-h-[300px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 print:break-inside-avoid">
+            <div className="print-chart-card mt-4 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {RECORD_TYPE_LABELS[comparisonTypes[1]]} — spend by category
@@ -720,7 +722,7 @@ export function CostsReport() {
             </div>
           )}
 
-          <div className="print-table-section mt-8 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 print:break-inside-avoid">
+          <div className="print-table-section mt-8 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 print:break-inside-avoid">
             <h2 className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
               Line items ({sortedDetail.length})
             </h2>
@@ -801,5 +803,6 @@ export function CostsReport() {
         </>
       )}
     </div>
+    </PageTransition>
   );
 }

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import client from "../api/client";
+import { PageTransition } from "../components/PageTransition";
+import { DetailPageSkeleton } from "../components/Skeleton";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
+import { PencilSquareIcon } from "../components/Icons";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import type { CostRecord, Laptop } from "../types/models";
@@ -57,10 +60,11 @@ export function LaptopDetail() {
     loadCost();
   }, [loadCost]);
 
-  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
+  if (loading) return <DetailPageSkeleton />;
   if (!laptop) return <p className="text-sm text-red-600">Laptop not found.</p>;
 
   return (
+    <PageTransition>
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div>
@@ -73,18 +77,17 @@ export function LaptopDetail() {
           <p className="text-sm text-gray-500 dark:text-gray-400">S/N: {laptop.serial_number}</p>
         </div>
         {canEdit && (
-          <div className="flex gap-2">
-            <Link
-              to={`/hardware/${id}/edit`}
-              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Edit
-            </Link>
-          </div>
+          <Link
+            to={`/hardware/${id}/edit`}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+            Edit
+          </Link>
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
         <dl className="space-y-6">
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
             <Field label="Status">
@@ -139,5 +142,6 @@ export function LaptopDetail() {
         <AuditTimeline tableName="laptops" recordId={laptop.id} />
       </div>
     </div>
+    </PageTransition>
   );
 }

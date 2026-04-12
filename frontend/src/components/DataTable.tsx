@@ -34,11 +34,11 @@ export function DataTable<T extends { id: string }>({
     : columns;
 
   return (
-    <div className="overflow-visible rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <div className="overflow-visible rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-950">
-            <tr>
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+          <thead>
+            <tr className="bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-sm">
               {active.map((col) => (
                 <th
                   key={col.key}
@@ -52,16 +52,21 @@ export function DataTable<T extends { id: string }>({
           </thead>
           <tbody
             className={
-              striped ? "bg-white dark:bg-gray-900" : "divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900"
+              striped ? "bg-white dark:bg-gray-900" : "divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-gray-900"
             }
           >
             {data.length === 0 && (
               <tr>
                 <td
                   colSpan={active.length}
-                  className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                  className="px-4 py-12 text-center"
                 >
-                  No records found.
+                  <div className="flex flex-col items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-8 w-8 text-gray-300 dark:text-gray-600">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                    </svg>
+                    <p className="text-sm text-gray-400 dark:text-gray-500">No records found</p>
+                  </div>
                 </td>
               </tr>
             )}
@@ -72,15 +77,15 @@ export function DataTable<T extends { id: string }>({
                 className={
                   striped
                     ? [
-                        "[&:nth-child(odd)]:bg-white dark:[&:nth-child(odd)]:bg-gray-900 [&:nth-child(even)]:bg-gray-50 dark:[&:nth-child(even)]:bg-gray-950",
+                        "[&:nth-child(odd)]:bg-white dark:[&:nth-child(odd)]:bg-gray-900 [&:nth-child(even)]:bg-gray-50/50 dark:[&:nth-child(even)]:bg-gray-950/50",
                         onRowClick
-                          ? "cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                          ? "cursor-pointer transition-colors duration-100 hover:bg-brand-50/50 dark:hover:bg-brand-950/30"
                           : "",
                       ]
                         .filter(Boolean)
                         .join(" ")
                     : onRowClick
-                      ? "cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                      ? "cursor-pointer transition-colors duration-100 hover:bg-brand-50/50 dark:hover:bg-brand-950/30"
                       : undefined
                 }
               >

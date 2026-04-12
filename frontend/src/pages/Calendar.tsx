@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
+import { PageTransition } from "../components/PageTransition";
 import { useAuth } from "../context/useAuth";
 import type { Service } from "../types/models";
 import { formatDateOnly, formatMonthYear, formatWeekdayShort } from "../utils/formatting";
@@ -203,6 +204,7 @@ export function Calendar() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -238,7 +240,7 @@ export function Calendar() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Visible Month
           </p>
@@ -246,13 +248,13 @@ export function Calendar() {
             {formatMonthYear(displayMonth, preferences)}
           </p>
         </div>
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Renewals This Month
           </p>
           <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{events.length}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Not Scheduled
           </p>
@@ -262,7 +264,7 @@ export function Calendar() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950">
           {dayNames.map((dayName) => (
             <div
@@ -290,7 +292,7 @@ export function Calendar() {
                   <span
                     className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm ${
                       isToday
-                        ? "bg-gray-900 dark:bg-gray-100 font-medium text-white dark:text-gray-900"
+                        ? "bg-brand-600 font-medium text-white"
                         : inMonth
                           ? "text-gray-900 dark:text-gray-100"
                           : "text-gray-400"
@@ -327,7 +329,7 @@ export function Calendar() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Month Renewal List</h2>
           {events.length === 0 ? (
             <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
@@ -338,7 +340,7 @@ export function Calendar() {
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+                  className="flex items-start justify-between gap-4 rounded-xl border border-gray-200 dark:border-gray-800 p-3"
                 >
                   <div>
                     <Link
@@ -365,7 +367,7 @@ export function Calendar() {
           )}
         </div>
 
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Not Yet Scheduled</h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Services need both a renewal date and a monthly or annual billing
@@ -396,5 +398,6 @@ export function Calendar() {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 }

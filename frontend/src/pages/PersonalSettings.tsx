@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import client from "../api/client";
+import { PageTransition } from "../components/PageTransition";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import type { User, UserPreferences } from "../types/models";
@@ -170,6 +171,7 @@ export function PersonalSettings() {
   const isManaged = profile && !isLocal;
 
   return (
+    <PageTransition>
     <div className="max-w-2xl space-y-10">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Personal Settings</h1>
@@ -185,7 +187,7 @@ export function PersonalSettings() {
           {isLocal && (
             <form
               onSubmit={handleProfileSubmit}
-              className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
+              className="space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6"
             >
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Profile</h2>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -200,7 +202,7 @@ export function PersonalSettings() {
                     onChange={(e) =>
                       setProfileForm((c) => ({ ...c, email: e.target.value }))
                     }
-                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   />
                 </div>
                 <div>
@@ -213,7 +215,7 @@ export function PersonalSettings() {
                     onChange={(e) =>
                       setProfileForm((c) => ({ ...c, first_name: e.target.value }))
                     }
-                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   />
                 </div>
                 <div>
@@ -226,7 +228,7 @@ export function PersonalSettings() {
                     onChange={(e) =>
                       setProfileForm((c) => ({ ...c, last_name: e.target.value }))
                     }
-                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -238,7 +240,7 @@ export function PersonalSettings() {
                     onChange={(e) =>
                       setProfileForm((c) => ({ ...c, display_name: e.target.value }))
                     }
-                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -250,14 +252,14 @@ export function PersonalSettings() {
                     onChange={(e) =>
                       setProfileForm((c) => ({ ...c, department: e.target.value }))
                     }
-                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                    className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {savingProfile ? "Saving..." : "Save profile"}
               </button>
@@ -265,7 +267,7 @@ export function PersonalSettings() {
           )}
 
           {isManaged && (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-6 text-sm text-gray-700 dark:text-gray-300">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-6 text-sm text-gray-700 dark:text-gray-300">
               <p className="font-medium text-gray-900 dark:text-gray-100">Organization-managed profile</p>
               <p className="mt-2">
                 Profile fields are managed by your organization. Please contact your administrator to change
@@ -277,7 +279,7 @@ export function PersonalSettings() {
           {isLocal && (
             <form
               onSubmit={handlePasswordSubmit}
-              className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
+              className="space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6"
             >
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Password</h2>
               <div>
@@ -292,7 +294,7 @@ export function PersonalSettings() {
                   onChange={(e) =>
                     setPwd((c) => ({ ...c, old_password: e.target.value }))
                   }
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 />
               </div>
               <div>
@@ -308,7 +310,7 @@ export function PersonalSettings() {
                   onChange={(e) =>
                     setPwd((c) => ({ ...c, new_password: e.target.value }))
                   }
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 />
               </div>
               <div>
@@ -322,13 +324,13 @@ export function PersonalSettings() {
                   minLength={8}
                   value={pwd.confirm}
                   onChange={(e) => setPwd((c) => ({ ...c, confirm: e.target.value }))}
-                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                  className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 />
               </div>
               <button
                 type="submit"
                 disabled={savingPwd}
-                className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
               >
                 {savingPwd ? "Updating..." : "Change password"}
               </button>
@@ -349,7 +351,7 @@ export function PersonalSettings() {
 
       <form
         onSubmit={handlePreferencesSubmit}
-        className="space-y-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6"
+        className="space-y-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6"
       >
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Locale and appearance</h2>
         <div>
@@ -370,7 +372,7 @@ export function PersonalSettings() {
               }))
             }
             placeholder={`Browser default (${browserLocale})`}
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
           <datalist id="locale-options">
             {COMMON_LOCALES.map((locale) => (
@@ -398,7 +400,7 @@ export function PersonalSettings() {
                 timezone: event.target.value || null,
               }))
             }
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           >
             <option value="">Browser default ({browserTimeZone})</option>
             {timeZoneOptions.map((timeZone) => (
@@ -425,7 +427,7 @@ export function PersonalSettings() {
                 theme: event.target.value as "light" | "dark",
               }))
             }
-            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           >
             <option value="light">Light</option>
             <option value="dark">Dark</option>
@@ -452,7 +454,7 @@ export function PersonalSettings() {
           <button
             type="submit"
             disabled={savingPrefs}
-            className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {savingPrefs ? "Saving..." : "Save locale and appearance"}
           </button>
@@ -473,5 +475,6 @@ export function PersonalSettings() {
         </div>
       </form>
     </div>
+    </PageTransition>
   );
 }

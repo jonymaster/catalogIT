@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import client from "../../api/client";
+import { PageTransition } from "../../components/PageTransition";
 import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
 
 interface IntegrationChannel {
@@ -291,6 +292,7 @@ export function SettingsIntegrations() {
   const telegram = ch("telegram");
 
   return (
+    <PageTransition>
     <div className="space-y-8">
       <div>
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Integrations</h2>
@@ -329,7 +331,7 @@ export function SettingsIntegrations() {
       )}
 
       {meta && (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-4 text-sm text-gray-700 dark:text-gray-200">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-4 text-sm text-gray-700 dark:text-gray-200">
           <p>
             <span className="font-medium">Public base URL:</span> {meta.public_base_url}
           </p>
@@ -345,7 +347,7 @@ export function SettingsIntegrations() {
       )}
 
       {/* Webhook */}
-      <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <h3 className="font-medium text-gray-900 dark:text-gray-100">Webhook</h3>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <IntegrationEnabledIndicator enabled={!!webhook?.enabled} />
@@ -384,7 +386,7 @@ export function SettingsIntegrations() {
           <div className="flex gap-2">
             <button
               type="submit"
-              className="rounded bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="rounded bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700"
             >
               Save
             </button>
@@ -416,7 +418,7 @@ export function SettingsIntegrations() {
       </section>
 
       {/* Telegram */}
-      <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <h3 className="font-medium text-gray-900 dark:text-gray-100">Telegram</h3>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <IntegrationEnabledIndicator enabled={!!telegram?.enabled} />
@@ -453,7 +455,7 @@ export function SettingsIntegrations() {
           <div className="flex gap-2">
             <button
               type="submit"
-              className="rounded bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="rounded bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700"
             >
               Save
             </button>
@@ -478,7 +480,7 @@ export function SettingsIntegrations() {
       </section>
 
       {/* Slack */}
-      <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <h3 className="font-medium text-gray-900 dark:text-gray-100">Slack</h3>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <IntegrationEnabledIndicator enabled={!!slack?.enabled} />
@@ -558,7 +560,7 @@ export function SettingsIntegrations() {
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
-              className="rounded bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="rounded bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700"
             >
               Save
             </button>
@@ -628,7 +630,7 @@ export function SettingsIntegrations() {
       </section>
 
       {/* Gmail */}
-      <section className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <h3 className="font-medium text-gray-900 dark:text-gray-100">Gmail (Google)</h3>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <IntegrationEnabledIndicator enabled={!!google?.enabled} />
@@ -711,7 +713,7 @@ export function SettingsIntegrations() {
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
-              className="rounded bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="rounded bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700"
             >
               Save
             </button>
@@ -755,5 +757,6 @@ export function SettingsIntegrations() {
         </details>
       </section>
     </div>
+    </PageTransition>
   );
 }
