@@ -62,7 +62,7 @@ services:
       retries: 5
 
   api:
-    image: jonymaster/catalogit-api:${CATALOGIT_TAG:-1.0.0}
+    image: jonymaster/catalogit-api:latest
     # If import fails for appuser, uncomment until the image is rebuilt with correct ownership:
     # user: "0:0"
     restart: unless-stopped
@@ -100,7 +100,7 @@ services:
 
   ui:
     # Image must serve static files on container port 80 (Dockerfile.prod), not Vite dev.
-    image: jonymaster/catalogit-ui:${CATALOGIT_TAG:-1.0.0}
+    image: jonymaster/catalogit-ui:latest
     restart: unless-stopped
     ports:
       - "${UI_PUBLISH:-8080}:80"
