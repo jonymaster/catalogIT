@@ -176,7 +176,7 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
         <p className="text-sm text-gray-400">No attachments yet.</p>
       ) : (
         <>
-          <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
             {attachments.map((att) => (
               <li
                 key={att.id}

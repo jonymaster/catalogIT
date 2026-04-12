@@ -1,3 +1,89 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Sidebar chrome: light default, dark when html.dark (see ThemeSync) */
+:root {
+  --sidebar-surface-bg:          #f4f4f5;
+  --sidebar-surface-bg-hover:    #e4e4e7;
+  --sidebar-surface-bg-active:   #d4d4d8;
+  --sidebar-surface-text:        #71717a;
+  --sidebar-surface-text-active: #18181b;
+  --sidebar-surface-accent:      #6366f1;
+  --sidebar-surface-border:      #e4e4e7;
+}
+
+html.dark {
+  --sidebar-surface-bg:          #0f1117;
+  --sidebar-surface-bg-hover:    #1a1d2b;
+  --sidebar-surface-bg-active:   #242838;
+  --sidebar-surface-text:        #9ca3af;
+  --sidebar-surface-text-active: #f3f4f6;
+  --sidebar-surface-accent:      #6366f1;
+  --sidebar-surface-border:      #1f2937;
+}
+
+/* ── Design tokens ───────────────────────────────────────────── */
+
+@theme {
+  /* Brand palette (indigo-based) */
+  --color-brand-50:  #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-brand-950: #1e1b4b;
+
+  /* Sidebar (theme-aware; variables from :root / html.dark above) */
+  --color-sidebar-bg:          var(--sidebar-surface-bg);
+  --color-sidebar-bg-hover:    var(--sidebar-surface-bg-hover);
+  --color-sidebar-bg-active:   var(--sidebar-surface-bg-active);
+  --color-sidebar-text:        var(--sidebar-surface-text);
+  --color-sidebar-text-active: var(--sidebar-surface-text-active);
+  --color-sidebar-accent:      var(--sidebar-surface-accent);
+  --color-sidebar-border:      var(--sidebar-surface-border);
+
+  /* Geometry */
+  --sidebar-expanded: 256px;
+  --sidebar-collapsed: 72px;
+
+  /* Easing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Animations */
+  --animate-fade-in:        fade-in 0.3s ease-out both;
+  --animate-fade-in-up:     fade-in-up 0.4s var(--ease-out-expo) both;
+  --animate-scale-in:       scale-in 0.2s var(--ease-out-expo) both;
+  --animate-slide-in-right: slide-in-right 0.3s var(--ease-out-expo) both;
+  --animate-stagger-1:      fade-in-up 0.4s var(--ease-out-expo) 0.00s both;
+  --animate-stagger-2:      fade-in-up 0.4s var(--ease-out-expo) 0.06s both;
+  --animate-stagger-3:      fade-in-up 0.4s var(--ease-out-expo) 0.12s both;
+  --animate-stagger-4:      fade-in-up 0.4s var(--ease-out-expo) 0.18s both;
+  --animate-stagger-5:      fade-in-up 0.4s var(--ease-out-expo) 0.24s both;
+  --animate-stagger-6:      fade-in-up 0.4s var(--ease-out-expo) 0.30s both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}

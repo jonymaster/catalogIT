@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
+import { PageTransition } from "../components/PageTransition";
+import { ArrowDownTrayIcon, PlusIcon } from "../components/Icons";
 import {
   ColumnHeaderMenu,
   type SortDirection,
@@ -103,6 +105,23 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     render: (laptop) => <StatusBadge status={laptop.status} />,
   },
   {
+    key: "hardware_location",
+    label: "Location",
+    filterType: "select",
+    getFilterValue: (laptop) =>
+      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+    getSortValue: (laptop) =>
+      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "",
+    getFilterOptions: (laptops) =>
+      getUniqueOptions(
+        laptops.map((laptop) =>
+          laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+        ),
+      ),
+    render: (laptop) =>
+      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+  },
+  {
     key: "cpu",
     label: "CPU",
     filterType: "text",
@@ -182,12 +201,14 @@ export function Hardware() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const nextRows = laptops.filter((laptop) => {
+      const locName = laptop.hardware_location?.name?.trim() ?? "";
       const matchesSearch =
         !q ||
         laptop.serial_number.toLowerCase().includes(q) ||
         laptop.model_name.toLowerCase().includes(q) ||
         laptop.cpu.toLowerCase().includes(q) ||
         laptop.status.toLowerCase().includes(q) ||
+        locName.toLowerCase().includes(q) ||
         getAssigneeName(laptop).toLowerCase().includes(q);
 
       if (!matchesSearch) {
@@ -322,6 +343,7 @@ export function Hardware() {
   }, [filters, laptops, sortState]);
 
   return (
+    <PageTransition>
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Hardware</h1>
@@ -332,7 +354,7 @@ export function Hardware() {
               onClick={() => setView("active")}
               className={`px-3 py-1.5 text-sm rounded ${
                 view === "active"
-                  ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                  ? "bg-brand-600 text-white"
                   : "text-gray-600 dark:text-gray-300"
               }`}
             >
@@ -343,7 +365,7 @@ export function Hardware() {
               onClick={() => setView("archived")}
               className={`px-3 py-1.5 text-sm rounded ${
                 view === "archived"
-                  ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                  ? "bg-brand-600 text-white"
                   : "text-gray-600 dark:text-gray-300"
               }`}
             >
@@ -355,23 +377,29 @@ export function Hardware() {
               type="button"
               onClick={handleExportCsv}
               disabled={filtered.length === 0}
-              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              <ArrowDownTrayIcon className="h-4 w-4" />
               Export CSV
             </button>
           )}
           {canEdit && view === "active" && (
             <Link
               to="/hardware/new"
-              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-brand-700"
             >
+              <PlusIcon className="h-4 w-4" />
               New Laptop
             </Link>
           )}
         </div>
       </div>
       {loading ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+          ))}
+        </div>
       ) : (
         <>
           <div className="mb-4 flex items-center gap-3">
@@ -399,5 +427,6 @@ export function Hardware() {
         </>
       )}
     </div>
+    </PageTransition>
   );
 }

@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { CostRecordForm } from "../components/CostRecordForm";
+import { PageTransition } from "../components/PageTransition";
 
 export function CostRecordCreate() {
   const { id } = useParams<{ id: string }>();
@@ -7,6 +8,7 @@ export function CostRecordCreate() {
   if (!id) return null;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div>
         <Link
@@ -19,9 +21,10 @@ export function CostRecordCreate() {
           Add Cost Record
         </h1>
       </div>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
         <CostRecordForm serviceId={id} />
       </div>
     </div>
+    </PageTransition>
   );
 }

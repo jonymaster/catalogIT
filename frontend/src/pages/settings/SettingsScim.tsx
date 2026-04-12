@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import client from "../../api/client";
 import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
+import { PageTransition } from "../../components/PageTransition";
 
 interface ScimStatus {
   enabled: boolean;
@@ -23,7 +24,8 @@ export function SettingsScim() {
   }
 
   return (
-    <div className="max-w-xl space-y-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+    <PageTransition>
+    <div className="max-w-xl space-y-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
       <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
         SCIM User Provisioning
       </h2>
@@ -80,5 +82,6 @@ export function SettingsScim() {
         )}
       </div>
     </div>
+    </PageTransition>
   );
 }

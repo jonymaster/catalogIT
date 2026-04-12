@@ -14,6 +14,8 @@ interface Props {
   yearData: YearData[];
   width?: number;
   height?: number;
+  /** Called with fiscal year when a year column is clicked (dashboard). */
+  onYearClick?: (year: number) => void;
 }
 
 const fmt = (n: number) =>
@@ -21,21 +23,27 @@ const fmt = (n: number) =>
 
 export function StackedBar({
   yearData,
-  width = 600,
-  height = 240,
+  width = 640,
+  height = 300,
+  onYearClick,
 }: Props) {
-  const max = Math.max(
-    ...yearData.map((yd) =>
-      yd.cats.reduce((s, c) => s + c.value, 0),
-    ),
-    1,
-  );
-  const startX = 70;
-  const chartH = height - 50;
-  const bw = Math.min(
-    80,
-    (width - startX - 20) / yearData.length - 12,
-  );
+  const max = yearData.length
+    ? Math.max(
+        ...yearData.map((yd) =>
+          yd.cats.reduce((s, c) => s + c.value, 0),
+        ),
+        1,
+      )
+    : 1;
+  const startX = 92;
+  const topInset = 36;
+  const bottomPad = 52;
+  const chartTop = topInset;
+  const chartBottom = height - bottomPad;
+  const chartH = chartBottom - chartTop;
+  const n = Math.max(yearData.length, 1);
+  const slot = (width - startX - 20) / n;
+  const bw = Math.min(104, Math.max(28, slot - 12));
 
   return (
     <svg
@@ -44,7 +52,7 @@ export function StackedBar({
       style={{ maxHeight: height }}
     >
       {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-        const y = 10 + chartH * (1 - f);
+        const y = chartTop + chartH * (1 - f);
         return (
           <g key={f}>
             <line
@@ -56,11 +64,12 @@ export function StackedBar({
               strokeWidth="0.5"
             />
             <text
-              x={startX - 6}
-              y={y + 3}
+              x={startX - 8}
+              y={y + 4}
               textAnchor="end"
-              fontSize="10"
-              className="fill-gray-400 dark:fill-gray-500"
+              fontSize="13"
+              fontWeight="500"
+              className="fill-gray-500 dark:fill-gray-400"
             >
               {fmt(max * f)}
             </text>
@@ -68,17 +77,19 @@ export function StackedBar({
         );
       })}
       {yearData.map((yd, i) => {
-        const x =
-          startX +
-          i * ((width - startX - 20) / yearData.length) +
-          6;
+        const colW = (width - startX - 20) / Math.max(yearData.length, 1);
+        const x = startX + i * colW + (colW - bw) / 2;
         let cumH = 0;
         const total = yd.cats.reduce((s, c) => s + c.value, 0);
         return (
-          <g key={i}>
+          <g
+            key={i}
+            className={onYearClick ? "cursor-pointer" : undefined}
+            onClick={() => onYearClick?.(yd.year)}
+          >
             {yd.cats.map((c, ci) => {
               const bh = (c.value / max) * chartH;
-              const y = 10 + chartH - cumH - bh;
+              const y = chartTop + chartH - cumH - bh;
               cumH += bh;
               return (
                 <rect
@@ -87,7 +98,7 @@ export function StackedBar({
                   y={y}
                   width={bw}
                   height={Math.max(bh, 0)}
-                  rx="2"
+                  rx="3"
                   fill={c.color}
                   opacity="0.8"
                 />
@@ -95,21 +106,21 @@ export function StackedBar({
             })}
             <text
               x={x + bw / 2}
-              y={10 + chartH - cumH - 4}
+              y={chartTop + chartH - cumH - 10}
               textAnchor="middle"
-              fontSize="9"
-              fontWeight="500"
-              className="fill-gray-800 dark:fill-gray-100"
+              fontSize="14"
+              fontWeight="600"
+              className="fill-gray-900 dark:fill-gray-50"
             >
               {fmt(total)}
             </text>
             <text
               x={x + bw / 2}
-              y={height - 4}
+              y={height - 14}
               textAnchor="middle"
-              fontSize="11"
-              fontWeight="500"
-              className="fill-gray-600 dark:fill-gray-400"
+              fontSize="14"
+              fontWeight="600"
+              className="fill-gray-700 dark:fill-gray-300"
             >
               {yd.year}
             </text>

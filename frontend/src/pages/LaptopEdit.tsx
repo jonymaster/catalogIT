@@ -2,38 +2,71 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import client from "../api/client";
 import { LaptopForm } from "../components/LaptopForm";
-import type { Laptop } from "../types/models";
+import { PageTransition } from "../components/PageTransition";
+import { FormSkeleton } from "../components/Skeleton";
+import type { HardwareLocation, HardwareStatus, Laptop } from "../types/models";
 
 export function LaptopEdit() {
   const { id } = useParams<{ id: string }>();
   const [laptop, setLaptop] = useState<Laptop | null>(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("");
   const [notes, setNotes] = useState("");
+  const [hardwareStatusId, setHardwareStatusId] = useState("");
+  const [hardwareLocationId, setHardwareLocationId] = useState("");
+  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>([]);
+  const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    client
+      .get<HardwareStatus[]>("/api/hardware-statuses/")
+      .then((r) => setHardwareStatuses(r.data))
+      .catch(() => setHardwareStatuses([]));
+    client
+      .get<HardwareLocation[]>("/api/hardware-locations/")
+      .then((r) => setHardwareLocations(r.data))
+      .catch(() => setHardwareLocations([]));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
     client
       .get<Laptop>(`/api/laptops/${id}`)
       .then((r) => {
-        setLaptop(r.data);
-        setStatus(r.data.status);
-        setNotes(r.data.notes ?? "");
+        const d = r.data;
+        setLaptop(d);
+        setNotes(d.notes ?? "");
+        setHardwareStatusId(d.hardware_status_id ?? "");
+        setHardwareLocationId(d.hardware_location_id ?? "");
       })
       .finally(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+    if (!laptop || hardwareStatuses.length === 0) return;
+    if (hardwareStatusId) return;
+    const m = hardwareStatuses.find(
+      (s) => s.name.toLowerCase() === laptop.status.trim().toLowerCase(),
+    );
+    if (m) setHardwareStatusId(m.id);
+  }, [laptop, hardwareStatuses, hardwareStatusId]);
+
   async function saveArchivedMetadata(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!id) return;
+    if (!id || !laptop) return;
     setSaving(true);
     try {
+      const row = hardwareStatuses.find((s) => s.id === hardwareStatusId);
       const response = await client.put<Laptop>(`/api/laptops/${id}`, {
-        status,
         notes: notes.trim() || null,
+        hardware_status_id: hardwareStatusId || null,
+        hardware_location_id: hardwareLocationId || null,
+        status: row?.name ?? laptop.status,
       });
       setLaptop(response.data);
+      setNotes(response.data.notes ?? "");
+      setHardwareStatusId(response.data.hardware_status_id ?? "");
+      setHardwareLocationId(response.data.hardware_location_id ?? "");
     } finally {
       setSaving(false);
     }
@@ -46,15 +79,23 @@ export function LaptopEdit() {
       : `/api/laptops/${id}/unarchive`;
     const response = await client.post<Laptop>(endpoint);
     setLaptop(response.data);
-    setStatus(response.data.status);
     setNotes(response.data.notes ?? "");
+    setHardwareStatusId(response.data.hardware_status_id ?? "");
+    setHardwareLocationId(response.data.hardware_location_id ?? "");
   }
 
-  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
+  if (loading) return <FormSkeleton />;
   if (!laptop)
     return <p className="text-sm text-red-600">Laptop not found.</p>;
 
+  const inputCls =
+    "block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100";
+  const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1";
+  const readOnlyCls = "mt-1 text-sm text-gray-900 dark:text-gray-100";
+  const rowGridCls = "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3";
+
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div>
         <Link
@@ -63,9 +104,14 @@ export function LaptopEdit() {
         >
           &larr; Back to {laptop.model_name}
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          Edit {laptop.model_name}
-        </h1>
+        <div className="mt-2 flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {laptop.model_name}
+          </h1>
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+            Editing
+          </span>
+        </div>
         <div className="mt-3 flex gap-2">
           <button
             type="button"
@@ -80,39 +126,72 @@ export function LaptopEdit() {
           </button>
         </div>
       </div>
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 border-l-4 border-l-brand-500 bg-white dark:bg-gray-900 p-6 shadow-sm">
         {laptop.is_active ? (
           <LaptopForm initial={laptop} />
         ) : (
-          <form onSubmit={saveArchivedMetadata} className="space-y-4">
+          <form onSubmit={saveArchivedMetadata} className="space-y-6">
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Archived hardware supports metadata-only updates.
+              Archived hardware supports metadata-only updates: notes, status, and location. Unarchive to
+              change assignment, specs, cost, and other fields.
             </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                Status
-              </label>
-              <input
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-              />
+            <div className={rowGridCls}>
+              <div>
+                <label className={labelCls}>Status</label>
+                <select
+                  className={inputCls}
+                  value={hardwareStatusId}
+                  onChange={(e) => setHardwareStatusId(e.target.value)}
+                  disabled={hardwareStatuses.length === 0}
+                >
+                  {hardwareStatuses.length === 0 ? (
+                    <option value="">Loading…</option>
+                  ) : (
+                    hardwareStatuses.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Assigned To</label>
+                <p className={readOnlyCls}>
+                  {laptop.assigned_to
+                    ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name} (${laptop.assigned_to.email})`
+                    : "Unassigned"}
+                </p>
+              </div>
+              <div>
+                <label className={labelCls}>Location</label>
+                <select
+                  className={inputCls}
+                  value={hardwareLocationId}
+                  onChange={(e) => setHardwareLocationId(e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {hardwareLocations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                Notes
-              </label>
+              <label className={labelCls}>Notes</label>
               <textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 rows={4}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                className={inputCls}
               />
             </div>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 disabled:opacity-50"
+              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save"}
             </button>
@@ -120,5 +199,6 @@ export function LaptopEdit() {
         )}
       </div>
     </div>
+    </PageTransition>
   );
 }

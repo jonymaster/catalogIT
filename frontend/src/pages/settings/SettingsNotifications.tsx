@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../../api/client";
+import { PageTransition } from "../../components/PageTransition";
 
 /** Source files in the public repo (docs + canned HTML). */
 const REPO_MAIN =
@@ -248,6 +249,7 @@ export function SettingsNotifications() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-8 max-w-2xl">
       <div>
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Renewal reminders</h2>
@@ -504,10 +506,11 @@ export function SettingsNotifications() {
         type="button"
         disabled={saving}
         onClick={() => void save()}
-        className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+        className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
       >
         {saving ? "Saving..." : "Save"}
       </button>
     </div>
+    </PageTransition>
   );
 }

@@ -1,8 +1,10 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import client from "../../api/client";
 import { useAuth } from "../../context/useAuth";
+import { useToast } from "../../context/useToast";
 import { formatDateTime } from "../../utils/formatting";
 import type { GlobalAuditEventRow, PaginatedGlobalAudit } from "../../types/models";
+import { PageTransition } from "../../components/PageTransition";
 
 const PER_PAGE = 50;
 
@@ -66,13 +68,13 @@ function AuditEventDetails({ row }: { row: GlobalAuditEventRow }) {
 
 export function SettingsAuditLog() {
   const { preferences } = useAuth();
+  const { showToast } = useToast();
   const [items, setItems] = useState<GlobalAuditEventRow[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
   const toggleExpanded = (id: string) => {
@@ -103,14 +105,16 @@ export function SettingsAuditLog() {
 
   useEffect(() => {
     setLoading(true);
-    setError(null);
     setExpandedIds(new Set());
     load(1)
       .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "Failed to load audit log");
+        showToast({
+          type: "error",
+          text: e instanceof Error ? e.message : "Failed to load audit log",
+        });
       })
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [load, showToast]);
 
   useEffect(() => {
     setPage(1);
@@ -119,18 +123,21 @@ export function SettingsAuditLog() {
   async function goToPage(next: number) {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;
     setLoading(true);
-    setError(null);
     setExpandedIds(new Set());
     try {
       await load(next);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load page");
+      showToast({
+        type: "error",
+        text: e instanceof Error ? e.message : "Failed to load page",
+      });
     } finally {
       setLoading(false);
     }
   }
 
   return (
+    <PageTransition>
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Audit logs</h1>
@@ -158,14 +165,12 @@ export function SettingsAuditLog() {
         </label>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
       {loading ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
       ) : items.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No events yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-950">
               <tr>
@@ -267,5 +272,6 @@ export function SettingsAuditLog() {
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }

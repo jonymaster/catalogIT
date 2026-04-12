@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user_permission import UserPermission
 
 
 class User(Base):
@@ -28,6 +32,13 @@ class User(Base):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(20), default="viewer")
     must_reset_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: ``local`` (manual/seed), ``scim``, or ``oidc`` (IdP-managed profile).
+    provisioning_source: Mapped[str] = mapped_column(String(20), default="local")
 
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    permission_rows: Mapped[list["UserPermission"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

@@ -19,6 +19,12 @@ class Laptop(Base):
     ram: Mapped[str] = mapped_column(String(50), default="")
     storage_size: Mapped[str] = mapped_column(String(50), default="")
     status: Mapped[str] = mapped_column(String(50))
+    hardware_status_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("hardware_statuses.id", ondelete="SET NULL"), nullable=True
+    )
+    hardware_location_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("hardware_locations.id", ondelete="SET NULL"), nullable=True
+    )
     assigned_to_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -30,3 +36,10 @@ class Laptop(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     assigned_to: Mapped["User | None"] = relationship(lazy="selectin")  # noqa: F821
+    hardware_status: Mapped["HardwareStatus | None"] = relationship(lazy="selectin")  # noqa: F821
+    hardware_location: Mapped["HardwareLocation | None"] = relationship(lazy="selectin")  # noqa: F821
+    cost_records: Mapped[list["CostRecord"]] = relationship(  # noqa: F821
+        back_populates="laptop",
+        lazy="noload",
+        cascade="all, delete-orphan",
+    )

@@ -34,20 +34,24 @@ async def _get_service(service_id: uuid.UUID, db: AsyncSession, *, for_write: bo
     return service
 
 
-def _to_read(record: CostRecord) -> CostRecordRead:
-    pm_name = record.recorded_by.first_name + " " + record.recorded_by.last_name if record.recorded_by else None
+def to_cost_record_read(record: CostRecord) -> CostRecordRead:
+    recorded_by_name = (
+        record.recorded_by.first_name + " " + record.recorded_by.last_name if record.recorded_by else None
+    )
     return CostRecordRead(
         id=record.id,
         service_id=record.service_id,
+        laptop_id=record.laptop_id,
         payment_method_id=record.payment_method_id,
         payment_method_name=None,
         fiscal_year=record.fiscal_year,
+        purchase_year=record.purchase_year,
         amount=float(record.amount),
         record_type=record.record_type,
         notes=record.notes,
         recorded_at=record.recorded_at,
         recorded_by_id=record.recorded_by_id,
-        recorded_by_name=pm_name,
+        recorded_by_name=recorded_by_name,
     )
 
 
@@ -72,7 +76,7 @@ async def list_cost_records(
 
     out = []
     for r in records:
-        item = _to_read(r)
+        item = to_cost_record_read(r)
         item.payment_method_name = pm_map.get(r.payment_method_id) if r.payment_method_id else None
         out.append(item)
     return out
@@ -89,7 +93,7 @@ async def get_cost_record(
     if not record or record.service_id != service_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
 
-    item = _to_read(record)
+    item = to_cost_record_read(record)
     if record.payment_method_id:
         pm = await db.get(PaymentMethod, record.payment_method_id)
         item.payment_method_name = pm.name if pm else None
@@ -106,8 +110,10 @@ async def create_cost_record(
     await _get_service(service_id, db, for_write=True)
     record = CostRecord(
         service_id=service_id,
+        laptop_id=None,
         payment_method_id=body.payment_method_id,
         fiscal_year=body.fiscal_year,
+        purchase_year=body.purchase_year,
         amount=body.amount,
         record_type=body.record_type,
         notes=body.notes,
@@ -117,7 +123,7 @@ async def create_cost_record(
     await db.flush()
     await db.refresh(record)
 
-    item = _to_read(record)
+    item = to_cost_record_read(record)
     if record.payment_method_id:
         pm = await db.get(PaymentMethod, record.payment_method_id)
         item.payment_method_name = pm.name if pm else None
@@ -143,7 +149,7 @@ async def update_cost_record(
     await db.flush()
     await db.refresh(record)
 
-    item = _to_read(record)
+    item = to_cost_record_read(record)
     if record.payment_method_id:
         pm = await db.get(PaymentMethod, record.payment_method_id)
         item.payment_method_name = pm.name if pm else None

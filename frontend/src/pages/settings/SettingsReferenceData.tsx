@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import client from "../../api/client";
+import { useToast } from "../../context/useToast";
 import type { ReferenceDataResource } from "../../types/referenceData";
 
 interface OutletContextValue {
@@ -8,9 +9,10 @@ interface OutletContextValue {
 }
 
 export function SettingsReferenceData() {
+  const { showToast } = useToast();
   const [resources, setResources] = useState<ReferenceDataResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     client
@@ -19,19 +21,24 @@ export function SettingsReferenceData() {
         setResources(response.data);
       })
       .catch(() => {
-        setError("Failed to load reference data resources.");
+        setLoadFailed(true);
+        showToast({ type: "error", text: "Failed to load reference data resources." });
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [showToast]);
 
   if (loading) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
   }
 
-  if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+  if (loadFailed) {
+    return (
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Could not load reference data resources.
+      </p>
+    );
   }
 
   return (
@@ -51,7 +58,7 @@ export function SettingsReferenceData() {
           className={({ isActive }) =>
             `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
               isActive
-                ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                ? "bg-brand-600 text-white"
                 : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:bg-gray-700"
             }`
           }
@@ -65,7 +72,7 @@ export function SettingsReferenceData() {
             className={({ isActive }) =>
               `rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                  ? "bg-brand-600 text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:bg-gray-700"
               }`
             }

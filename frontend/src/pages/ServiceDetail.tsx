@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useParams,
   Link,
@@ -6,12 +6,16 @@ import {
   Outlet,
 } from "react-router-dom";
 import client from "../api/client";
+import { PageTransition } from "../components/PageTransition";
+import { PencilSquareIcon } from "../components/Icons";
+import { DetailPageSkeleton } from "../components/Skeleton";
 import { useAuth } from "../context/useAuth";
 import type { Service } from "../types/models";
 
 const tabs = [
   { to: ".", label: "Overview", end: true },
   { to: "costs", label: "Costs", end: false },
+  { to: "assignments", label: "Seats & assignments", end: false },
 ];
 
 export function ServiceDetail() {
@@ -22,17 +26,32 @@ export function ServiceDetail() {
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
+    setLoading(true);
     client
       .get<Service>(`/api/services/${id}`)
-      .then((r) => setService(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!cancelled) setService(r.data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  if (loading) return <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>;
+  const reloadService = useCallback(() => {
+    if (!id) return;
+    client.get<Service>(`/api/services/${id}`).then((r) => setService(r.data));
+  }, [id]);
+
+  if (loading) return <DetailPageSkeleton />;
   if (!service)
     return <p className="text-sm text-red-600">Service not found.</p>;
 
   return (
+    <PageTransition>
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
@@ -47,14 +66,13 @@ export function ServiceDetail() {
           </h1>
         </div>
         {canEdit && (
-          <div className="flex gap-2">
-            <Link
-              to={`/services/${id}/edit`}
-              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Edit
-            </Link>
-          </div>
+          <Link
+            to={`/services/${id}/edit`}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+            Edit
+          </Link>
         )}
       </div>
 
@@ -68,7 +86,7 @@ export function ServiceDetail() {
               className={({ isActive }) =>
                 `whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
                   isActive
-                    ? "border-gray-900 dark:border-gray-100 text-gray-900 dark:text-gray-100"
+                    ? "border-brand-600 text-gray-900 dark:text-gray-100"
                     : "border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200"
                 }`
               }
@@ -79,7 +97,8 @@ export function ServiceDetail() {
         </nav>
       </div>
 
-      <Outlet context={{ service }} />
+      <Outlet context={{ service, reloadService }} />
     </div>
+    </PageTransition>
   );
 }

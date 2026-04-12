@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import client from "../../api/client";
+import { PageTransition } from "../../components/PageTransition";
 import type { Laptop, Service } from "../../types/models";
 
 export function SettingsRecordDeletion() {
@@ -59,6 +60,7 @@ export function SettingsRecordDeletion() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-8">
       <div>
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Record Deletion</h2>
@@ -72,7 +74,7 @@ export function SettingsRecordDeletion() {
         {services.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No archived services available.</p>
         ) : (
-          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
@@ -113,7 +115,7 @@ export function SettingsRecordDeletion() {
         {laptops.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No archived hardware records available.</p>
         ) : (
-          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
@@ -149,5 +151,6 @@ export function SettingsRecordDeletion() {
         )}
       </section>
     </div>
+    </PageTransition>
   );
 }

@@ -16,10 +16,15 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+function isAuthPath(): boolean {
+  const p = window.location.pathname;
+  return p === "/login" || p.startsWith("/sso/");
+}
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !isAuthPath()) {
       localStorage.removeItem("catalogit_token");
       window.location.href = "/login";
     }

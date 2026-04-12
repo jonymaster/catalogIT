@@ -17,10 +17,10 @@ from app.models.service import Service
 from app.models.user import User
 from app.dependencies.storage import ensure_bucket
 from app.routers import (
-    api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
-    history, integrations, internal, laptops, me, payment_methods, reference_data,
-    service_classifications, service_statuses, services, scim,
-    settings, users, vendors,
+    admin_export, api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
+    hardware_locations, hardware_statuses, history, integrations, internal, laptop_cost_records,
+    laptops, me, payment_methods, reference_data, service_classifications, service_statuses, services,
+    scim, settings, user_directory, users, vendors,
 )
 from scripts.seed_from_json import SEED_DIR, seed_database
 
@@ -59,6 +59,7 @@ async def _seed_admin() -> None:
                     role="admin",
                     password_hash=hashed,
                     must_reset_password=True,
+                    provisioning_source="local",
                 )
                 session.add(admin)
                 logger.info("Default admin account created")
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(me.router)
+    app.include_router(user_directory.router)
     app.include_router(scim.router)
     app.include_router(services.router)
     app.include_router(laptops.router)
@@ -154,9 +156,13 @@ def create_app() -> FastAPI:
     app.include_router(payment_methods.router)
     app.include_router(service_classifications.router)
     app.include_router(service_statuses.router)
+    app.include_router(hardware_statuses.router)
+    app.include_router(hardware_locations.router)
     app.include_router(reference_data.router)
     app.include_router(cost_records.router)
+    app.include_router(laptop_cost_records.router)
     app.include_router(dashboard.router)
+    app.include_router(admin_export.router)
 
     @app.get("/health")
     async def health() -> dict:

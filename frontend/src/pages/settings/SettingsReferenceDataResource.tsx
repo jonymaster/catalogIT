@@ -8,8 +8,10 @@ import {
 } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
 import client from "../../api/client";
+import { useToast } from "../../context/useToast";
 import type { Column } from "../../components/DataTable";
 import { DataTable } from "../../components/DataTable";
+import { PageTransition } from "../../components/PageTransition";
 import { SearchInput } from "../../components/SearchInput";
 import type {
   ReferenceDataField,
@@ -53,7 +55,7 @@ function ResourceFieldInput({
   onChange: (value: string) => void;
 }) {
   const sharedClassName =
-    "mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400";
+    "mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
 
   return (
     <label className="block">
@@ -88,6 +90,7 @@ function ResourceFieldInput({
 }
 
 export function SettingsReferenceDataResource() {
+  const { showToast } = useToast();
   const { resourceKey } = useParams<{ resourceKey: string }>();
   const { resources } = useOutletContext<{ resources: ReferenceDataResource[] }>();
   const resource = resources.find((item) => item.key === resourceKey);
@@ -99,10 +102,6 @@ export function SettingsReferenceDataResource() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
   const [editingRecord, setEditingRecord] = useState<ReferenceDataRecord | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
@@ -118,7 +117,7 @@ export function SettingsReferenceDataResource() {
         setRecords(response.data);
       })
       .catch((error) => {
-        setMessage({
+        showToast({
           type: "error",
           text: extractErrorDetail(error, `Failed to load ${resource.plural_label.toLowerCase()}.`),
         });
@@ -126,7 +125,7 @@ export function SettingsReferenceDataResource() {
       .finally(() => {
         setLoading(false);
       });
-  }, [resource]);
+  }, [resource, showToast]);
 
   const filtered = useMemo(() => {
     if (!resource || !search.trim()) {
@@ -166,7 +165,6 @@ export function SettingsReferenceDataResource() {
     }
     setEditingRecord(null);
     setFormValues(buildEmptyForm(resource));
-    setMessage(null);
     dialogRef.current?.showModal();
   }
 
@@ -177,7 +175,6 @@ export function SettingsReferenceDataResource() {
     }
 
     setSaving(true);
-    setMessage(null);
 
     const payload = Object.fromEntries(
       resource.fields.map((field) => [
@@ -189,13 +186,13 @@ export function SettingsReferenceDataResource() {
     try {
       if (editingRecord) {
         await client.patch(`${resource.api_path}${editingRecord.id}`, payload);
-        setMessage({
+        showToast({
           type: "success",
           text: `${resource.label} updated.`,
         });
       } else {
         await client.post(resource.api_path, payload);
-        setMessage({
+        showToast({
           type: "success",
           text: `${resource.label} created.`,
         });
@@ -203,7 +200,7 @@ export function SettingsReferenceDataResource() {
       await reloadRecords();
       closeDialog();
     } catch (error) {
-      setMessage({
+      showToast({
         type: "error",
         text: extractErrorDetail(error, `Failed to save ${resource.label.toLowerCase()}.`),
       });
@@ -224,23 +221,22 @@ export function SettingsReferenceDataResource() {
     }
 
     setDeletingId(record.id);
-    setMessage(null);
     try {
       await client.delete(`${resource.api_path}${record.id}`);
       await reloadRecords();
-      setMessage({
+      showToast({
         type: "success",
         text: `${resource.label} deleted.`,
       });
     } catch (error) {
-      setMessage({
+      showToast({
         type: "error",
         text: extractErrorDetail(error, `Failed to delete ${resource.label.toLowerCase()}.`),
       });
     } finally {
       setDeletingId(null);
     }
-  }, [reloadRecords, resource]);
+  }, [reloadRecords, resource, showToast]);
 
   const columns = useMemo<Column<ReferenceDataRecord>[]>(() => {
     if (!resource) {
@@ -276,7 +272,6 @@ export function SettingsReferenceDataResource() {
                     ]),
                   ),
                 );
-                setMessage(null);
                 dialogRef.current?.showModal();
               }}
             >
@@ -304,8 +299,9 @@ export function SettingsReferenceDataResource() {
   }
 
   return (
+    <PageTransition>
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
             {resource.plural_label}
@@ -315,21 +311,11 @@ export function SettingsReferenceDataResource() {
         <button
           type="button"
           onClick={openCreateDialog}
-          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
         >
           Add {resource.label}
         </button>
       </div>
-
-      {message && (
-        <p
-          className={`text-sm ${
-            message.type === "success" ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
 
       <div className="max-w-sm">
         <SearchInput
@@ -347,7 +333,7 @@ export function SettingsReferenceDataResource() {
 
       <dialog
         ref={dialogRef}
-        className="w-full max-w-2xl rounded-lg border border-gray-200 dark:border-gray-700 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
+        className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-gray-800 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
         onClose={() => {
           setEditingRecord(null);
         }}
@@ -391,7 +377,7 @@ export function SettingsReferenceDataResource() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {saving ? "Saving..." : editingRecord ? "Save changes" : `Create ${resource.label}`}
             </button>
@@ -399,5 +385,6 @@ export function SettingsReferenceDataResource() {
         </form>
       </dialog>
     </div>
+    </PageTransition>
   );
 }

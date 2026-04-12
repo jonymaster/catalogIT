@@ -18,7 +18,7 @@ from app.dependencies.auth import get_current_user, require_role
 from app.dependencies.db import get_audited_db
 from app.database import get_db
 from app.integrations import constants as ic
-from app.integrations.config_helpers import CHANNEL_ORDER, merged_metadata, row_to_read
+from app.integrations.config_helpers import CHANNEL_ORDER, default_metadata, merged_metadata, row_to_read
 from app.integrations.crypto import decrypt_json, encrypt_json
 from app.integrations.telegram_api import normalize_bot_token
 from app.integrations.gmail_send import oauth_expires_in_seconds, resolve_google_email_with_token
@@ -305,6 +305,39 @@ async def test_integration(
         entity_label=f"Integration ({channel})",
     )
     return TestSendResponse(ok=True, detail=None)
+
+
+@settings_router.post("/{channel}/disconnect", response_model=IntegrationChannelRead)
+async def disconnect_integration(
+    channel: str,
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    if channel not in CHANNEL_ORDER:
+        raise HTTPException(status_code=404, detail="Unknown channel")
+    row = await db.get(IntegrationConfig, channel)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    row.enabled = False
+    row.connection_status = "not_configured"
+    row.last_error = None
+    row.last_success_at = None
+    row.token_expires_at = None
+    row.secrets_encrypted = None
+    row.metadata_ = default_metadata(channel)
+    await db.flush()
+    await record_global_audit_event(
+        db,
+        category="notification",
+        event_type="integration_disconnected",
+        entity_table="integration_config",
+        entity_key=channel,
+        actor_user_id=_user.id,
+        summary=f"Integration disconnected ({channel})",
+        details={"channel": channel},
+        entity_label=f"Integration ({channel})",
+    )
+    return IntegrationChannelRead(**row_to_read(row, channel))
 
 
 # --- OAuth: Google ---

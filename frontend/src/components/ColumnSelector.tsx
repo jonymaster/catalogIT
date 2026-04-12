@@ -168,7 +168,7 @@ export function ColumnSelector<T>({
                     type="checkbox"
                     checked
                     onChange={() => toggle(key)}
-                    className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
+                    className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-brand-500/30"
                   />
                 </label>
               </div>
@@ -190,7 +190,7 @@ export function ColumnSelector<T>({
                   type="checkbox"
                   checked={false}
                   onChange={() => toggle(col.key)}
-                  className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400"
+                  className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-brand-500/30"
                 />
                 {columnLabel(col)}
               </label>

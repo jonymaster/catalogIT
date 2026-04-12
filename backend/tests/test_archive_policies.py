@@ -18,7 +18,14 @@ class ArchiveUpdatePolicyTest(unittest.TestCase):
         self.assertEqual(exc.exception.status_code, 400)
 
     def test_archived_laptop_allows_metadata_fields(self) -> None:
-        _validate_archived_laptop_update_fields({"notes": "note", "status": "In Stock"})
+        _validate_archived_laptop_update_fields(
+            {
+                "notes": "note",
+                "status": "In Stock",
+                "hardware_status_id": "abc",
+                "hardware_location_id": None,
+            }
+        )
 
     def test_archived_laptop_rejects_core_fields(self) -> None:
         with self.assertRaises(HTTPException) as exc:

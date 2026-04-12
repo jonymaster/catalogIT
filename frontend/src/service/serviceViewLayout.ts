@@ -18,7 +18,8 @@ export type ServiceFieldKey =
   | "payment_method"
   | "nonprofit_pricing"
   | "renewal_reminders"
-  | "notes";
+  | "notes"
+  | "total_seats";
 
 export const SERVICE_VIEW_SECTIONS: readonly {
   id: string;
@@ -36,6 +37,7 @@ export const SERVICE_VIEW_SECTIONS: readonly {
       "sso_integrated",
       "scim_enabled",
       "vendor",
+      "total_seats",
     ],
   },
   {
@@ -77,4 +79,5 @@ export const SERVICE_FIELD_LABELS: Record<ServiceFieldKey, string> = {
   nonprofit_pricing: "Nonprofit Pricing",
   renewal_reminders: "Renewal reminders",
   notes: "Notes",
+  total_seats: "Number of seats",
 };

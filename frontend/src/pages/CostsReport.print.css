@@ -1,0 +1,134 @@
+/**
+ * Print layout for the IT Financial Report page only.
+ * Imported from CostsReport.tsx — keep selectors scoped under .costs-report-print.
+ */
+
+@media print {
+  @page {
+    margin: 12mm 10mm;
+    size: auto;
+  }
+
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  body aside {
+    display: none !important;
+  }
+
+  body main {
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .costs-report-print {
+    max-width: 100%;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    color: #111827 !important;
+    background: #fff !important;
+  }
+
+  .costs-report-print h1.costs-report-print-title {
+    font-size: 16pt;
+    font-weight: 700;
+    margin: 0 0 10pt 0;
+    padding-bottom: 8pt;
+    border-bottom: 2px solid #111827;
+    color: #111827 !important;
+  }
+
+  .costs-report-print-summary {
+    margin-bottom: 14pt;
+    padding-bottom: 10pt;
+    border-bottom: 1px solid #9ca3af;
+    font-size: 9.5pt;
+    color: #374151 !important;
+  }
+
+  .costs-report-print-summary strong {
+    color: #111827 !important;
+  }
+
+  .costs-report-print .print-kpi-card {
+    border: 1px solid #d1d5db !important;
+    background: #f9fafb !important;
+    color: #111827 !important;
+    break-inside: avoid;
+  }
+
+  .costs-report-print .print-kpi-card p {
+    color: inherit !important;
+  }
+
+  .costs-report-print .print-chart-card {
+    border: 1px solid #d1d5db !important;
+    background: #fff !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .costs-report-print .print-chart-card h2 {
+    color: #374151 !important;
+  }
+
+  .costs-report-print svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .costs-report-print-table-wrap {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .costs-report-data-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 9.5pt;
+  }
+
+  .costs-report-data-table thead {
+    display: table-header-group;
+  }
+
+  .costs-report-data-table thead th {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+    border: 1px solid #9ca3af !important;
+    padding: 6pt 8pt !important;
+  }
+
+  .costs-report-data-table tbody td {
+    border: 1px solid #d1d5db !important;
+    color: #111827 !important;
+    background: #fff !important;
+    padding: 5pt 8pt !important;
+  }
+
+  .costs-report-data-table tbody tr {
+    break-inside: avoid;
+  }
+
+  .costs-report-print .print-table-section h2 {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+    border-color: #9ca3af !important;
+  }
+
+  /* Line-wrap long names when printing */
+  .costs-report-print .print-name-cell {
+    max-width: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    word-break: break-word;
+  }
+}

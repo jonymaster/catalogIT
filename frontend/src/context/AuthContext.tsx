@@ -5,6 +5,7 @@ import {
   AuthContext,
   ROLE_HIERARCHY,
   decodePayload,
+  userHasFinancialView,
   type UserInfo,
 } from "./auth-context";
 
@@ -88,6 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canEdit =
     !!user?.role && (ROLE_HIERARCHY[user.role] ?? 0) >= ROLE_HIERARCHY.editor;
 
+  const canFinancialView = userHasFinancialView(user);
+
   return (
     <AuthContext.Provider
       value={{
@@ -96,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         preferences,
         preferencesLoading,
         canEdit,
+        canFinancialView,
         login,
         logout,
         setToken,

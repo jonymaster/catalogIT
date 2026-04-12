@@ -7,15 +7,27 @@ import {
 } from "react";
 import { ToastContext, type ToastState } from "./toast-context";
 
+const TOAST_DURATION_MS = 5000;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
+  const clearDismissTimer = useCallback(() => {
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const dismissToast = useCallback(() => {
+    clearDismissTimer();
+    setToast(null);
+  }, [clearDismissTimer]);
+
   const showToast = useCallback(
     (nextToast: { type: "success" | "error"; text: string }) => {
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
+      clearDismissTimer();
 
       setToast({
         id: Date.now(),
@@ -26,9 +38,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       timeoutRef.current = window.setTimeout(() => {
         setToast(null);
         timeoutRef.current = null;
-      }, 3000);
+      }, TOAST_DURATION_MS);
     },
-    [],
+    [clearDismissTimer],
   );
 
   const value = useMemo(() => ({ showToast }), [showToast]);
@@ -36,12 +48,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <ToastViewport toast={toast} />
+      <ToastViewport toast={toast} onDismiss={dismissToast} />
     </ToastContext.Provider>
   );
 }
 
-function ToastViewport({ toast }: { toast: ToastState | null }) {
+function ToastViewport({
+  toast,
+  onDismiss,
+}: {
+  toast: ToastState | null;
+  onDismiss: () => void;
+}) {
   if (!toast) {
     return null;
   }
@@ -52,12 +70,24 @@ function ToastViewport({ toast }: { toast: ToastState | null }) {
       : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200";
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-50">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-50 max-w-[min(24rem,calc(100vw-2rem))]">
       <div
         key={toast.id}
-        className={`min-w-72 rounded-lg border px-4 py-3 text-sm shadow-lg ${tone}`}
+        role={toast.type === "error" ? "alert" : "status"}
+        aria-live={toast.type === "error" ? "assertive" : "polite"}
+        className={`pointer-events-auto flex animate-fade-in-up items-start gap-2 rounded-lg border px-3 py-2.5 text-sm shadow-lg ${tone}`}
       >
-        {toast.text}
+        <p className="min-w-0 flex-1 leading-snug">{toast.text}</p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="-m-1 shrink-0 rounded-md p-1 text-current opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-current/40"
+          aria-label="Dismiss"
+        >
+          <span aria-hidden className="block text-lg leading-none">
+            &times;
+          </span>
+        </button>
       </div>
     </div>
   );

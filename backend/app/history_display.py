@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.category import Category
 from app.models.cost_center import CostCenter
 from app.models.contract import Contract
+from app.models.hardware_location import HardwareLocation
+from app.models.hardware_status import HardwareStatus
 from app.models.payment_method import PaymentMethod
 from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
@@ -35,6 +37,16 @@ def _user_label(u: User) -> str:
         return u.email
     name = f"{u.first_name or ''} {u.last_name or ''}".strip()
     return name or str(u.id)
+
+
+def _laptop_assignee_label(u: User) -> str:
+    """Prefer display name for laptop assignee history (matches detail / list copy)."""
+    name = f"{u.first_name or ''} {u.last_name or ''}".strip()
+    if name:
+        return name
+    if u.email:
+        return u.email
+    return str(u.id)
 
 
 def _contract_label(c: Contract) -> str:
@@ -130,9 +142,19 @@ def _friendly_service_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | N
 
 
 def _friendly_laptop_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Drop duplicate status FK when `status` is present; rename FK keys for timeline display."""
     if not d:
         return d
     out = dict(d)
+    if "hardware_status_id" in out:
+        if "status" in out:
+            del out["hardware_status_id"]
+        else:
+            out["status"] = out.pop("hardware_status_id")
+    if "hardware_location_id" in out:
+        val = out.pop("hardware_location_id")
+        if "location" not in out:
+            out["location"] = val
     if "assigned_to_id" in out:
         val = out.pop("assigned_to_id")
         if "assigned_to" not in out:
@@ -156,24 +178,39 @@ async def _humanize_laptop_fks(
     old_values: dict[str, Any] | None,
     new_values: dict[str, Any] | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    ids: set[uuid.UUID] = set()
+    keys = {
+        "assigned_to_id": (User, _laptop_assignee_label),
+        "hardware_status_id": (HardwareStatus, lambda r: r.name),
+        "hardware_location_id": (HardwareLocation, lambda r: r.name),
+    }
+
+    id_by_key: dict[str, set[uuid.UUID]] = {k: set() for k in keys}
     for side in (old_values, new_values):
-        if not side or "assigned_to_id" not in side:
+        if not side:
             continue
-        uid = _parse_uuid(side["assigned_to_id"])
-        if uid:
-            ids.add(uid)
-    if not ids:
-        return old_values, new_values
-    labels = await _load_labels(db, User, ids, _user_label)
+        for col in keys:
+            if col not in side:
+                continue
+            uid = _parse_uuid(side[col])
+            if uid:
+                id_by_key[col].add(uid)
+
+    label_maps: dict[str, dict[uuid.UUID, str]] = {}
+    for col, (model, label_fn) in keys.items():
+        ids = id_by_key[col]
+        if ids:
+            label_maps[col] = await _load_labels(db, model, ids, label_fn)
 
     def remap(d: dict[str, Any] | None) -> dict[str, Any] | None:
-        if not d or "assigned_to_id" not in d:
+        if not d:
             return d
         out = dict(d)
-        uid = _parse_uuid(out["assigned_to_id"])
-        if uid and uid in labels:
-            out["assigned_to_id"] = labels[uid]
+        for col, _ in keys.items():
+            if col not in out:
+                continue
+            uid = _parse_uuid(out[col])
+            if uid and col in label_maps and uid in label_maps[col]:
+                out[col] = label_maps[col][uid]
         return out
 
     return remap(old_values), remap(new_values)

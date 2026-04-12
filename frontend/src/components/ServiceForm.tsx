@@ -43,6 +43,7 @@ interface FormData {
   renewal_reminders_enabled: boolean;
   renewal_use_custom_offsets: boolean;
   renewal_offsets_input: string;
+  total_seats: string;
 }
 
 const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
@@ -73,6 +74,7 @@ function toFormData(s?: Service): FormData {
     ),
     renewal_offsets_input:
       s?.renewal_offsets_days?.join(", ") ?? "30, 14, 7, 1",
+    total_seats: s?.total_seats != null ? String(s.total_seats) : "",
   };
 }
 
@@ -96,7 +98,7 @@ export function ServiceForm({ initial }: Props) {
 
   useEffect(() => {
     Promise.all([
-      client.get<User[]>("/api/settings/users/"),
+      client.get<User[]>("/api/users/"),
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
       client.get<CostCenter[]>("/api/cost-centers/"),
@@ -192,6 +194,17 @@ export function ServiceForm({ initial }: Props) {
       }
     }
 
+    let total_seats: number | null = null;
+    if (form.total_seats.trim() !== "") {
+      const n = parseInt(form.total_seats, 10);
+      if (Number.isNaN(n) || n < 1) {
+        setError("Number of seats must be a positive integer, or leave blank for unlimited.");
+        setSaving(false);
+        return;
+      }
+      total_seats = n;
+    }
+
     const payload = {
       name: form.name,
       status: form.status,
@@ -201,6 +214,10 @@ export function ServiceForm({ initial }: Props) {
       sso_integrated: form.sso_integrated,
       notes: form.notes || null,
       owner_ids: form.owner_ids,
+      assignee_ids: isEdit
+        ? (initial?.assignees ?? []).map((a) => a.id)
+        : [],
+      total_seats,
       vendor_id: form.vendor_id || null,
       category_id: form.category_id || null,
       cost_center_id: form.cost_center_id || null,
@@ -232,7 +249,7 @@ export function ServiceForm({ initial }: Props) {
   }
 
   const inputCls =
-    "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-500 dark:focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 dark:ring-gray-400";
+    "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
   const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200";
 
   function renderFieldControl(key: ServiceFieldKey) {
@@ -442,7 +459,7 @@ export function ServiceForm({ initial }: Props) {
         );
       case "renewal_reminders":
         return (
-          <div className="col-span-full space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950 p-4">
+          <div className="col-span-full space-y-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-4">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {SERVICE_FIELD_LABELS.renewal_reminders}
             </p>
@@ -548,6 +565,23 @@ export function ServiceForm({ initial }: Props) {
             </label>
           </div>
         );
+      case "total_seats":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.total_seats}</label>
+            <input
+              type="number"
+              min={1}
+              className={inputCls}
+              value={form.total_seats}
+              onChange={(e) => set("total_seats", e.target.value)}
+              placeholder="Unlimited if empty"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Total licensed seats for this service. Leave empty if not capped.
+            </p>
+          </div>
+        );
       case "notes":
         return (
           <div className="col-span-full">
@@ -609,7 +643,7 @@ export function ServiceForm({ initial }: Props) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
+          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {saving ? "Saving..." : isEdit ? "Update Service" : "Create Service"}
         </button>

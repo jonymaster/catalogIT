@@ -9,6 +9,8 @@ interface Props {
   width?: number;
   height?: number;
   color?: string;
+  /** Called with bar index when a bar is clicked (e.g. year columns on the dashboard). */
+  onBarClick?: (index: number) => void;
 }
 
 const fmt = (n: number) =>
@@ -16,14 +18,22 @@ const fmt = (n: number) =>
 
 export function BarChart({
   data,
-  width = 600,
-  height = 220,
+  width = 640,
+  height = 300,
   color = "#6366f1",
+  onBarClick,
 }: Props) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  const bw = Math.min(60, (width - 80) / data.length - 8);
-  const startX = 70;
-  const chartH = height - 50;
+  const max = data.length ? Math.max(...data.map((d) => d.value), 1) : 1;
+  const n = Math.max(data.length, 1);
+  const slot = (width - 96) / n;
+  const bw = Math.min(96, Math.max(28, slot - 12));
+  const startX = 92;
+  /** Space above the plot for value labels (font ~14px + margin). */
+  const topInset = 36;
+  const bottomPad = 52;
+  const chartTop = topInset;
+  const chartBottom = height - bottomPad;
+  const chartH = chartBottom - chartTop;
 
   return (
     <svg
@@ -32,7 +42,7 @@ export function BarChart({
       style={{ maxHeight: height }}
     >
       {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-        const y = 10 + chartH * (1 - f);
+        const y = chartTop + chartH * (1 - f);
         return (
           <g key={f}>
             <line
@@ -44,11 +54,12 @@ export function BarChart({
               strokeWidth="0.5"
             />
             <text
-              x={startX - 6}
-              y={y + 3}
+              x={startX - 8}
+              y={y + 4}
               textAnchor="end"
-              fontSize="10"
-              className="fill-gray-400 dark:fill-gray-500"
+              fontSize="13"
+              fontWeight="500"
+              className="fill-gray-500 dark:fill-gray-400"
             >
               {fmt(max * f)}
             </text>
@@ -57,36 +68,41 @@ export function BarChart({
       })}
       {data.map((d, i) => {
         const bh = (d.value / max) * chartH;
-        const x =
-          startX + i * ((width - startX - 10) / data.length) + 4;
-        const y = 10 + chartH - bh;
+        const colW = (width - startX - 16) / n;
+        const x = startX + i * colW + (colW - bw) / 2;
+        const y = chartTop + chartH - bh;
         return (
-          <g key={i}>
+          <g
+            key={i}
+            className={onBarClick ? "cursor-pointer" : undefined}
+            onClick={() => onBarClick?.(i)}
+          >
             <rect
               x={x}
               y={y}
               width={bw}
               height={bh}
-              rx="3"
+              rx="4"
               fill={d.color || color}
               opacity="0.85"
             />
             <text
               x={x + bw / 2}
-              y={y - 4}
+              y={y - 10}
               textAnchor="middle"
-              fontSize="9"
-              fontWeight="500"
-              className="fill-gray-800 dark:fill-gray-100"
+              fontSize="14"
+              fontWeight="600"
+              className="fill-gray-900 dark:fill-gray-50"
             >
               {fmt(d.value)}
             </text>
             <text
               x={x + bw / 2}
-              y={height - 4}
+              y={height - 14}
               textAnchor="middle"
-              fontSize="10"
-              className="fill-gray-600 dark:fill-gray-400"
+              fontSize="14"
+              fontWeight="600"
+              className="fill-gray-700 dark:fill-gray-300"
             >
               {d.label}
             </text>

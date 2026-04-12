@@ -2,17 +2,19 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeSync } from "./components/ThemeSync";
 import { ToastProvider } from "./context/ToastContext";
-import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ProtectedRoute, RequireFinancialView } from "./components/ProtectedRoute";
 import { Shell } from "./components/Shell";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
 import { ResetPassword } from "./pages/ResetPassword";
+import { CostsReport } from "./pages/CostsReport";
 import { Dashboard } from "./pages/Dashboard";
 import { Calendar } from "./pages/Calendar";
 import { Services } from "./pages/Services";
 import { ServiceDetail } from "./pages/ServiceDetail";
 import { ServiceOverview } from "./pages/ServiceOverview";
 import { ServiceCosts } from "./pages/ServiceCosts";
+import { ServiceAssignments } from "./pages/ServiceAssignments";
 import { CostRecordCreate } from "./pages/CostRecordCreate";
 import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
@@ -35,6 +37,7 @@ import { SettingsReferenceDataResource } from "./pages/settings/SettingsReferenc
 import { SettingsNotifications } from "./pages/settings/SettingsNotifications";
 import { SettingsAuditLog } from "./pages/settings/SettingsAuditLog";
 import { SettingsRecordDeletion } from "./pages/settings/SettingsRecordDeletion";
+import { SettingsExport } from "./pages/settings/SettingsExport";
 
 export default function App() {
   return (
@@ -49,12 +52,21 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<Shell />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route
+                  path="/costs"
+                  element={
+                    <RequireFinancialView>
+                      <CostsReport />
+                    </RequireFinancialView>
+                  }
+                />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/services/new" element={<ServiceCreate />} />
                 <Route path="/services/:id" element={<ServiceDetail />}>
                   <Route index element={<ServiceOverview />} />
                   <Route path="costs" element={<ServiceCosts />} />
+                  <Route path="assignments" element={<ServiceAssignments />} />
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
@@ -85,6 +97,7 @@ export default function App() {
                     />
                   </Route>
                   <Route path="record-deletion" element={<SettingsRecordDeletion />} />
+                  <Route path="export" element={<SettingsExport />} />
                   <Route path="tokens" element={<SettingsTokens />} />
                   <Route path="api" element={<SettingsApi />} />
                 </Route>
