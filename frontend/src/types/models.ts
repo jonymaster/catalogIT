@@ -145,6 +145,7 @@ export interface Service {
   renewal_date: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;
+  point_of_contact: string | null;
   notes: string | null;
   owners: User[];
   assignees: User[];
