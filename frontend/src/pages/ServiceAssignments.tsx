@@ -222,7 +222,7 @@ export function ServiceAssignments() {
 
       {manageOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="manage-assignments-title"
@@ -233,7 +233,7 @@ export function ServiceAssignments() {
             aria-label="Close"
             onClick={() => !saving && setManageOpen(false)}
           />
-          <div className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl border border-gray-200 dark:border-gray-800 bg-white shadow-xl dark:bg-gray-900">
+          <div className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col self-center rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
             <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
               <h2
                 id="manage-assignments-title"
