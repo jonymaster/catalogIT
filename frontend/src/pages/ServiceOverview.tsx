@@ -170,6 +170,12 @@ function renderField(
           {service.notes?.trim() ? service.notes : "—"}
         </Field>
       );
+    case "point_of_contact":
+      return (
+        <Field label={SERVICE_FIELD_LABELS.point_of_contact}>
+          {service.point_of_contact?.trim() ? service.point_of_contact : "—"}
+        </Field>
+      );
     default:
       return null;
   }
@@ -194,7 +200,9 @@ export function ServiceOverview() {
               <div
                 key={key}
                 className={
-                  key === "notes" || key === "renewal_reminders"
+                  key === "notes" ||
+                  key === "renewal_reminders" ||
+                  key === "point_of_contact"
                     ? "col-span-full"
                     : undefined
                 }

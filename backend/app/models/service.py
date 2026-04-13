@@ -70,6 +70,7 @@ class Service(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     deprecated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    point_of_contact: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     total_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

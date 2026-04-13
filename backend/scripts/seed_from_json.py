@@ -228,6 +228,8 @@ async def _seed_services(session: AsyncSession) -> None:
             scim_enabled=r.get("scim_enabled", False),
             criticality=r.get("criticality"),
             nonprofit_pricing=r.get("nonprofit_pricing", False),
+            point_of_contact=r.get("point_of_contact"),
+            notes=r.get("notes"),
         )
         session.add(svc)
         await session.flush()

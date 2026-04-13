@@ -11,6 +11,7 @@ export function ServiceEdit() {
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+  const [pointOfContact, setPointOfContact] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -21,6 +22,7 @@ export function ServiceEdit() {
       .then((r) => {
         setService(r.data);
         setStatus(r.data.status);
+        setPointOfContact(r.data.point_of_contact ?? "");
         setNotes(r.data.notes ?? "");
       })
       .finally(() => setLoading(false));
@@ -33,6 +35,7 @@ export function ServiceEdit() {
     try {
       const response = await client.put<Service>(`/api/services/${id}`, {
         status,
+        point_of_contact: pointOfContact.trim() || null,
         notes: notes.trim() || null,
       });
       setService(response.data);
@@ -49,6 +52,7 @@ export function ServiceEdit() {
     const response = await client.post<Service>(endpoint);
     setService(response.data);
     setStatus(response.data.status);
+    setPointOfContact(response.data.point_of_contact ?? "");
     setNotes(response.data.notes ?? "");
   }
 
@@ -105,6 +109,20 @@ export function ServiceEdit() {
                 onChange={(event) => setStatus(event.target.value)}
                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                Point of contact
+              </label>
+              <input
+                value={pointOfContact}
+                onChange={(event) => setPointOfContact(event.target.value)}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                placeholder="e.g. Jane Doe (Vendor Account Manager)"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Main person to contact for account management or vendor support.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">

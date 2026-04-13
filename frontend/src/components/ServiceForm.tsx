@@ -29,6 +29,7 @@ interface FormData {
   renewal_date: string;
   yearly_cost: string;
   sso_integrated: boolean;
+  point_of_contact: string;
   notes: string;
   owner_ids: string[];
   vendor_id: string;
@@ -57,6 +58,7 @@ function toFormData(s?: Service): FormData {
     renewal_date: s?.renewal_date ?? "",
     yearly_cost: s?.yearly_cost != null ? String(s.yearly_cost) : "",
     sso_integrated: s?.sso_integrated ?? false,
+    point_of_contact: s?.point_of_contact ?? "",
     notes: s?.notes ?? "",
     owner_ids: s?.owners.map((o) => o.id) ?? [],
     vendor_id: s?.vendor_id ?? "",
@@ -212,6 +214,7 @@ export function ServiceForm({ initial }: Props) {
       renewal_date: form.renewal_date || null,
       yearly_cost: form.yearly_cost ? Number(form.yearly_cost) : null,
       sso_integrated: form.sso_integrated,
+      point_of_contact: form.point_of_contact.trim() || null,
       notes: form.notes || null,
       owner_ids: form.owner_ids,
       assignee_ids: isEdit
@@ -594,6 +597,24 @@ export function ServiceForm({ initial }: Props) {
             />
           </div>
         );
+      case "point_of_contact":
+        return (
+          <div className="col-span-full">
+            <label className={labelCls}>
+              {SERVICE_FIELD_LABELS.point_of_contact}
+            </label>
+            <input
+              type="text"
+              className={inputCls}
+              value={form.point_of_contact}
+              onChange={(e) => set("point_of_contact", e.target.value)}
+              placeholder="e.g. Jane Doe (Vendor Account Manager)"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Main person to contact for account management or vendor support.
+            </p>
+          </div>
+        );
       default:
         return null;
     }
@@ -627,7 +648,9 @@ export function ServiceForm({ initial }: Props) {
               <div
                 key={key}
                 className={
-                  key === "notes" || key === "renewal_reminders"
+                  key === "notes" ||
+                  key === "renewal_reminders" ||
+                  key === "point_of_contact"
                     ? "col-span-full"
                     : undefined
                 }

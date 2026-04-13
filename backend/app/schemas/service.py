@@ -21,6 +21,7 @@ class ServiceCreate(BaseModel):
     renewal_date: date | None = None
     yearly_cost: float | None = None
     sso_integrated: bool = False
+    point_of_contact: str | None = None
     notes: str | None = None
     owner_ids: list[uuid.UUID] = []
     # New fields
@@ -54,6 +55,7 @@ class ServiceUpdate(BaseModel):
     renewal_date: date | None = None
     yearly_cost: float | None = None
     sso_integrated: bool | None = None
+    point_of_contact: str | None = None
     notes: str | None = None
     owner_ids: list[uuid.UUID] | None = None
     # New fields
@@ -89,6 +91,7 @@ class ServiceRead(BaseModel):
     renewal_date: date | None
     yearly_cost: float | None
     sso_integrated: bool
+    point_of_contact: str | None
     notes: str | None
     owners: list[UserRead]
     assignees: list[UserRead]

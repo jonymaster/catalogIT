@@ -125,6 +125,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "renewal_reminders_enabled": s.renewal_reminders_enabled,
             "renewal_offsets_days": s.renewal_offsets_days,
             "total_seats": s.total_seats,
+            "point_of_contact": s.point_of_contact,
             "notes": s.notes,
         }
         services_out.append(row)
