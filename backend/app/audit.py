@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session, UOWTransaction
@@ -54,6 +55,8 @@ AUDITED_TABLES: frozenset[str] = frozenset(
 
 def _serialize_value(value):
     if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, Decimal):
         return str(value)
     if isinstance(value, (date, datetime)):
         if isinstance(value, datetime) and value.tzinfo is not None:
