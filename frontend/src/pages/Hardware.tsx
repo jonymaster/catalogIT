@@ -11,6 +11,7 @@ import { ColumnSelector } from "../components/ColumnSelector";
 import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
+import { ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
@@ -41,6 +42,10 @@ function getAssigneeName(laptop: Laptop) {
   return laptop.assigned_to
     ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name}`
     : "--";
+}
+
+function getHardwareStatusDisplayLabel(laptop: Laptop): string {
+  return laptop.hardware_status?.name ?? laptop.status;
 }
 
 function getHardwareSortValue(
@@ -98,11 +103,19 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     key: "status",
     label: "Status",
     filterType: "select",
-    getFilterValue: (laptop) => laptop.status,
-    getSortValue: (laptop) => laptop.status,
+    getFilterValue: getHardwareStatusDisplayLabel,
+    getSortValue: (laptop) => getHardwareStatusDisplayLabel(laptop),
     getFilterOptions: (laptops) =>
-      getUniqueOptions(laptops.map((laptop) => laptop.status)),
-    render: (laptop) => <StatusBadge status={laptop.status} />,
+      getUniqueOptions(laptops.map((laptop) => getHardwareStatusDisplayLabel(laptop))),
+    render: (laptop) =>
+      laptop.hardware_status ? (
+        <ColoredReferenceBadge
+          label={laptop.hardware_status.name}
+          color={laptop.hardware_status.color}
+        />
+      ) : (
+        <StatusBadge status={laptop.status} />
+      ),
   },
   {
     key: "hardware_location",
@@ -208,6 +221,7 @@ export function Hardware() {
         laptop.model_name.toLowerCase().includes(q) ||
         laptop.cpu.toLowerCase().includes(q) ||
         laptop.status.toLowerCase().includes(q) ||
+        (laptop.hardware_status?.name ?? "").toLowerCase().includes(q) ||
         locName.toLowerCase().includes(q) ||
         getAssigneeName(laptop).toLowerCase().includes(q);
 

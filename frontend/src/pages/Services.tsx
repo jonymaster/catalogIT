@@ -3,7 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import { ArrowDownTrayIcon, PlusIcon } from "../components/Icons";
-import { ClassificationBadge, CriticalityBadge } from "../components/Badge";
+import {
+  BooleanYesNoBadge,
+  ClassificationBadge,
+  ColoredReferenceBadge,
+  CriticalityBadge,
+} from "../components/Badge";
 import {
   ColumnHeaderMenu,
   type SortDirection,
@@ -115,9 +120,15 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getSortValue: (service) => getServiceStatusLabel(service),
     getFilterOptions: (services) =>
       getUniqueOptions(services.map((service) => getServiceStatusLabel(service))),
-    render: (service) => (
-      <StatusBadge status={getServiceStatusLabel(service)} />
-    ),
+    render: (service) =>
+      service.service_status ? (
+        <ColoredReferenceBadge
+          label={service.service_status.name}
+          color={service.service_status.color}
+        />
+      ) : (
+        <StatusBadge status={getServiceStatusLabel(service)} />
+      ),
   },
   {
     key: "spending_category",
@@ -127,7 +138,15 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getSortValue: (service) => categoryLabel(service),
     getFilterOptions: (services) =>
       getUniqueOptions(services.map((service) => categoryLabel(service))),
-    render: (service) => categoryLabel(service) || "--",
+    render: (service) =>
+      service.category_rel ? (
+        <ColoredReferenceBadge
+          label={service.category_rel.name}
+          color={service.category_rel.color}
+        />
+      ) : (
+        "--"
+      ),
   },
   {
     key: "cost_center",
@@ -173,7 +192,9 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getFilterValue: (service) => getBooleanLabel(service.nonprofit_pricing),
     getSortValue: (service) => service.nonprofit_pricing,
     getFilterOptions: () => ["No", "Yes"],
-    render: (service) => getBooleanLabel(service.nonprofit_pricing),
+    render: (service) => (
+      <BooleanYesNoBadge value={service.nonprofit_pricing} />
+    ),
   },
   {
     key: "yearly_cost",
@@ -198,7 +219,15 @@ const columnDefinitions: ServiceColumnDefinition[] = [
       getUniqueOptions(
         services.map((service) => service.payment_method?.name ?? "--"),
       ),
-    render: (service) => service.payment_method?.name ?? "--",
+    render: (service) =>
+      service.payment_method ? (
+        <ColoredReferenceBadge
+          label={service.payment_method.name}
+          color={service.payment_method.color}
+        />
+      ) : (
+        "--"
+      ),
   },
   {
     key: "billing_schedule",
@@ -228,7 +257,9 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getFilterValue: (service) => getBooleanLabel(service.sso_integrated),
     getSortValue: (service) => service.sso_integrated,
     getFilterOptions: () => ["No", "Yes"],
-    render: (service) => getBooleanLabel(service.sso_integrated),
+    render: (service) => (
+      <BooleanYesNoBadge value={service.sso_integrated} />
+    ),
   },
   {
     key: "scim_enabled",
@@ -237,7 +268,7 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getFilterValue: getScimLabel,
     getSortValue: (service) => service.scim_enabled ?? false,
     getFilterOptions: () => ["--", "No", "Yes"],
-    render: getScimLabel,
+    render: (service) => <BooleanYesNoBadge value={service.scim_enabled} />,
   },
   {
     key: "vendor",

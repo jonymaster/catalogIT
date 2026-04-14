@@ -19,6 +19,7 @@ from app.routers.reference_data_utils import (
     refresh_and_return,
     validate_safe_delete,
 )
+from app.reference_data_colors import pick_random_badge_color
 from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
@@ -45,7 +46,11 @@ async def create_category(
     db: AsyncSession = Depends(get_audited_db),
 ):
     await ensure_unique_name(db, Category, body.name)
-    category = Category(name=body.name.strip(), description=body.description)
+    category = Category(
+        name=body.name.strip(),
+        description=body.description,
+        color=body.color or pick_random_badge_color(),
+    )
     db.add(category)
     return await refresh_and_return(db, category)
 
@@ -66,6 +71,9 @@ async def update_category(
 
     if "description" in update_data:
         category.description = update_data["description"]
+
+    if "color" in update_data and update_data["color"] is not None:
+        category.color = update_data["color"]
 
     return await refresh_and_return(db, category)
 

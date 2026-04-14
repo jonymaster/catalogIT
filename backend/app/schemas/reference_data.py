@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-ReferenceFieldType = Literal["text", "textarea", "url"]
+ReferenceFieldType = Literal["text", "textarea", "url", "badge_preset"]
 
 
 class ReferenceDataFieldRead(BaseModel):

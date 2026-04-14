@@ -4,20 +4,25 @@ import uuid
 
 from pydantic import BaseModel
 
+from app.schemas.badge_preset_field import OptionalBadgePreset
+
 
 class CategoryCreate(BaseModel):
     name: str
     description: str | None = None
+    color: OptionalBadgePreset = None
 
 
 class CategoryUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    color: OptionalBadgePreset = None
 
 
 class CategoryRead(BaseModel):
     id: uuid.UUID
     name: str
     description: str | None
+    color: str
 
     model_config = {"from_attributes": True}

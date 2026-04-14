@@ -13,6 +13,11 @@ import type { Column } from "../../components/DataTable";
 import { DataTable } from "../../components/DataTable";
 import { PageTransition } from "../../components/PageTransition";
 import { SearchInput } from "../../components/SearchInput";
+import {
+  REFERENCE_BADGE_PRESET_CLASSES,
+  REFERENCE_BADGE_PRESETS,
+  isReferenceBadgePresetId,
+} from "../../constants/referenceBadgePresets";
 import type {
   ReferenceDataField,
   ReferenceDataRecord,
@@ -72,6 +77,34 @@ function ResourceFieldInput({
           className={sharedClassName}
           onChange={(event) => onChange(event.target.value)}
         />
+      ) : field.input_type === "badge_preset" ? (
+        <div className="mt-2.5">
+          <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-5 md:grid-cols-6">
+            {REFERENCE_BADGE_PRESETS.map((preset) => {
+              const selected = value.trim().toLowerCase() === preset.id;
+              const chipClass = REFERENCE_BADGE_PRESET_CLASSES[preset.id];
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  title={preset.label}
+                  onClick={() => onChange(preset.id)}
+                  className={`min-h-[2.875rem] rounded-lg border p-2 text-left transition-colors sm:min-h-[3rem] sm:p-2.5 ${
+                    selected
+                      ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/25 dark:border-brand-400 dark:bg-brand-950/40"
+                      : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:hover:border-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`flex min-h-[1.75rem] items-center justify-center rounded-full px-2 py-1 text-center text-[11px] font-medium leading-tight sm:min-h-[1.875rem] sm:text-xs ${chipClass}`}
+                  >
+                    {preset.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       ) : (
         <input
           type={field.input_type}
@@ -248,7 +281,25 @@ export function SettingsReferenceDataResource() {
       .map<Column<ReferenceDataRecord>>((field) => ({
         key: field.key,
         header: field.label,
-        render: (row) => row[field.key] || "--",
+        render: (row) => {
+          const cell = row[field.key];
+          if (field.input_type === "badge_preset") {
+            const id =
+              typeof cell === "string" ? cell.trim().toLowerCase() : "";
+            if (!id || !isReferenceBadgePresetId(id)) return "--";
+            const label =
+              REFERENCE_BADGE_PRESETS.find((p) => p.id === id)?.label ?? id;
+            const chipClass = REFERENCE_BADGE_PRESET_CLASSES[id];
+            return (
+              <span
+                className={`inline-flex max-w-full whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${chipClass}`}
+              >
+                {label}
+              </span>
+            );
+          }
+          return cell || "--";
+        },
       }));
 
     return [
@@ -333,12 +384,15 @@ export function SettingsReferenceDataResource() {
 
       <dialog
         ref={dialogRef}
-        className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-gray-800 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0"
+        className="max-h-[90vh] w-[calc(100%-1.5rem)] max-w-3xl overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 p-0 shadow-xl backdrop:bg-black/40 open:fixed open:top-1/2 open:left-1/2 open:-translate-x-1/2 open:-translate-y-1/2 open:m-0 sm:w-[calc(100%-2rem)]"
         onClose={() => {
           setEditingRecord(null);
         }}
       >
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
+        <form
+          onSubmit={handleSubmit}
+          className="max-h-[90vh] space-y-5 overflow-y-auto p-6 sm:p-7"
+        >
           <div className="space-y-1">
             <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {editingRecord ? `Edit ${resource.label}` : `Add ${resource.label}`}
@@ -350,7 +404,12 @@ export function SettingsReferenceDataResource() {
             {resource.fields.map((field) => (
               <div
                 key={field.key}
-                className={field.input_type === "textarea" ? "md:col-span-2" : undefined}
+                className={
+                  field.input_type === "textarea" ||
+                  field.input_type === "badge_preset"
+                    ? "md:col-span-2"
+                    : undefined
+                }
               >
                 <ResourceFieldInput
                   field={field}

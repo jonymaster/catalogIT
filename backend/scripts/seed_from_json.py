@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session, engine
+from app.reference_data_colors import coerce_badge_preset_value, pick_random_badge_color
 from app.models import (
     Category,
     CostRecord,
@@ -102,7 +103,15 @@ async def _seed_categories(session: AsyncSession) -> None:
         existing = await session.get(Category, uid)
         if existing:
             continue
-        session.add(Category(id=uid, name=r["name"], description=r.get("description")))
+        raw_color = r.get("color")
+        color = (
+            coerce_badge_preset_value(str(raw_color))
+            if raw_color
+            else pick_random_badge_color()
+        )
+        session.add(
+            Category(id=uid, name=r["name"], description=r.get("description"), color=color)
+        )
     await session.flush()
     print(f"  categories: {len(rows)} processed")
 
@@ -114,7 +123,20 @@ async def _seed_payment_methods(session: AsyncSession) -> None:
         existing = await session.get(PaymentMethod, uid)
         if existing:
             continue
-        session.add(PaymentMethod(id=uid, name=r["name"], method_type=r.get("method_type", "")))
+        raw_color = r.get("color")
+        color = (
+            coerce_badge_preset_value(str(raw_color))
+            if raw_color
+            else pick_random_badge_color()
+        )
+        session.add(
+            PaymentMethod(
+                id=uid,
+                name=r["name"],
+                method_type=r.get("method_type", ""),
+                color=color,
+            )
+        )
     await session.flush()
     print(f"  payment_methods: {len(rows)} processed")
 
@@ -152,7 +174,14 @@ async def _seed_service_statuses(session: AsyncSession) -> None:
         )
         if result.scalar_one_or_none():
             continue
-        session.add(ServiceStatus(id=uid, name=name, description=description))
+        session.add(
+            ServiceStatus(
+                id=uid,
+                name=name,
+                description=description,
+                color=pick_random_badge_color(),
+            )
+        )
     await session.flush()
     print(f"  service_statuses: {len(status_rows)} processed")
 
