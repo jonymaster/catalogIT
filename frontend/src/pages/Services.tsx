@@ -450,7 +450,7 @@ export function Services() {
   }, [filtered, preferences, visibleKeys]);
 
   const showDescriptionTooltip = useCallback(
-    (event: React.MouseEvent<HTMLSpanElement>, description: string) => {
+    (event: React.SyntheticEvent<HTMLSpanElement>, description: string) => {
       const containerRect = pageRef.current?.getBoundingClientRect();
       if (!containerRect) return;
       const rect = event.currentTarget.getBoundingClientRect();
