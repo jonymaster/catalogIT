@@ -9,6 +9,8 @@ export type BadgeColor =
   | "blue"
   | "purple"
   | "amber"
+  | "yellow"
+  | "orange"
   | "red"
   | "teal"
   | "pink";
@@ -19,6 +21,8 @@ const colorMap: Record<BadgeColor, string> = {
   blue: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   purple: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
   amber: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  yellow: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+  orange: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
   red: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   teal: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
   pink: "bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-300",
@@ -41,9 +45,9 @@ export function Badge({ children, color = "gray" }: Props) {
 
 const criticalityColors: Record<string, BadgeColor> = {
   Critical: "red",
-  High: "amber",
-  Medium: "blue",
-  Low: "gray",
+  High: "orange",
+  Medium: "yellow",
+  Low: "blue",
 };
 
 export function CriticalityBadge({ value }: { value: string | null }) {
