@@ -145,6 +145,7 @@ export interface ServiceHistoryEntry {
 export interface Service {
   id: string;
   name: string;
+  description: string | null;
   status: string;
   billing_schedule: string;
   renewal_date: string | null;

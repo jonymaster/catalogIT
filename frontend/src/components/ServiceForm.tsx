@@ -24,6 +24,7 @@ interface Props {
 
 interface FormData {
   name: string;
+  description: string;
   status: string;
   billing_schedule: string;
   renewal_date: string;
@@ -53,6 +54,7 @@ const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
 function toFormData(s?: Service): FormData {
   return {
     name: s?.name ?? "",
+    description: s?.description ?? "",
     status: s?.status ?? "Contract",
     billing_schedule: s?.billing_schedule ?? "",
     renewal_date: s?.renewal_date ?? "",
@@ -209,6 +211,7 @@ export function ServiceForm({ initial }: Props) {
 
     const payload = {
       name: form.name,
+      description: form.description.trim() || null,
       status: form.status,
       billing_schedule: form.billing_schedule,
       renewal_date: form.renewal_date || null,
@@ -636,6 +639,20 @@ export function ServiceForm({ initial }: Props) {
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
         />
+      </div>
+
+      <div>
+        <label className={labelCls}>Description</label>
+        <input
+          maxLength={255}
+          className={inputCls + " mt-1 max-w-xl"}
+          value={form.description}
+          onChange={(e) => set("description", e.target.value)}
+          placeholder="Short service description"
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {form.description.length}/255 characters
+        </p>
       </div>
 
       {SERVICE_VIEW_SECTIONS.map((section) => (

@@ -64,6 +64,11 @@ export function ServiceDetail() {
           <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {service.name}
           </h1>
+          {service.description && (
+            <p className="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+              {service.description}
+            </p>
+          )}
         </div>
         {canEdit && (
           <Link

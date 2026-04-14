@@ -109,6 +109,18 @@ export function MagnifyingGlassIcon({ className = "h-5 w-5", ...p }: IconProps) 
   );
 }
 
+export function InformationCircleIcon({ className = "h-5 w-5", ...p }: IconProps) {
+  return (
+    <svg {...defaults} className={className} {...p}>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.02M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+      />
+    </svg>
+  );
+}
+
 export function ArrowDownTrayIcon({ className = "h-5 w-5", ...p }: IconProps) {
   return (
     <svg {...defaults} className={className} {...p}>

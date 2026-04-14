@@ -20,7 +20,13 @@ router = APIRouter(prefix="/api/services", tags=["services"])
 
 _writer = require_role("admin", "editor")
 _admin = require_role("admin")
-_ARCHIVED_SERVICE_EDITABLE_FIELDS = {"point_of_contact", "notes", "status", "service_status_id"}
+_ARCHIVED_SERVICE_EDITABLE_FIELDS = {
+    "description",
+    "point_of_contact",
+    "notes",
+    "status",
+    "service_status_id",
+}
 
 
 def _ensure_seat_capacity(total_seats: int | None, assignee_count: int) -> None:
@@ -37,7 +43,7 @@ def _validate_archived_service_update_fields(update_data: dict[str, object]) -> 
     if disallowed_fields:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Archived services only allow updates to point of contact, notes, and status",
+            detail="Archived services only allow updates to description, point of contact, notes, and status",
         )
 
 
@@ -134,6 +140,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
 
     service = Service(
         name=body.name,
+        description=body.description,
         status=service_status.name if service_status else body.status,
         billing_schedule=body.billing_schedule,
         renewal_date=body.renewal_date,
