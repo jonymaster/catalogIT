@@ -31,6 +31,7 @@ class Service(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     status: Mapped[str] = mapped_column(String(50))
     yearly_cost: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)

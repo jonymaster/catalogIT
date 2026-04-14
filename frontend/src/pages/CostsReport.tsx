@@ -13,6 +13,7 @@ import {
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import {
   buildStackedYearData,
+  combinedActualEstimatedByYear,
   classificationBarColor,
   costCenterFilterOptions,
   distinctCategoryNames,
@@ -20,7 +21,9 @@ import {
   filterCostRecords,
   fmtFull,
   getCategoryColor,
+  isCurrentOrFutureFiscalYear,
   totalByYear,
+  visualAmountForRecordTypeAndYear,
   yoyPercent,
   categoryDisplayName,
 } from "../utils/dashboardCostAggregates";
@@ -30,6 +33,7 @@ const RECORD_TYPE_LABELS: Record<string, string> = {
   estimated: "Estimated",
   budget: "Budget",
 };
+const COMBINED_RECORD_TYPE_LABEL = "Actual + Estimated";
 
 function classificationLabel(slug: string): string {
   if (slug === "") return "(None)";
@@ -140,6 +144,9 @@ export function CostsReport() {
   const [fiscalYearsFilter, setFiscalYearsFilter] = useState<number[]>([]);
   const [focusYear, setFocusYear] = useState<number | null>(null);
   const [printGeneratedAt, setPrintGeneratedAt] = useState("");
+  const [combineActualEstimatedCfYears, setCombineActualEstimatedCfYears] =
+    useState(true);
+  const currentYear = new Date().getFullYear();
 
   const categoryOptions = useMemo(() => {
     return distinctCategoryNames(allRecords).map((v) => ({
@@ -198,24 +205,108 @@ export function CostsReport() {
     ],
   );
 
-  const recordsTypeA = useMemo(
+  const filteredRecordsAllTypes = useMemo(
     () =>
-      filteredRecords.filter((r) => r.record_type === comparisonTypes[0]),
-    [filteredRecords, comparisonTypes],
+      filterCostRecords(allRecords, {
+        categories,
+        source,
+        classifications,
+        comparisonRecordTypes: ["actual", "estimated", "budget"],
+        costCenters,
+        fiscalYears: fiscalYearsFilter,
+      }),
+    [
+      allRecords,
+      categories,
+      source,
+      classifications,
+      costCenters,
+      fiscalYearsFilter,
+    ],
   );
 
-  const recordsTypeB = useMemo(
-    () =>
-      comparisonTypes.length > 1
-        ? filteredRecords.filter((r) => r.record_type === comparisonTypes[1])
-        : [],
-    [filteredRecords, comparisonTypes],
-  );
+  const recordsForSelectedVisuals = useMemo(() => {
+    const selectedTypes = new Set(comparisonTypes);
+    return filteredRecordsAllTypes.filter((record) => {
+      if (record.record_type === "budget") {
+        return selectedTypes.has("budget");
+      }
+      if (record.record_type === "actual" || record.record_type === "estimated") {
+        if (
+          combineActualEstimatedCfYears &&
+          isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+        ) {
+          return selectedTypes.has("actual") || selectedTypes.has("estimated");
+        }
+        return selectedTypes.has(record.record_type);
+      }
+      return selectedTypes.has(record.record_type as never);
+    });
+  }, [
+    comparisonTypes,
+    filteredRecordsAllTypes,
+    currentYear,
+    combineActualEstimatedCfYears,
+  ]);
+
+  const visualRecordsTypeA = useMemo(() => {
+    const typeA = comparisonTypes[0];
+    if (!typeA) return [];
+    return recordsForSelectedVisuals.filter((record) => {
+      if (
+        combineActualEstimatedCfYears &&
+        typeA === "actual" &&
+        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+      ) {
+        return record.record_type === "actual" || record.record_type === "estimated";
+      }
+      if (
+        combineActualEstimatedCfYears &&
+        typeA === "estimated" &&
+        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+      ) {
+        return record.record_type === "actual" || record.record_type === "estimated";
+      }
+      return record.record_type === typeA;
+    });
+  }, [
+    comparisonTypes,
+    recordsForSelectedVisuals,
+    currentYear,
+    combineActualEstimatedCfYears,
+  ]);
+
+  const visualRecordsTypeB = useMemo(() => {
+    const typeB = comparisonTypes[1];
+    if (!typeB) return [];
+    return recordsForSelectedVisuals.filter((record) => {
+      if (
+        combineActualEstimatedCfYears &&
+        typeB === "actual" &&
+        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+      ) {
+        return record.record_type === "actual" || record.record_type === "estimated";
+      }
+      if (
+        combineActualEstimatedCfYears &&
+        typeB === "estimated" &&
+        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+      ) {
+        return record.record_type === "actual" || record.record_type === "estimated";
+      }
+      return record.record_type === typeB;
+    });
+  }, [
+    comparisonTypes,
+    recordsForSelectedVisuals,
+    currentYear,
+    combineActualEstimatedCfYears,
+  ]);
 
   const chartYears = useMemo(() => {
-    const ys = new Set(filteredRecords.map((r) => r.fiscal_year));
+    const ys = new Set(recordsForSelectedVisuals.map((r) => r.fiscal_year));
     return Array.from(ys).sort((a, b) => a - b);
-  }, [filteredRecords]);
+  }, [recordsForSelectedVisuals]);
 
   const displayYear = useMemo(() => {
     if (chartYears.length === 0) return null;
@@ -226,48 +317,158 @@ export function CostsReport() {
   }, [chartYears, focusYear]);
 
   const costByYearA = useMemo(
-    () => totalByYear(recordsTypeA, chartYears),
-    [recordsTypeA, chartYears],
+    () => totalByYear(visualRecordsTypeA, chartYears),
+    [visualRecordsTypeA, chartYears],
   );
 
   const costByYearB = useMemo(
-    () => totalByYear(recordsTypeB, chartYears),
-    [recordsTypeB, chartYears],
+    () => totalByYear(visualRecordsTypeB, chartYears),
+    [visualRecordsTypeB, chartYears],
   );
+  const combinedByYear = useMemo(() => {
+    if (!combineActualEstimatedCfYears) return {} as Record<number, number>;
+    return combinedActualEstimatedByYear(
+      recordsForSelectedVisuals,
+      chartYears,
+      currentYear,
+    );
+  }, [
+    combineActualEstimatedCfYears,
+    recordsForSelectedVisuals,
+    chartYears,
+    currentYear,
+  ]);
+  const visualCostByYearA = useMemo(() => {
+    if (!combineActualEstimatedCfYears) return costByYearA;
+    return chartYears.reduce<Record<number, number>>((acc, year) => {
+      acc[year] = visualAmountForRecordTypeAndYear(
+        comparisonTypes[0] ?? "",
+        year,
+        costByYearA[year] ?? 0,
+        combinedByYear[year] ?? 0,
+        currentYear,
+      );
+      return acc;
+    }, {});
+  }, [
+    combineActualEstimatedCfYears,
+    chartYears,
+    comparisonTypes,
+    costByYearA,
+    combinedByYear,
+    currentYear,
+  ]);
+  const visualCostByYearB = useMemo(() => {
+    if (!combineActualEstimatedCfYears) return costByYearB;
+    return chartYears.reduce<Record<number, number>>((acc, year) => {
+      acc[year] = visualAmountForRecordTypeAndYear(
+        comparisonTypes[1] ?? "",
+        year,
+        costByYearB[year] ?? 0,
+        combinedByYear[year] ?? 0,
+        currentYear,
+      );
+      return acc;
+    }, {});
+  }, [
+    combineActualEstimatedCfYears,
+    chartYears,
+    comparisonTypes,
+    costByYearB,
+    combinedByYear,
+    currentYear,
+  ]);
 
   const yoyA =
-    displayYear !== null ? yoyPercent(costByYearA, displayYear) : 0;
+    displayYear !== null ? yoyPercent(visualCostByYearA, displayYear) : 0;
   const yoyB =
-    displayYear !== null ? yoyPercent(costByYearB, displayYear) : 0;
+    displayYear !== null ? yoyPercent(visualCostByYearB, displayYear) : 0;
 
   const categoryNamesForStackA = useMemo(
-    () => distinctCategoryNames(recordsTypeA),
-    [recordsTypeA],
+    () => distinctCategoryNames(visualRecordsTypeA),
+    [visualRecordsTypeA],
   );
 
   const categoryNamesForStackB = useMemo(
-    () => distinctCategoryNames(recordsTypeB),
-    [recordsTypeB],
+    () => distinctCategoryNames(visualRecordsTypeB),
+    [visualRecordsTypeB],
   );
 
   const stackedDataA = useMemo(
     () =>
-      buildStackedYearData(recordsTypeA, chartYears, categoryNamesForStackA),
-    [recordsTypeA, chartYears, categoryNamesForStackA],
+      buildStackedYearData(visualRecordsTypeA, chartYears, categoryNamesForStackA),
+    [visualRecordsTypeA, chartYears, categoryNamesForStackA],
   );
 
   const stackedDataB = useMemo(
     () =>
-      buildStackedYearData(recordsTypeB, chartYears, categoryNamesForStackB),
-    [recordsTypeB, chartYears, categoryNamesForStackB],
+      buildStackedYearData(visualRecordsTypeB, chartYears, categoryNamesForStackB),
+    [visualRecordsTypeB, chartYears, categoryNamesForStackB],
   );
 
   const sortedDetail = useMemo(() => {
-    return [...filteredRecords].sort((a, b) => {
+    if (!combineActualEstimatedCfYears) {
+      return [...filteredRecords].sort((a, b) => {
+        if (b.fiscal_year !== a.fiscal_year) return b.fiscal_year - a.fiscal_year;
+        return b.amount - a.amount;
+      });
+    }
+    const combinedRows = new Map<string, (typeof filteredRecords)[number]>();
+    const passthroughRows: (typeof filteredRecords)[number][] = [];
+    recordsForSelectedVisuals.forEach((record) => {
+      if (
+        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear) &&
+        (record.record_type === "actual" || record.record_type === "estimated")
+      ) {
+        const key = [
+          record.source,
+          record.service_id ?? "",
+          record.laptop_id ?? "",
+          record.service_name,
+          record.classification ?? "",
+          record.category_name ?? "",
+          record.cost_center_name ?? "",
+          record.fiscal_year,
+        ].join("|");
+        const existing = combinedRows.get(key);
+        if (existing) {
+          existing.amount += record.amount;
+          existing.record_type = "actual_estimated_combined";
+        } else {
+          combinedRows.set(key, {
+            ...record,
+            record_type: "actual_estimated_combined",
+          });
+        }
+      } else {
+        passthroughRows.push(record);
+      }
+    });
+    return [...passthroughRows, ...combinedRows.values()].sort((a, b) => {
       if (b.fiscal_year !== a.fiscal_year) return b.fiscal_year - a.fiscal_year;
       return b.amount - a.amount;
     });
-  }, [filteredRecords]);
+  }, [
+    combineActualEstimatedCfYears,
+    filteredRecords,
+    recordsForSelectedVisuals,
+    currentYear,
+  ]);
+
+  function displayRecordTypeLabel(recordType: string, fiscalYear: number): string {
+    if (
+      combineActualEstimatedCfYears &&
+      isCurrentOrFutureFiscalYear(fiscalYear, currentYear) &&
+      (recordType === "actual" || recordType === "estimated")
+    ) {
+      return COMBINED_RECORD_TYPE_LABEL;
+    }
+    return RECORD_TYPE_LABELS[recordType] ?? recordType;
+  }
+
+  function yoyLabelForType(recordType: string, fiscalYear: number): string {
+    return `YoY ${displayRecordTypeLabel(recordType, fiscalYear)} (${fiscalYear})`;
+  }
 
   function handleDownloadCsv() {
     const headers = [
@@ -393,6 +594,10 @@ export function CostsReport() {
               : [...fiscalYearsFilter].sort((a, b) => a - b).join(", ")}
           </li>
           <li>
+            <strong>Combine actual + estimated (current/future years):</strong>{" "}
+            {combineActualEstimatedCfYears ? "On" : "Off"}
+          </li>
+          <li>
             <strong>Rows in report:</strong> {sortedDetail.length}
           </li>
         </ul>
@@ -488,6 +693,18 @@ export function CostsReport() {
               {COMPARISON_MODE_LABEL[m]}
             </button>
           ))}
+          <label className="flex w-full cursor-pointer items-start gap-2 text-sm text-gray-700 sm:w-auto dark:text-gray-300">
+            <input
+              id="cr-combine-ae"
+              type="checkbox"
+              checked={combineActualEstimatedCfYears}
+              onChange={(e) => setCombineActualEstimatedCfYears(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
+            />
+            <span>
+              Combine Actual and Estimated for current and future years
+            </span>
+          </label>
           <div className="ml-auto flex flex-wrap gap-2">
             <button
               type="button"
@@ -527,25 +744,25 @@ export function CostsReport() {
             >
               <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                 <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {RECORD_TYPE_LABELS[comparisonTypes[0]]} ({displayYear})
+                  {displayRecordTypeLabel(comparisonTypes[0] ?? "", displayYear)} ({displayYear})
                 </p>
                 <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-100">
-                  {fmtFull(costByYearA[displayYear] ?? 0)}
+                  {fmtFull(visualCostByYearA[displayYear] ?? 0)}
                 </p>
               </div>
               {!isOnlyActual && comparisonTypes[1] !== undefined && (
                 <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                   <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {RECORD_TYPE_LABELS[comparisonTypes[1]]} ({displayYear})
+                    {displayRecordTypeLabel(comparisonTypes[1], displayYear)} ({displayYear})
                   </p>
                   <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-100">
-                    {fmtFull(costByYearB[displayYear] ?? 0)}
+                    {fmtFull(visualCostByYearB[displayYear] ?? 0)}
                   </p>
                 </div>
               )}
               <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                 <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  YoY {RECORD_TYPE_LABELS[comparisonTypes[0]]} ({displayYear})
+                  {yoyLabelForType(comparisonTypes[0] ?? "", displayYear)}
                 </p>
                 <p
                   className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
@@ -562,7 +779,7 @@ export function CostsReport() {
               {!isOnlyActual && comparisonTypes[1] !== undefined && (
                 <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                   <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    YoY {RECORD_TYPE_LABELS[comparisonTypes[1]]} ({displayYear})
+                    {yoyLabelForType(comparisonTypes[1], displayYear)}
                   </p>
                   <p
                     className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
@@ -608,7 +825,7 @@ export function CostsReport() {
               <BarChart
                 data={chartYears.map((y) => ({
                   label: String(y),
-                  value: costByYearA[y] ?? 0,
+                  value: visualCostByYearA[y] ?? 0,
                   color: y === displayYear ? "#4f46e5" : "#c7d2fe",
                 }))}
                 onBarClick={(i) => {
@@ -626,7 +843,7 @@ export function CostsReport() {
                 <BarChart
                   data={chartYears.map((y) => ({
                     label: String(y),
-                    value: costByYearA[y] ?? 0,
+                    value: visualCostByYearA[y] ?? 0,
                     color: y === displayYear ? "#4f46e5" : "#c7d2fe",
                   }))}
                   onBarClick={(i) => {
@@ -643,7 +860,7 @@ export function CostsReport() {
                   <BarChart
                     data={chartYears.map((y) => ({
                       label: String(y),
-                      value: costByYearB[y] ?? 0,
+                      value: visualCostByYearB[y] ?? 0,
                       color: y === displayYear ? "#0d9488" : "#99f6e4",
                     }))}
                     onBarClick={(i) => {
@@ -792,7 +1009,9 @@ export function CostsReport() {
                         {fmtFull(r.amount)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
+                        {r.record_type === "actual_estimated_combined"
+                          ? COMBINED_RECORD_TYPE_LABEL
+                          : RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
                       </td>
                     </tr>
                   ))}

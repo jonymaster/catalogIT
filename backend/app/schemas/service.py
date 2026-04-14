@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.category import CategoryRead
 from app.schemas.cost_center import CostCenterRead
@@ -16,6 +16,7 @@ from app.schemas.vendor import VendorRead
 
 class ServiceCreate(BaseModel):
     name: str
+    description: str | None = Field(default=None, max_length=255)
     status: str = "Contract"
     billing_schedule: str = ""
     renewal_date: date | None = None
@@ -50,6 +51,7 @@ class ServiceCreate(BaseModel):
 
 class ServiceUpdate(BaseModel):
     name: str | None = None
+    description: str | None = Field(default=None, max_length=255)
     status: str | None = None
     billing_schedule: str | None = None
     renewal_date: date | None = None
@@ -86,6 +88,7 @@ class ServiceUpdate(BaseModel):
 class ServiceRead(BaseModel):
     id: uuid.UUID
     name: str
+    description: str | None = None
     status: str
     billing_schedule: str
     renewal_date: date | None

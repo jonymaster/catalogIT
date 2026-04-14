@@ -33,6 +33,15 @@ export function classificationBarColor(slug: string | null): string {
 
 export const fmtFull = (n: number) => `$${n.toLocaleString()}`;
 
+export const COMBINED_RECORD_TYPES = ["actual", "estimated"] as const;
+
+export function isCurrentOrFutureFiscalYear(
+  fiscalYear: number,
+  currentYear = new Date().getFullYear(),
+): boolean {
+  return fiscalYear >= currentYear;
+}
+
 export function totalByYear(
   records: DashboardCostRecord[],
   years: number[],
@@ -45,6 +54,46 @@ export function totalByYear(
     m[r.fiscal_year] = (m[r.fiscal_year] ?? 0) + r.amount;
   });
   return m;
+}
+
+export function combinedActualEstimatedByYear(
+  records: DashboardCostRecord[],
+  years: number[],
+  currentYear = new Date().getFullYear(),
+): Record<number, number> {
+  const totals: Record<number, number> = {};
+  years.forEach((year) => {
+    totals[year] = 0;
+  });
+  records.forEach((record) => {
+    if (
+      COMBINED_RECORD_TYPES.includes(
+        record.record_type as (typeof COMBINED_RECORD_TYPES)[number],
+      ) &&
+      isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+    ) {
+      totals[record.fiscal_year] = (totals[record.fiscal_year] ?? 0) + record.amount;
+    }
+  });
+  return totals;
+}
+
+export function visualAmountForRecordTypeAndYear(
+  recordType: string,
+  fiscalYear: number,
+  baseAmount: number,
+  combinedActualEstimatedAmount: number,
+  currentYear = new Date().getFullYear(),
+): number {
+  if (
+    COMBINED_RECORD_TYPES.includes(
+      recordType as (typeof COMBINED_RECORD_TYPES)[number],
+    ) &&
+    isCurrentOrFutureFiscalYear(fiscalYear, currentYear)
+  ) {
+    return combinedActualEstimatedAmount;
+  }
+  return baseAmount;
 }
 
 export function yoyPercent(

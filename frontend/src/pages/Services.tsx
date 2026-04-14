@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
-import { ArrowDownTrayIcon, PlusIcon } from "../components/Icons";
+import {
+  ArrowDownTrayIcon,
+  InformationCircleIcon,
+  PlusIcon,
+} from "../components/Icons";
 import {
   BooleanYesNoBadge,
   ClassificationBadge,
@@ -43,6 +47,12 @@ type ServiceFilters = Record<string, string | string[]>;
 interface SortState {
   key: string | null;
   direction: SortDirection | null;
+}
+
+interface HoveredDescriptionState {
+  text: string;
+  left: number;
+  top: number;
 }
 
 function getOwnerNames(service: Service) {
@@ -319,6 +329,7 @@ function getServiceExportValue(
 }
 
 export function Services() {
+  const pageRef = useRef<HTMLDivElement | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [view, setView] = useState<"active" | "archived">("active");
   const [loading, setLoading] = useState(true);
@@ -335,6 +346,8 @@ export function Services() {
     key: null,
     direction: null,
   });
+  const [hoveredDescription, setHoveredDescription] =
+    useState<HoveredDescriptionState | null>(null);
   const [visibleKeys, setVisibleKeys] = useColumnPrefs(
     "catalogit:services:columns",
     ALL_COLUMN_KEYS,
@@ -436,6 +449,29 @@ export function Services() {
     );
   }, [filtered, preferences, visibleKeys]);
 
+  const showDescriptionTooltip = useCallback(
+    (event: React.MouseEvent<HTMLSpanElement>, description: string) => {
+      const containerRect = pageRef.current?.getBoundingClientRect();
+      if (!containerRect) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const viewportPadding = 16;
+      const viewportLeft = Math.max(
+        viewportPadding,
+        Math.min(window.innerWidth - viewportPadding, rect.left),
+      );
+      setHoveredDescription({
+        text: description,
+        left: viewportLeft - containerRect.left,
+        top: rect.bottom - containerRect.top + 8,
+      });
+    },
+    [],
+  );
+
+  const hideDescriptionTooltip = useCallback(() => {
+    setHoveredDescription(null);
+  }, []);
+
   const hasActiveFilters = useMemo(() => {
     if (search.trim()) {
       return true;
@@ -454,7 +490,31 @@ export function Services() {
         key: column.key,
         label: column.label,
         render:
-          column.key === "renewal_date"
+          column.key === "name"
+            ? (service) => (
+              <div className="inline-flex items-center gap-1.5">
+                {service.description && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Description: ${service.description}`}
+                    onMouseEnter={(event) =>
+                      showDescriptionTooltip(event, service.description ?? "")
+                    }
+                    onMouseLeave={hideDescriptionTooltip}
+                    onFocus={(event) =>
+                      showDescriptionTooltip(event, service.description ?? "")
+                    }
+                    onBlur={hideDescriptionTooltip}
+                    className="inline-flex cursor-help text-[#4f46e5]"
+                  >
+                    <InformationCircleIcon className="h-5 w-5" strokeWidth={2.25} />
+                  </span>
+                )}
+                <span>{service.name}</span>
+              </div>
+            )
+            : column.key === "renewal_date"
             ? (service) => formatDateOnly(service.renewal_date, preferences)
             : column.render,
         header:
@@ -511,11 +571,11 @@ export function Services() {
           ),
       };
     });
-  }, [filters, preferences, services, sortState]);
+  }, [filters, hideDescriptionTooltip, preferences, services, showDescriptionTooltip, sortState]);
 
   return (
     <PageTransition>
-    <div>
+    <div ref={pageRef} className="relative">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Services</h1>
         <div className="flex shrink-0 items-center gap-2">
@@ -612,6 +672,14 @@ export function Services() {
             onRowClick={(s) => navigate(`/services/${s.id}`)}
           />
         </>
+      )}
+      {hoveredDescription && (
+        <div
+          className="pointer-events-none absolute z-[9999] max-w-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1 text-xs text-gray-700 dark:text-gray-200 shadow-lg"
+          style={{ left: hoveredDescription.left, top: hoveredDescription.top }}
+        >
+          {hoveredDescription.text}
+        </div>
       )}
     </div>
     </PageTransition>
