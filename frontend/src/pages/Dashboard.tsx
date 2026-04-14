@@ -9,9 +9,12 @@ import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import type { Service, Laptop } from "../types/models";
 import { DashboardSkeleton } from "../components/Skeleton";
 import {
+  combinedActualEstimatedByYear,
   fmtFull,
+  isCurrentOrFutureFiscalYear,
   sumForYearAndClassification,
   totalByYear,
+  visualAmountForRecordTypeAndYear,
   yoyPercent,
 } from "../utils/dashboardCostAggregates";
 
@@ -140,6 +143,11 @@ export function Dashboard() {
     () => records.filter((r) => r.record_type === "actual"),
     [records],
   );
+  const estimatedRecords = useMemo(
+    () => records.filter((r) => r.record_type === "estimated"),
+    [records],
+  );
+  const currentYear = new Date().getFullYear();
 
   const serviceMatches = useMemo(() => {
     if (!normalizedSearch) {
@@ -161,9 +169,27 @@ export function Dashboard() {
       .slice(0, 5);
   }, [laptops, normalizedSearch]);
 
-  const costByYear = useMemo(
+  const actualCostByYear = useMemo(
     () => totalByYear(actualRecords, years),
     [actualRecords, years],
+  );
+  const combinedActualEstimatedCostByYear = useMemo(
+    () => combinedActualEstimatedByYear(records, years, currentYear),
+    [records, years, currentYear],
+  );
+  const costByYear = useMemo(
+    () =>
+      years.reduce<Record<number, number>>((acc, year) => {
+        acc[year] = visualAmountForRecordTypeAndYear(
+          "actual",
+          year,
+          actualCostByYear[year] ?? 0,
+          combinedActualEstimatedCostByYear[year] ?? 0,
+          currentYear,
+        );
+        return acc;
+      }, {}),
+    [years, actualCostByYear, combinedActualEstimatedCostByYear, currentYear],
   );
 
   const yoyChange = useMemo(
@@ -172,13 +198,25 @@ export function Dashboard() {
   );
 
   const coreSaasTotal = useMemo(
-    () => sumForYearAndClassification(actualRecords, dashYear, "core_saas"),
-    [actualRecords, dashYear],
+    () =>
+      isCurrentOrFutureFiscalYear(dashYear, currentYear)
+        ? sumForYearAndClassification(actualRecords, dashYear, "core_saas") +
+          sumForYearAndClassification(estimatedRecords, dashYear, "core_saas")
+        : sumForYearAndClassification(actualRecords, dashYear, "core_saas"),
+    [actualRecords, estimatedRecords, dashYear, currentYear],
   );
 
   const subscriptionTotal = useMemo(
-    () => sumForYearAndClassification(actualRecords, dashYear, "subscription"),
-    [actualRecords, dashYear],
+    () =>
+      isCurrentOrFutureFiscalYear(dashYear, currentYear)
+        ? sumForYearAndClassification(actualRecords, dashYear, "subscription") +
+          sumForYearAndClassification(
+            estimatedRecords,
+            dashYear,
+            "subscription",
+          )
+        : sumForYearAndClassification(actualRecords, dashYear, "subscription"),
+    [actualRecords, estimatedRecords, dashYear, currentYear],
   );
 
   if (loading) {
@@ -352,24 +390,40 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Cost KPIs (actual records only — matches chart) */}
+          {/* Cost KPIs (actual + estimated for current/future years) */}
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatCard
-              label="Total spend (actual)"
+              label={
+                isCurrentOrFutureFiscalYear(dashYear, currentYear)
+                  ? "Total spend (actual + estimated)"
+                  : "Total spend (actual)"
+              }
               value={fmtFull(costByYear[dashYear] ?? 0)}
             />
             <StatCard
-              label="YoY change (actual)"
+              label={
+                isCurrentOrFutureFiscalYear(dashYear, currentYear)
+                  ? "YoY change (actual + estimated)"
+                  : "YoY change (actual)"
+              }
               value={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`}
               color={yoyChange < 0 ? "text-emerald-600" : yoyChange > 0 ? "text-red-600" : "text-gray-900 dark:text-gray-100"}
             />
             <StatCard
-              label="Core SaaS (actual)"
+              label={
+                isCurrentOrFutureFiscalYear(dashYear, currentYear)
+                  ? "Core SaaS (actual + estimated)"
+                  : "Core SaaS (actual)"
+              }
               value={fmtFull(coreSaasTotal)}
               color="text-purple-700"
             />
             <StatCard
-              label="Subscriptions (actual)"
+              label={
+                isCurrentOrFutureFiscalYear(dashYear, currentYear)
+                  ? "Subscriptions (actual + estimated)"
+                  : "Subscriptions (actual)"
+              }
               value={fmtFull(subscriptionTotal)}
               color="text-blue-700"
             />
@@ -384,7 +438,7 @@ export function Dashboard() {
           {/* Total spend by year */}
           <div className="mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
             <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Total spend by year (actual)
+              Total spend by year (actual; current/future includes estimated)
             </h3>
             <BarChart
               data={years.map((y) => ({
