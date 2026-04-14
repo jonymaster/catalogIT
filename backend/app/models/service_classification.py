@@ -6,6 +6,7 @@ from sqlalchemy import String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.reference_data_colors import pick_random_badge_color
 
 
 class ServiceClassification(Base):
@@ -16,3 +17,4 @@ class ServiceClassification(Base):
     slug: Mapped[str] = mapped_column(String(64), unique=True)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color: Mapped[str] = mapped_column(String(32), default=pick_random_badge_color)

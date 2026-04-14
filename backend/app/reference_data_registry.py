@@ -68,6 +68,14 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
                 placeholder="e.g. IT Ops, AWS Suwali, AWS Check, Organization",
             ),
             ReferenceFieldDefinition(
+                key="color",
+                label="Badge color",
+                input_type="badge_preset",
+                required=False,
+                show_in_list=True,
+                help_text="Preset chip color for service lists (readable in light and dark mode). Random when created.",
+            ),
+            ReferenceFieldDefinition(
                 key="description",
                 label="Description",
                 input_type="textarea",
@@ -112,6 +120,14 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
                 label="Name",
                 required=True,
                 placeholder="e.g. Corporate Visa",
+            ),
+            ReferenceFieldDefinition(
+                key="color",
+                label="Badge color",
+                input_type="badge_preset",
+                required=False,
+                show_in_list=True,
+                help_text="Preset chip color for service lists (readable in light and dark mode). Random when created.",
             ),
             ReferenceFieldDefinition(
                 key="method_type",
@@ -178,6 +194,14 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
                 placeholder="e.g. Active, Dismissed, Under Review",
             ),
             ReferenceFieldDefinition(
+                key="color",
+                label="Badge color",
+                input_type="badge_preset",
+                required=False,
+                show_in_list=True,
+                help_text="Preset chip color for service lists (readable in light and dark mode). Random when created.",
+            ),
+            ReferenceFieldDefinition(
                 key="description",
                 label="Description",
                 input_type="textarea",
@@ -199,6 +223,14 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
                 label="Name",
                 required=True,
                 placeholder="e.g. In Stock, Assigned, In Repair",
+            ),
+            ReferenceFieldDefinition(
+                key="color",
+                label="Badge color",
+                input_type="badge_preset",
+                required=False,
+                show_in_list=True,
+                help_text="Preset chip color on the hardware list (readable in light and dark mode). Random when created.",
             ),
             ReferenceFieldDefinition(
                 key="description",
@@ -245,6 +277,14 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
                 label="Name",
                 required=True,
                 placeholder="e.g. Core SaaS, Internal",
+            ),
+            ReferenceFieldDefinition(
+                key="color",
+                label="Badge color",
+                input_type="badge_preset",
+                required=False,
+                show_in_list=True,
+                help_text="Preset chip color for service lists (readable in light and dark mode). Random when created.",
             ),
             ReferenceFieldDefinition(
                 key="description",

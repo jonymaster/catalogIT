@@ -1,4 +1,4 @@
-export type ReferenceDataInputType = "text" | "textarea" | "url";
+export type ReferenceDataInputType = "text" | "textarea" | "url" | "badge_preset";
 
 export interface ReferenceDataField {
   key: string;

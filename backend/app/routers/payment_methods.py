@@ -20,6 +20,7 @@ from app.routers.reference_data_utils import (
     refresh_and_return,
     validate_safe_delete,
 )
+from app.reference_data_colors import pick_random_badge_color
 from app.schemas.payment_method import PaymentMethodCreate, PaymentMethodRead, PaymentMethodUpdate
 
 router = APIRouter(prefix="/api/payment-methods", tags=["payment-methods"])
@@ -59,6 +60,7 @@ async def create_payment_method(
         method_type=body.method_type.strip(),
         last_four=body.last_four,
         notes=body.notes,
+        color=body.color or pick_random_badge_color(),
     )
     db.add(payment_method)
     return await refresh_and_return(db, payment_method)
@@ -94,6 +96,9 @@ async def update_payment_method(
         payment_method.last_four = update_data["last_four"]
     if "notes" in update_data:
         payment_method.notes = update_data["notes"]
+
+    if "color" in update_data and update_data["color"] is not None:
+        payment_method.color = update_data["color"]
 
     return await refresh_and_return(db, payment_method)
 

@@ -1,3 +1,8 @@
+import {
+  REFERENCE_BADGE_PRESET_CLASSES,
+  isReferenceBadgePresetId,
+} from "../constants/referenceBadgePresets";
+
 export type BadgeColor =
   | "gray"
   | "green"
@@ -46,6 +51,42 @@ export function CriticalityBadge({ value }: { value: string | null }) {
   return <Badge color={criticalityColors[value] ?? "gray"}>{value}</Badge>;
 }
 
+export function ColoredReferenceBadge({
+  label,
+  color,
+}: {
+  label: string;
+  color: string;
+}) {
+  const preset = color.trim().toLowerCase();
+  if (!isReferenceBadgePresetId(preset)) {
+    return <Badge color="gray">{label}</Badge>;
+  }
+  const chipClass = REFERENCE_BADGE_PRESET_CLASSES[preset];
+  return (
+    <span
+      className={`inline-flex max-w-full whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${chipClass}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+export function BooleanYesNoBadge({
+  value,
+}: {
+  value: boolean | null | undefined;
+}) {
+  if (value == null) {
+    return <span className="text-gray-400 dark:text-gray-500">--</span>;
+  }
+  return value ? (
+    <Badge color="green">Yes</Badge>
+  ) : (
+    <Badge color="red">No</Badge>
+  );
+}
+
 const classificationColors: Record<string, BadgeColor> = {
   core_saas: "purple",
   subscription: "blue",
@@ -55,9 +96,13 @@ const classificationColors: Record<string, BadgeColor> = {
 export function ClassificationBadge({
   classification,
 }: {
-  classification: { slug: string; name: string } | null;
+  classification: { slug: string; name: string; color?: string | null } | null;
 }) {
   if (!classification) return <span className="text-gray-400">--</span>;
+  const custom = classification.color?.trim().toLowerCase();
+  if (custom && isReferenceBadgePresetId(custom)) {
+    return <ColoredReferenceBadge label={classification.name} color={custom} />;
+  }
   return (
     <Badge color={classificationColors[classification.slug] ?? "gray"}>
       {classification.name}

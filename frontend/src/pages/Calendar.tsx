@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
+import { ChevronLeftIcon, ChevronRightIcon } from "../components/Icons";
 import { PageTransition } from "../components/PageTransition";
 import { useAuth } from "../context/useAuth";
 import type { Service } from "../types/models";
@@ -42,13 +43,15 @@ function monthEnd(value: Date) {
 
 function weekStart(value: Date) {
   const result = new Date(value);
-  result.setDate(result.getDate() - result.getDay());
+  const day = result.getDay();
+  result.setDate(result.getDate() - ((day + 6) % 7));
   return result;
 }
 
 function weekEnd(value: Date) {
   const result = new Date(value);
-  result.setDate(result.getDate() + (6 - result.getDay()));
+  const day = result.getDay();
+  result.setDate(result.getDate() + ((7 - day) % 7));
   return result;
 }
 
@@ -142,7 +145,7 @@ export function Calendar() {
   const dayNames = useMemo(
     () =>
       Array.from({ length: 7 }, (_, index) =>
-        formatWeekdayShort(new Date(2026, 0, 4 + index), preferences),
+        formatWeekdayShort(new Date(Date.UTC(2026, 0, 5 + index)), preferences),
       ),
     [preferences],
   );
@@ -217,24 +220,26 @@ export function Calendar() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            aria-label="Previous month"
             onClick={() => setDisplayMonth((current) => shiftMonth(current, -1))}
-            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="inline-flex items-center justify-center rounded-md border border-gray-300 p-2 text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            Previous
+            <ChevronLeftIcon className="h-5 w-5" aria-hidden />
           </button>
           <button
             type="button"
             onClick={() => setDisplayMonth(monthStart(new Date()))}
-            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
           >
             Today
           </button>
           <button
             type="button"
+            aria-label="Next month"
             onClick={() => setDisplayMonth((current) => shiftMonth(current, 1))}
-            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="inline-flex items-center justify-center rounded-md border border-gray-300 p-2 text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
           >
-            Next
+            <ChevronRightIcon className="h-5 w-5" aria-hidden />
           </button>
         </div>
       </div>
@@ -266,10 +271,14 @@ export function Calendar() {
 
       <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950">
-          {dayNames.map((dayName) => (
+          {dayNames.map((dayName, index) => (
             <div
               key={dayName}
-              className="px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+              className={`px-3 py-2 text-xs font-medium uppercase tracking-wider ${
+                index === 6
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
             >
               {dayName}
             </div>
@@ -280,28 +289,45 @@ export function Calendar() {
           {eventsByDay.map(({ day, events: dayEvents }) => {
             const inMonth = isSameMonth(day, displayMonth);
             const isToday = sameDay(day, today);
+            const isSunday = day.getDay() === 0;
 
             return (
               <div
                 key={day.toISOString()}
                 className={`min-h-36 border-b border-r border-gray-200 dark:border-gray-700 p-2 align-top ${
-                  inMonth ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-950/70"
+                  isSunday
+                    ? inMonth
+                      ? "bg-red-50/90 dark:bg-red-950/35"
+                      : "bg-red-50/60 dark:bg-red-950/25"
+                    : inMonth
+                      ? "bg-white dark:bg-gray-900"
+                      : "bg-gray-50 dark:bg-gray-950/70"
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span
                     className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm ${
                       isToday
-                        ? "bg-brand-600 font-medium text-white"
-                        : inMonth
-                          ? "text-gray-900 dark:text-gray-100"
-                          : "text-gray-400"
+                        ? isSunday
+                          ? "bg-red-600 font-medium text-white"
+                          : "bg-brand-600 font-medium text-white"
+                        : isSunday
+                          ? inMonth
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-red-400/90 dark:text-red-500/80"
+                          : inMonth
+                            ? "text-gray-900 dark:text-gray-100"
+                            : "text-gray-400"
                     }`}
                   >
                     {day.getDate()}
                   </span>
                   {dayEvents.length > 0 && (
-                    <span className="text-xs text-gray-400">{dayEvents.length}</span>
+                    <span
+                      className={`text-xs ${isSunday ? "text-red-500/90 dark:text-red-400/90" : "text-gray-400"}`}
+                    >
+                      {dayEvents.length}
+                    </span>
                   )}
                 </div>
 

@@ -56,6 +56,7 @@ export interface Category {
   id: string;
   name: string;
   description: string | null;
+  color: string;
 }
 
 export interface CostCenter {
@@ -70,18 +71,21 @@ export interface PaymentMethod {
   method_type: string;
   last_four: string | null;
   notes: string | null;
+  color: string;
 }
 
 export interface ServiceStatus {
   id: string;
   name: string;
   description: string | null;
+  color: string;
 }
 
 export interface HardwareStatus {
   id: string;
   name: string;
   description: string | null;
+  color: string;
 }
 
 export interface HardwareLocation {
@@ -95,6 +99,7 @@ export interface ServiceClassification {
   slug: string;
   name: string;
   description: string | null;
+  color: string;
 }
 
 export interface Contract {

@@ -19,6 +19,7 @@ from app.routers.reference_data_utils import (
     refresh_and_return,
     validate_safe_delete,
 )
+from app.reference_data_colors import pick_random_badge_color
 from app.schemas.service_status import (
     ServiceStatusCreate,
     ServiceStatusRead,
@@ -54,6 +55,7 @@ async def create_service_status(
     service_status = ServiceStatus(
         name=body.name.strip(),
         description=body.description,
+        color=body.color or pick_random_badge_color(),
     )
     db.add(service_status)
     return await refresh_and_return(db, service_status)
@@ -85,6 +87,9 @@ async def update_service_status(
 
     if "description" in update_data:
         service_status.description = update_data["description"]
+
+    if "color" in update_data and update_data["color"] is not None:
+        service_status.color = update_data["color"]
 
     return await refresh_and_return(db, service_status)
 

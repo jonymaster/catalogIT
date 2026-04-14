@@ -1,7 +1,12 @@
 import { useOutletContext } from "react-router-dom";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
-import { ClassificationBadge, CriticalityBadge } from "../components/Badge";
+import {
+  BooleanYesNoBadge,
+  ClassificationBadge,
+  ColoredReferenceBadge,
+  CriticalityBadge,
+} from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { formatBillingSchedule } from "../service/serviceBilling";
@@ -30,11 +35,6 @@ function Field({
   );
 }
 
-function boolLabel(v: boolean | null | undefined): string {
-  if (v == null) return "--";
-  return v ? "Yes" : "No";
-}
-
 function renderField(
   key: ServiceFieldKey,
   service: Service,
@@ -45,7 +45,14 @@ function renderField(
       const label = service.service_status?.name ?? service.status;
       return (
         <Field label={SERVICE_FIELD_LABELS.status}>
-          <StatusBadge status={label} />
+          {service.service_status ? (
+            <ColoredReferenceBadge
+              label={service.service_status.name}
+              color={service.service_status.color}
+            />
+          ) : (
+            <StatusBadge status={label} />
+          )}
         </Field>
       );
     }
@@ -84,13 +91,13 @@ function renderField(
     case "sso_integrated":
       return (
         <Field label={SERVICE_FIELD_LABELS.sso_integrated}>
-          {boolLabel(service.sso_integrated)}
+          <BooleanYesNoBadge value={service.sso_integrated} />
         </Field>
       );
     case "scim_enabled":
       return (
         <Field label={SERVICE_FIELD_LABELS.scim_enabled}>
-          {service.scim_enabled == null ? "--" : boolLabel(service.scim_enabled)}
+          <BooleanYesNoBadge value={service.scim_enabled} />
         </Field>
       );
     case "vendor":
@@ -102,7 +109,14 @@ function renderField(
     case "spending_category":
       return (
         <Field label={SERVICE_FIELD_LABELS.spending_category}>
-          {service.category_rel?.name ?? "--"}
+          {service.category_rel ? (
+            <ColoredReferenceBadge
+              label={service.category_rel.name}
+              color={service.category_rel.color}
+            />
+          ) : (
+            "--"
+          )}
         </Field>
       );
     case "cost_center":
@@ -155,13 +169,20 @@ function renderField(
     case "payment_method":
       return (
         <Field label={SERVICE_FIELD_LABELS.payment_method}>
-          {service.payment_method?.name ?? "--"}
+          {service.payment_method ? (
+            <ColoredReferenceBadge
+              label={service.payment_method.name}
+              color={service.payment_method.color}
+            />
+          ) : (
+            "--"
+          )}
         </Field>
       );
     case "nonprofit_pricing":
       return (
         <Field label={SERVICE_FIELD_LABELS.nonprofit_pricing}>
-          {boolLabel(service.nonprofit_pricing)}
+          <BooleanYesNoBadge value={service.nonprofit_pricing} />
         </Field>
       );
     case "notes":

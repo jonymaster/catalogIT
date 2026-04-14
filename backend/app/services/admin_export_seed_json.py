@@ -54,6 +54,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "id": str(c.id),
             "name": c.name,
             "description": c.description,
+            "color": c.color,
         }
         for c in categories
     ]
@@ -68,6 +69,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "method_type": pm.method_type,
             "last_four": pm.last_four,
             "notes": pm.notes,
+            "color": pm.color,
         }
         for pm in payment_methods
     ]

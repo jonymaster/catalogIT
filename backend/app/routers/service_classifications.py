@@ -20,6 +20,7 @@ from app.routers.reference_data_utils import (
     refresh_and_return,
     validate_safe_delete,
 )
+from app.reference_data_colors import pick_random_badge_color
 from app.schemas.service_classification import (
     ServiceClassificationCreate,
     ServiceClassificationRead,
@@ -121,6 +122,7 @@ async def create_service_classification(
         slug=slug,
         name=name,
         description=body.description,
+        color=body.color or pick_random_badge_color(),
     )
     db.add(row)
     return await refresh_and_return(db, row)
@@ -163,6 +165,9 @@ async def update_service_classification(
 
     if "description" in update_data:
         row.description = update_data["description"]
+
+    if "color" in update_data and update_data["color"] is not None:
+        row.color = update_data["color"]
 
     return await refresh_and_return(db, row)
 

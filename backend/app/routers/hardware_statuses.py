@@ -19,6 +19,7 @@ from app.routers.reference_data_utils import (
     refresh_and_return,
     validate_safe_delete,
 )
+from app.reference_data_colors import pick_random_badge_color
 from app.schemas.hardware_status import (
     HardwareStatusCreate,
     HardwareStatusRead,
@@ -54,6 +55,7 @@ async def create_hardware_status(
     row = HardwareStatus(
         name=body.name.strip(),
         description=body.description,
+        color=body.color or pick_random_badge_color(),
     )
     db.add(row)
     return await refresh_and_return(db, row)
@@ -85,6 +87,9 @@ async def update_hardware_status(
 
     if "description" in update_data:
         row.description = update_data["description"]
+
+    if "color" in update_data and update_data["color"] is not None:
+        row.color = update_data["color"]
 
     return await refresh_and_return(db, row)
 

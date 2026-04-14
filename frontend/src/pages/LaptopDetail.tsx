@@ -6,6 +6,7 @@ import { DetailPageSkeleton } from "../components/Skeleton";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { PencilSquareIcon } from "../components/Icons";
+import { ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import type { CostRecord, Laptop } from "../types/models";
@@ -91,7 +92,14 @@ export function LaptopDetail() {
         <dl className="space-y-6">
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
             <Field label="Status">
-              <StatusBadge status={laptop.status} />
+              {laptop.hardware_status ? (
+                <ColoredReferenceBadge
+                  label={laptop.hardware_status.name}
+                  color={laptop.hardware_status.color}
+                />
+              ) : (
+                <StatusBadge status={laptop.status} />
+              )}
             </Field>
             <Field label="Assigned To">
               {laptop.assigned_to
