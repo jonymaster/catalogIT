@@ -198,6 +198,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
     headers = [
         "id",
         "name",
+        "description",
         "status",
         "billing_schedule",
         "renewal_date",
@@ -230,6 +231,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
             [
                 str(s.id),
                 s.name,
+                s.description or "",
                 s.status,
                 s.billing_schedule,
                 _fmt_date(s.renewal_date),

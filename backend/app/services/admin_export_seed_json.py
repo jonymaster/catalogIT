@@ -107,6 +107,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
         row: dict[str, Any] = {
             "id": str(s.id),
             "name": s.name,
+            "description": s.description,
             "status": s.status,
             "service_type": slug,
             "billing_schedule": s.billing_schedule or "",
@@ -123,6 +124,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "criticality": s.criticality,
             "nonprofit_pricing": s.nonprofit_pricing,
             "is_active": s.is_active,
+            "deprecated_at": s.deprecated_at.isoformat() if s.deprecated_at else None,
             "renewal_date": s.renewal_date.isoformat() if s.renewal_date else None,
             "renewal_reminders_enabled": s.renewal_reminders_enabled,
             "renewal_offsets_days": s.renewal_offsets_days,
