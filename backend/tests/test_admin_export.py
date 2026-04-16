@@ -52,6 +52,7 @@ class AdminExportCsvTest(unittest.TestCase):
         self.assertTrue(text.startswith("\ufeff"))
 
     def test_service_csv_includes_description_column(self) -> None:
+        classification_id = uuid.uuid4()
         service = SimpleNamespace(
             id=uuid.uuid4(),
             name="Email Suite",
@@ -71,6 +72,7 @@ class AdminExportCsvTest(unittest.TestCase):
             cost_center=None,
             payment_method=None,
             service_status=None,
+            classification_id=classification_id,
             service_classification=None,
             scim_enabled=None,
             criticality=None,
@@ -89,6 +91,9 @@ class AdminExportCsvTest(unittest.TestCase):
         self.assertIn("description", headers)
         desc_idx = headers.index("description")
         self.assertEqual(rows[0][desc_idx], "Corporate email and calendar")
+        self.assertIn("classification_id", headers)
+        classification_id_idx = headers.index("classification_id")
+        self.assertEqual(rows[0][classification_id_idx], str(classification_id))
         self.assertIn("is_active", headers)
         self.assertIn("deprecated_at", headers)
 
@@ -96,6 +101,9 @@ class AdminExportCsvTest(unittest.TestCase):
 class AdminExportSeedJsonTest(unittest.TestCase):
     def test_services_seed_json_includes_description_and_archived_fields(self) -> None:
         service_id = uuid.uuid4()
+        classification_id = uuid.uuid4()
+        hardware_status_id = uuid.uuid4()
+        hardware_location_id = uuid.uuid4()
         service = SimpleNamespace(
             id=service_id,
             name="CRM",
@@ -106,6 +114,7 @@ class AdminExportSeedJsonTest(unittest.TestCase):
             category_id=None,
             payment_method_id=None,
             cost_center_id=None,
+            classification_id=classification_id,
             owners=[],
             assignees=[],
             service_classification=None,
@@ -121,19 +130,73 @@ class AdminExportSeedJsonTest(unittest.TestCase):
             point_of_contact=None,
             notes=None,
         )
+        laptop = SimpleNamespace(
+            id=uuid.uuid4(),
+            serial_number="SN-100",
+            model_name="ThinkPad",
+            cpu="M3",
+            ram="16GB",
+            storage_size="512GB",
+            status="Assigned",
+            hardware_status_id=hardware_status_id,
+            hardware_location_id=hardware_location_id,
+            assigned_to_id=None,
+            notes=None,
+            is_active=False,
+            archived_at=datetime(2026, 3, 20, 8, 0, 0),
+            created_at=datetime(2026, 1, 10, 10, 0, 0),
+            updated_at=datetime(2026, 4, 10, 10, 0, 0),
+        )
+        hardware_status = SimpleNamespace(
+            id=hardware_status_id,
+            name="Assigned",
+            description="Issued to user",
+            color="blue",
+        )
+        hardware_location = SimpleNamespace(
+            id=hardware_location_id,
+            name="HQ",
+            description="Main office",
+        )
         # execute() call order follows build_seed_json_files queries:
-        # vendors, categories, payment methods, users, services, cost records, history
-        db = _FakeDb([[], [], [], [], [service], [], []])
+        # vendors, categories, payment methods, cost centers, service statuses,
+        # service classifications, hardware statuses, hardware locations, users,
+        # services, laptops, cost records, history
+        db = _FakeDb(
+            [
+                [],
+                [],
+                [],
+                [],
+                [],
+                [],
+                [hardware_status],
+                [hardware_location],
+                [],
+                [service],
+                [laptop],
+                [],
+                [],
+            ]
+        )
 
         files = asyncio.run(build_seed_json_files(db))
         services = json.loads(files["data/seed-json/services.json"])
+        hardware_statuses = json.loads(files["data/seed-json/hardware_statuses.json"])
+        hardware_locations = json.loads(files["data/seed-json/hardware_locations.json"])
+        laptops = json.loads(files["data/seed-json/laptops.json"])
 
         self.assertEqual(len(services), 1)
         exported = services[0]
         self.assertEqual(exported["id"], str(service_id))
         self.assertEqual(exported["description"], "Customer relationship platform")
+        self.assertEqual(exported["classification_id"], str(classification_id))
         self.assertFalse(exported["is_active"])
         self.assertEqual(exported["deprecated_at"], "2026-03-15T10:00:00")
+        self.assertEqual(hardware_statuses[0]["id"], str(hardware_status_id))
+        self.assertEqual(hardware_locations[0]["id"], str(hardware_location_id))
+        self.assertEqual(laptops[0]["hardware_status_id"], str(hardware_status_id))
+        self.assertEqual(laptops[0]["hardware_location_id"], str(hardware_location_id))
 
 
 class AdminExportAuthTest(unittest.TestCase):
