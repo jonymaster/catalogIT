@@ -9,10 +9,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models.category import Category
+from app.models.cost_center import CostCenter
 from app.models.cost_record import CostRecord
+from app.models.hardware_location import HardwareLocation
+from app.models.hardware_status import HardwareStatus
+from app.models.laptop import Laptop
 from app.models.payment_method import PaymentMethod
 from app.models.service import Service
+from app.models.service_classification import ServiceClassification
 from app.models.service_history import ServiceHistoryEntry
+from app.models.service_status import ServiceStatus
 from app.models.user import User
 from app.models.vendor import Vendor
 
@@ -74,6 +80,70 @@ async def build_seed_json_files(db) -> dict[str, str]:
         for pm in payment_methods
     ]
 
+    cost_centers = (
+        await db.execute(select(CostCenter).order_by(CostCenter.name))
+    ).scalars().all()
+    cost_centers_out = [
+        {
+            "id": str(cc.id),
+            "name": cc.name,
+            "description": cc.description,
+        }
+        for cc in cost_centers
+    ]
+
+    service_statuses = (
+        await db.execute(select(ServiceStatus).order_by(ServiceStatus.name))
+    ).scalars().all()
+    service_statuses_out = [
+        {
+            "id": str(ss.id),
+            "name": ss.name,
+            "description": ss.description,
+            "color": ss.color,
+        }
+        for ss in service_statuses
+    ]
+
+    service_classifications = (
+        await db.execute(select(ServiceClassification).order_by(ServiceClassification.name))
+    ).scalars().all()
+    service_classifications_out = [
+        {
+            "id": str(sc.id),
+            "slug": sc.slug,
+            "name": sc.name,
+            "description": sc.description,
+            "color": sc.color,
+        }
+        for sc in service_classifications
+    ]
+
+    hardware_statuses = (
+        await db.execute(select(HardwareStatus).order_by(HardwareStatus.name))
+    ).scalars().all()
+    hardware_statuses_out = [
+        {
+            "id": str(hs.id),
+            "name": hs.name,
+            "description": hs.description,
+            "color": hs.color,
+        }
+        for hs in hardware_statuses
+    ]
+
+    hardware_locations = (
+        await db.execute(select(HardwareLocation).order_by(HardwareLocation.name))
+    ).scalars().all()
+    hardware_locations_out = [
+        {
+            "id": str(hl.id),
+            "name": hl.name,
+            "description": hl.description,
+        }
+        for hl in hardware_locations
+    ]
+
     users = (await db.execute(select(User).order_by(User.email))).scalars().all()
     users_out = []
     for u in users:
@@ -107,6 +177,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
         row: dict[str, Any] = {
             "id": str(s.id),
             "name": s.name,
+            "description": s.description,
             "status": s.status,
             "service_type": slug,
             "billing_schedule": s.billing_schedule or "",
@@ -114,6 +185,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "category_id": str(s.category_id) if s.category_id else None,
             "payment_method_id": str(s.payment_method_id) if s.payment_method_id else None,
             "cost_center_id": str(s.cost_center_id) if s.cost_center_id else None,
+            "classification_id": str(s.classification_id) if s.classification_id else None,
             "owner_ids": [str(u.id) for u in s.owners],
             "assignee_ids": [str(u.id) for u in s.assignees],
             "classification": (
@@ -123,6 +195,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "criticality": s.criticality,
             "nonprofit_pricing": s.nonprofit_pricing,
             "is_active": s.is_active,
+            "deprecated_at": s.deprecated_at.isoformat() if s.deprecated_at else None,
             "renewal_date": s.renewal_date.isoformat() if s.renewal_date else None,
             "renewal_reminders_enabled": s.renewal_reminders_enabled,
             "renewal_offsets_days": s.renewal_offsets_days,
@@ -131,6 +204,40 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "notes": s.notes,
         }
         services_out.append(row)
+
+    laptops = (
+        await db.execute(
+            select(Laptop)
+            .options(
+                selectinload(Laptop.hardware_status),
+                selectinload(Laptop.hardware_location),
+                selectinload(Laptop.assigned_to),
+            )
+            .order_by(Laptop.serial_number)
+        )
+    ).scalars().all()
+    laptops_out = [
+        {
+            "id": str(l.id),
+            "serial_number": l.serial_number,
+            "model_name": l.model_name,
+            "cpu": l.cpu,
+            "ram": l.ram,
+            "storage_size": l.storage_size,
+            "status": l.status,
+            "hardware_status_id": str(l.hardware_status_id) if l.hardware_status_id else None,
+            "hardware_location_id": (
+                str(l.hardware_location_id) if l.hardware_location_id else None
+            ),
+            "assigned_to_id": str(l.assigned_to_id) if l.assigned_to_id else None,
+            "notes": l.notes,
+            "is_active": l.is_active,
+            "archived_at": l.archived_at.isoformat() if l.archived_at else None,
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "updated_at": l.updated_at.isoformat() if l.updated_at else None,
+        }
+        for l in laptops
+    ]
 
     cost_rows = (
         await db.execute(
@@ -197,8 +304,14 @@ same zip remain the canonical tabular export.
         f"{prefix}vendors.json": _dumps(vendors_out),
         f"{prefix}categories.json": _dumps(categories_out),
         f"{prefix}payment_methods.json": _dumps(payment_methods_out),
+        f"{prefix}cost_centers.json": _dumps(cost_centers_out),
+        f"{prefix}service_statuses.json": _dumps(service_statuses_out),
+        f"{prefix}service_classifications.json": _dumps(service_classifications_out),
+        f"{prefix}hardware_statuses.json": _dumps(hardware_statuses_out),
+        f"{prefix}hardware_locations.json": _dumps(hardware_locations_out),
         f"{prefix}users.json": _dumps(users_out),
         f"{prefix}services.json": _dumps(services_out),
+        f"{prefix}laptops.json": _dumps(laptops_out),
         f"{prefix}cost_records.json": _dumps(cost_records_out),
         f"{prefix}service_history.json": _dumps(service_history_out),
     }

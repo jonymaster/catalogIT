@@ -198,6 +198,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
     headers = [
         "id",
         "name",
+        "description",
         "status",
         "billing_schedule",
         "renewal_date",
@@ -213,6 +214,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
         "cost_center_name",
         "payment_method_name",
         "service_status_name",
+        "classification_id",
         "classification_slug",
         "scim_enabled",
         "criticality",
@@ -230,6 +232,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
             [
                 str(s.id),
                 s.name,
+                s.description or "",
                 s.status,
                 s.billing_schedule,
                 _fmt_date(s.renewal_date),
@@ -245,6 +248,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
                 s.cost_center.name if s.cost_center else "",
                 s.payment_method.name if s.payment_method else "",
                 s.service_status.name if s.service_status else "",
+                str(s.classification_id) if s.classification_id else "",
                 s.service_classification.slug if s.service_classification else "",
                 s.scim_enabled if s.scim_enabled is not None else "",
                 s.criticality or "",
