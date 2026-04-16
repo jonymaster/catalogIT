@@ -89,6 +89,10 @@ function StatCard({
 }
 
 export function Dashboard() {
+  const emptyClassificationKey = "__none__";
+  const emptyCategoryKey = "__uncategorized__";
+  const emptyClassificationLabel = "(None)";
+  const emptyCategoryLabel = "(Uncategorized)";
   const { user, canFinancialView } = useAuth();
   const navigate = useNavigate();
   const [inventoryLoading, setInventoryLoading] = useState(true);
@@ -97,6 +101,8 @@ export function Dashboard() {
   const { records, fiscalYears, loading: costLoading } = useDashboardCostData();
   const [dashYear, setDashYear] = useState<number>(new Date().getFullYear());
   const [dashYearInitialized, setDashYearInitialized] = useState(false);
+  const [selectedClassificationIndex, setSelectedClassificationIndex] = useState(0);
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [dashboardSearch, setDashboardSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -148,6 +154,48 @@ export function Dashboard() {
     [records],
   );
   const currentYear = new Date().getFullYear();
+  const showProjectedValues = isCurrentOrFutureFiscalYear(dashYear, currentYear);
+
+  const classificationOptions = useMemo(() => {
+    const unique = new Set<string>();
+    records.forEach((record) => {
+      unique.add((record.classification ?? "").trim() || emptyClassificationKey);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [records]);
+
+  const categoryOptions = useMemo(() => {
+    const unique = new Set<string>();
+    records.forEach((record) => {
+      unique.add((record.category_name ?? "").trim() || emptyCategoryKey);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  }, [records]);
+
+  useEffect(() => {
+    setSelectedClassificationIndex((prev) =>
+      classificationOptions.length === 0
+        ? 0
+        : Math.min(prev, classificationOptions.length - 1),
+    );
+  }, [classificationOptions]);
+
+  useEffect(() => {
+    setSelectedCategoryIndex((prev) =>
+      categoryOptions.length === 0 ? 0 : Math.min(prev, categoryOptions.length - 1),
+    );
+  }, [categoryOptions]);
+
+  const selectedClassificationKey =
+    classificationOptions[selectedClassificationIndex] ?? emptyClassificationKey;
+  const selectedCategoryKey = categoryOptions[selectedCategoryIndex] ?? emptyCategoryKey;
+
+  const selectedClassificationLabel =
+    selectedClassificationKey === emptyClassificationKey
+      ? emptyClassificationLabel
+      : selectedClassificationKey;
+  const selectedCategoryLabel =
+    selectedCategoryKey === emptyCategoryKey ? emptyCategoryLabel : selectedCategoryKey;
 
   const serviceMatches = useMemo(() => {
     if (!normalizedSearch) {
@@ -197,26 +245,52 @@ export function Dashboard() {
     [costByYear, dashYear],
   );
 
-  const coreSaasTotal = useMemo(
+  const classificationTotal = useMemo(
     () =>
-      isCurrentOrFutureFiscalYear(dashYear, currentYear)
-        ? sumForYearAndClassification(actualRecords, dashYear, "core_saas") +
-          sumForYearAndClassification(estimatedRecords, dashYear, "core_saas")
-        : sumForYearAndClassification(actualRecords, dashYear, "core_saas"),
-    [actualRecords, estimatedRecords, dashYear, currentYear],
-  );
-
-  const subscriptionTotal = useMemo(
-    () =>
-      isCurrentOrFutureFiscalYear(dashYear, currentYear)
-        ? sumForYearAndClassification(actualRecords, dashYear, "subscription") +
+      showProjectedValues
+        ? sumForYearAndClassification(
+            actualRecords,
+            dashYear,
+            selectedClassificationKey,
+          ) +
           sumForYearAndClassification(
             estimatedRecords,
             dashYear,
-            "subscription",
+            selectedClassificationKey,
           )
-        : sumForYearAndClassification(actualRecords, dashYear, "subscription"),
-    [actualRecords, estimatedRecords, dashYear, currentYear],
+        : sumForYearAndClassification(
+            actualRecords,
+            dashYear,
+            selectedClassificationKey,
+          ),
+    [
+      showProjectedValues,
+      actualRecords,
+      estimatedRecords,
+      dashYear,
+      selectedClassificationKey,
+    ],
+  );
+
+  const categoryTotal = useMemo(
+    () => {
+      const selectedCategoryAmount = (collection: typeof records) =>
+        collection.reduce((total, record) => {
+          if (record.fiscal_year !== dashYear) return total;
+          const key = (record.category_name ?? "").trim() || emptyCategoryKey;
+          return key === selectedCategoryKey ? total + record.amount : total;
+        }, 0);
+      return showProjectedValues
+        ? selectedCategoryAmount(actualRecords) + selectedCategoryAmount(estimatedRecords)
+        : selectedCategoryAmount(actualRecords);
+    },
+    [
+      showProjectedValues,
+      actualRecords,
+      estimatedRecords,
+      dashYear,
+      selectedCategoryKey,
+    ],
   );
 
   if (loading) {
@@ -394,7 +468,7 @@ export function Dashboard() {
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatCard
               label={
-                isCurrentOrFutureFiscalYear(dashYear, currentYear)
+                showProjectedValues
                   ? "Total spend (actual + estimated)"
                   : "Total spend (actual)"
               }
@@ -402,7 +476,7 @@ export function Dashboard() {
             />
             <StatCard
               label={
-                isCurrentOrFutureFiscalYear(dashYear, currentYear)
+                showProjectedValues
                   ? "YoY change (actual + estimated)"
                   : "YoY change (actual)"
               }
@@ -411,21 +485,35 @@ export function Dashboard() {
             />
             <StatCard
               label={
-                isCurrentOrFutureFiscalYear(dashYear, currentYear)
-                  ? "Core SaaS (actual + estimated)"
-                  : "Core SaaS (actual)"
+                showProjectedValues
+                  ? `Classification: ${selectedClassificationLabel} (actual + estimated)`
+                  : `Classification: ${selectedClassificationLabel} (actual)`
               }
-              value={fmtFull(coreSaasTotal)}
+              value={fmtFull(classificationTotal)}
               color="text-purple-700"
+              subtext="Click to cycle"
+              onClick={() =>
+                setSelectedClassificationIndex((prev) =>
+                  classificationOptions.length === 0
+                    ? 0
+                    : (prev + 1) % classificationOptions.length,
+                )
+              }
             />
             <StatCard
               label={
-                isCurrentOrFutureFiscalYear(dashYear, currentYear)
-                  ? "Subscriptions (actual + estimated)"
-                  : "Subscriptions (actual)"
+                showProjectedValues
+                  ? `Category: ${selectedCategoryLabel} (actual + estimated)`
+                  : `Category: ${selectedCategoryLabel} (actual)`
               }
-              value={fmtFull(subscriptionTotal)}
+              value={fmtFull(categoryTotal)}
               color="text-blue-700"
+              subtext="Click to cycle"
+              onClick={() =>
+                setSelectedCategoryIndex((prev) =>
+                  categoryOptions.length === 0 ? 0 : (prev + 1) % categoryOptions.length,
+                )
+              }
             />
           </div>
 
