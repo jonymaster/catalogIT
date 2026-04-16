@@ -144,7 +144,6 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         status=service_status.name if service_status else body.status,
         billing_schedule=body.billing_schedule,
         renewal_date=body.renewal_date,
-        yearly_cost=body.yearly_cost,
         sso_integrated=body.sso_integrated,
         point_of_contact=body.point_of_contact,
         notes=body.notes,

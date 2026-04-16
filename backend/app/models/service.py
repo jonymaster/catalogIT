@@ -3,11 +3,12 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Table, Text, func
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, func, select
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from app.database import Base
+from app.models.cost_record import CostRecord
 
 service_owners = Table(
     "service_owners",
@@ -34,8 +35,18 @@ class Service(Base):
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     status: Mapped[str] = mapped_column(String(50))
-    yearly_cost: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     sso_integrated: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    yearly_cost = column_property(
+        select(CostRecord.amount)
+        .where(
+            CostRecord.service_id == id,
+            CostRecord.laptop_id.is_(None),
+        )
+        .order_by(CostRecord.fiscal_year.desc(), CostRecord.recorded_at.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
 
     # --- New normalized columns ---
     vendor_id: Mapped[uuid.UUID | None] = mapped_column(
