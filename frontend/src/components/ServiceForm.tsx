@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { formatBillingSchedule } from "../service/serviceBilling";
 import {
@@ -28,7 +28,6 @@ interface FormData {
   status: string;
   billing_schedule: string;
   renewal_date: string;
-  yearly_cost: string;
   sso_integrated: boolean;
   point_of_contact: string;
   notes: string;
@@ -58,7 +57,6 @@ function toFormData(s?: Service): FormData {
     status: s?.status ?? "Contract",
     billing_schedule: s?.billing_schedule ?? "",
     renewal_date: s?.renewal_date ?? "",
-    yearly_cost: s?.yearly_cost != null ? String(s.yearly_cost) : "",
     sso_integrated: s?.sso_integrated ?? false,
     point_of_contact: s?.point_of_contact ?? "",
     notes: s?.notes ?? "",
@@ -215,7 +213,6 @@ export function ServiceForm({ initial }: Props) {
       status: form.status,
       billing_schedule: form.billing_schedule,
       renewal_date: form.renewal_date || null,
-      yearly_cost: form.yearly_cost ? Number(form.yearly_cost) : null,
       sso_integrated: form.sso_integrated,
       point_of_contact: form.point_of_contact.trim() || null,
       notes: form.notes || null,
@@ -524,19 +521,35 @@ export function ServiceForm({ initial }: Props) {
             />
           </div>
         );
-      case "yearly_cost":
+      case "yearly_cost": {
+        const linkCls =
+          "inline-flex text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline";
+        if (isEdit && initial) {
+          return (
+            <div>
+              <span className={labelCls}>{SERVICE_FIELD_LABELS.yearly_cost}</span>
+              <p className="mt-1">
+                <Link
+                  to={`/services/${initial.id}/costs`}
+                  className={linkCls}
+                >
+                  {initial.yearly_cost != null
+                    ? `$${Number(initial.yearly_cost).toLocaleString()}`
+                    : "Costs page"}
+                </Link>
+              </p>
+            </div>
+          );
+        }
         return (
           <div>
-            <label className={labelCls}>{SERVICE_FIELD_LABELS.yearly_cost} ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              className={inputCls}
-              value={form.yearly_cost}
-              onChange={(e) => set("yearly_cost", e.target.value)}
-            />
+            <span className={labelCls}>{SERVICE_FIELD_LABELS.yearly_cost}</span>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              After you create this service, add fiscal amounts on its Costs tab.
+            </p>
           </div>
         );
+      }
       case "payment_method":
         return (
           <div>

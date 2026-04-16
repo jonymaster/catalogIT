@@ -20,7 +20,6 @@ class ServiceCreate(BaseModel):
     status: str = "Contract"
     billing_schedule: str = ""
     renewal_date: date | None = None
-    yearly_cost: float | None = None
     sso_integrated: bool = False
     point_of_contact: str | None = None
     notes: str | None = None
@@ -55,7 +54,6 @@ class ServiceUpdate(BaseModel):
     status: str | None = None
     billing_schedule: str | None = None
     renewal_date: date | None = None
-    yearly_cost: float | None = None
     sso_integrated: bool | None = None
     point_of_contact: str | None = None
     notes: str | None = None

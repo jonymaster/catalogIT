@@ -7,11 +7,13 @@
     "status": "contract",
     "billing_schedule": "monthly",
     "category_id": 1,
-    "owner_ids": [1, 2],
+    "owner_ids": [
+      1,
+      2
+    ],
     "scim_enabled": true,
     "payment_method_id": 3,
-    "criticality": "Critical",
-    "yearly_cost": 4800
+    "criticality": "Critical"
   },
   {
     "id": 2,
@@ -21,11 +23,12 @@
     "status": "self_managed",
     "billing_schedule": "monthly",
     "category_id": 1,
-    "owner_ids": [1],
+    "owner_ids": [
+      1
+    ],
     "scim_enabled": true,
     "payment_method_id": 1,
-    "criticality": "Critical",
-    "yearly_cost": 11500
+    "criticality": "Critical"
   },
   {
     "id": 3,
@@ -35,11 +38,12 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 1,
-    "owner_ids": [2],
+    "owner_ids": [
+      2
+    ],
     "scim_enabled": false,
     "payment_method_id": 3,
-    "criticality": "Critical",
-    "yearly_cost": 9200
+    "criticality": "Critical"
   },
   {
     "id": 4,
@@ -49,11 +53,12 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 4,
-    "owner_ids": [3],
+    "owner_ids": [
+      3
+    ],
     "scim_enabled": true,
     "payment_method_id": 3,
-    "criticality": "Critical",
-    "yearly_cost": 5400
+    "criticality": "Critical"
   },
   {
     "id": 5,
@@ -63,11 +68,12 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 1,
-    "owner_ids": [1],
+    "owner_ids": [
+      1
+    ],
     "scim_enabled": true,
     "payment_method_id": 2,
-    "criticality": "Critical",
-    "yearly_cost": 15200
+    "criticality": "Critical"
   },
   {
     "id": 6,
@@ -77,11 +83,13 @@
     "status": "self_managed",
     "billing_schedule": "monthly",
     "category_id": 4,
-    "owner_ids": [2, 3],
+    "owner_ids": [
+      2,
+      3
+    ],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "Critical",
-    "yearly_cost": 235000
+    "criticality": "Critical"
   },
   {
     "id": 7,
@@ -91,11 +99,12 @@
     "status": "contract",
     "billing_schedule": "monthly",
     "category_id": 4,
-    "owner_ids": [3],
+    "owner_ids": [
+      3
+    ],
     "scim_enabled": false,
     "payment_method_id": 4,
-    "criticality": "High",
-    "yearly_cost": 38000
+    "criticality": "High"
   },
   {
     "id": 8,
@@ -105,11 +114,12 @@
     "status": "self_managed",
     "billing_schedule": "monthly",
     "category_id": 2,
-    "owner_ids": [5],
+    "owner_ids": [
+      5
+    ],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "High",
-    "yearly_cost": 8000
+    "criticality": "High"
   },
   {
     "id": 9,
@@ -119,11 +129,12 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 2,
-    "owner_ids": [5],
+    "owner_ids": [
+      5
+    ],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "Medium",
-    "yearly_cost": 7500
+    "criticality": "Medium"
   },
   {
     "id": 10,
@@ -133,11 +144,12 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 1,
-    "owner_ids": [1],
+    "owner_ids": [
+      1
+    ],
     "scim_enabled": true,
     "payment_method_id": 3,
-    "criticality": "Critical",
-    "yearly_cost": 3000
+    "criticality": "Critical"
   },
   {
     "id": 11,
@@ -147,11 +159,12 @@
     "status": "contract",
     "billing_schedule": "monthly",
     "category_id": 4,
-    "owner_ids": [2],
+    "owner_ids": [
+      2
+    ],
     "scim_enabled": true,
     "payment_method_id": 4,
-    "criticality": "High",
-    "yearly_cost": 12500
+    "criticality": "High"
   },
   {
     "id": 12,
@@ -161,11 +174,13 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 5,
-    "owner_ids": [3, 5],
+    "owner_ids": [
+      3,
+      5
+    ],
     "scim_enabled": true,
     "payment_method_id": 2,
-    "criticality": "High",
-    "yearly_cost": 6800
+    "criticality": "High"
   },
   {
     "id": 13,
@@ -175,11 +190,12 @@
     "status": "contract",
     "billing_schedule": "monthly",
     "category_id": 4,
-    "owner_ids": [3],
+    "owner_ids": [
+      3
+    ],
     "scim_enabled": false,
     "payment_method_id": 1,
-    "criticality": "High",
-    "yearly_cost": 2600
+    "criticality": "High"
   },
   {
     "id": 14,
@@ -189,10 +205,12 @@
     "status": "contract",
     "billing_schedule": "annually",
     "category_id": 4,
-    "owner_ids": [3, 4],
+    "owner_ids": [
+      3,
+      4
+    ],
     "scim_enabled": true,
     "payment_method_id": 2,
-    "criticality": "High",
-    "yearly_cost": 13200
+    "criticality": "High"
   }
 ]

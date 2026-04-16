@@ -244,7 +244,6 @@ async def _seed_services(session: AsyncSession) -> None:
             name=r["name"],
             status=normalized_status,
             billing_schedule=r.get("billing_schedule", ""),
-            yearly_cost=r.get("yearly_cost"),
             vendor_id=_uuid("vendor", r["vendor_id"]),
             category_id=_uuid("category", r["category_id"]),
             payment_method_id=_uuid("payment_method", r["payment_method_id"]),
