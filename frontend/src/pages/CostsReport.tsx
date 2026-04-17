@@ -1,48 +1,63 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import "./CostsReport.print.css";
-import { BarChart } from "../components/charts/BarChart";
+import type { Column } from "../components/DataTable";
+import { DataTable } from "../components/DataTable";
 import { PageTransition } from "../components/PageTransition";
+import { BarChart } from "../components/charts/BarChart";
 import { StackedBar } from "../components/charts/StackedBar";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
-import {
-  COMPARISON_MODE_LABEL,
-  comparisonRecordTypesForMode,
-  type ComparisonMode,
-  type CostSourceFilter,
+import type {
+  DashboardCostDimension,
+  DashboardCostRecord,
+  ReportAnalysisMode,
 } from "../types/dashboardCost";
+import { DASHBOARD_COST_DIMENSION_LABEL } from "../types/dashboardCost";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import {
-  buildStackedYearData,
-  combinedActualEstimatedByYear,
+  categoryDisplayName,
   classificationBarColor,
+  classificationDisplayName,
   costCenterFilterOptions,
+  dimensionFilterOptions,
+  dimensionValueForRecord,
   distinctCategoryNames,
   distinctClassifications,
   filterCostRecords,
   fmtFull,
   getCategoryColor,
   isCurrentOrFutureFiscalYear,
-  totalByYear,
-  visualAmountForRecordTypeAndYear,
-  yoyPercent,
-  categoryDisplayName,
+  totalsByDimension,
+  vendorDisplayName,
+  sourceDisplayName,
+  buildStackedDimensionData,
 } from "../utils/dashboardCostAggregates";
 
-const RECORD_TYPE_LABELS: Record<string, string> = {
-  actual: "Actual",
-  estimated: "Estimated",
-  budget: "Budget",
-};
-const COMBINED_RECORD_TYPE_LABEL = "Actual + Estimated";
+type RecordType = "actual" | "estimated" | "budget";
 
-function classificationLabel(slug: string): string {
-  if (slug === "") return "(None)";
-  if (slug === "core_saas") return "Core SaaS";
-  if (slug === "subscription") return "Subscription";
-  if (slug === "internal") return "Internal";
-  if (slug === "hardware") return "Hardware";
-  return slug;
-}
+type DrilldownState = {
+  year: number | null;
+  primaryKey: string | null;
+  primaryLabel: string | null;
+  secondaryKey: string | null;
+  secondaryLabel: string | null;
+};
+
+type DetailRow = DashboardCostRecord & { id: string };
+
+const RECORD_TYPE_OPTIONS: { value: RecordType; label: string }[] = [
+  { value: "actual", label: "Actual" },
+  { value: "estimated", label: "Estimated" },
+  { value: "budget", label: "Budget" },
+];
+
+const REPORT_DIMENSIONS: DashboardCostDimension[] = [
+  "category",
+  "classification",
+  "vendor",
+  "cost_center",
+  "source",
+];
 
 function MultiStringSelect({
   id,
@@ -61,7 +76,10 @@ function MultiStringSelect({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+      <label
+        htmlFor={id}
+        className="block text-xs font-medium text-gray-600 dark:text-gray-400"
+      >
         {label}
       </label>
       <select
@@ -69,14 +87,14 @@ function MultiStringSelect({
         multiple
         value={values}
         onChange={(e) => {
-          onChange(Array.from(e.target.selectedOptions, (o) => o.value));
+          onChange(Array.from(e.target.selectedOptions, (option) => option.value));
         }}
         size={Math.min(6, Math.max(3, options.length))}
         className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -88,393 +106,417 @@ function MultiStringSelect({
 }
 
 function MultiYearSelect({
-  id,
-  label,
   years,
   values,
   onChange,
 }: {
-  id: string;
-  label: string;
   years: number[];
   values: number[];
   onChange: (next: number[]) => void;
 }) {
-  const strValues = values.map(String);
+  const selected = values.map(String);
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-        {label}
+      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+        Fiscal years
       </label>
       <select
-        id={id}
         multiple
-        value={strValues}
+        value={selected}
         onChange={(e) => {
           onChange(
-            Array.from(e.target.selectedOptions, (o) => Number.parseInt(o.value, 10)),
+            Array.from(e.target.selectedOptions, (option) =>
+              Number.parseInt(option.value, 10),
+            ),
           );
         }}
         size={Math.min(6, Math.max(3, years.length))}
         className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
       >
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
+        {years.map((year) => (
+          <option key={year} value={year}>
+            {year}
           </option>
         ))}
       </select>
       <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-        Empty = include all years in the filtered data.
+        Leave empty to include every year present in the filtered data.
       </p>
     </div>
   );
 }
 
+function SummaryCard({
+  label,
+  value,
+  subtext,
+}: {
+  label: string;
+  value: string;
+  subtext?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+        {value}
+      </p>
+      {subtext && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{subtext}</p>}
+    </div>
+  );
+}
+
+function QuickFilterButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-brand-700 hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-brand-200"
+    >
+      {label}
+    </button>
+  );
+}
+
+function dimensionColor(dimension: DashboardCostDimension, key: string) {
+  if (dimension === "classification") {
+    return classificationBarColor(key || null);
+  }
+  return getCategoryColor(`${dimension}:${key || "__none__"}`);
+}
+
+function formatRecordType(recordType: string) {
+  return RECORD_TYPE_OPTIONS.find((option) => option.value === recordType)?.label ?? recordType;
+}
+
+function timeStackGroups(
+  records: DashboardCostRecord[],
+  years: number[],
+  secondaryDimension: DashboardCostDimension,
+) {
+  return years.map((year) => {
+    const slices = new Map<
+      string,
+      { id: string; name: string; value: number; color: string }
+    >();
+
+    records
+      .filter((record) => record.fiscal_year === year)
+      .forEach((record) => {
+        const value = dimensionValueForRecord(record, secondaryDimension);
+        const existing = slices.get(value.key);
+        if (existing) {
+          existing.value += record.amount;
+          return;
+        }
+        slices.set(value.key, {
+          id: value.key,
+          name: value.label,
+          value: record.amount,
+          color: dimensionColor(secondaryDimension, value.key),
+        });
+      });
+
+    return {
+      key: String(year),
+      label: String(year),
+      cats: Array.from(slices.values()).sort(
+        (left, right) => right.value - left.value || left.name.localeCompare(right.name),
+      ),
+    };
+  });
+}
+
+function recordIncludedInVisuals(
+  record: DashboardCostRecord,
+  selectedRecordTypes: string[],
+  includeEstimatedForecast: boolean,
+  currentYear: number,
+) {
+  if (selectedRecordTypes.includes(record.record_type)) {
+    return true;
+  }
+
+  return (
+    includeEstimatedForecast &&
+    selectedRecordTypes.includes("actual") &&
+    record.record_type === "estimated" &&
+    isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
+  );
+}
+
 export function CostsReport() {
-  const { records: allRecords, fiscalYears: apiYears, loading, error } =
-    useDashboardCostData();
-
+  const { records: allRecords, fiscalYears, loading, error } = useDashboardCostData();
+  const [analysisMode, setAnalysisMode] = useState<ReportAnalysisMode>("time");
+  const [source, setSource] = useState<"all" | "service" | "hardware">("all");
   const [categories, setCategories] = useState<string[]>([]);
-  const [source, setSource] = useState<CostSourceFilter>("all");
   const [classifications, setClassifications] = useState<string[]>([]);
-  const [comparisonMode, setComparisonMode] =
-    useState<ComparisonMode>("only_actual");
+  const [vendors, setVendors] = useState<string[]>([]);
   const [costCenters, setCostCenters] = useState<string[]>([]);
+  const [recordTypes, setRecordTypes] = useState<string[]>(["actual"]);
   const [fiscalYearsFilter, setFiscalYearsFilter] = useState<number[]>([]);
-  const [focusYear, setFocusYear] = useState<number | null>(null);
+  const [primaryDimension, setPrimaryDimension] =
+    useState<DashboardCostDimension>("vendor");
+  const [secondaryDimension, setSecondaryDimension] =
+    useState<DashboardCostDimension>("category");
+  const [includeEstimatedForecast, setIncludeEstimatedForecast] = useState(true);
   const [printGeneratedAt, setPrintGeneratedAt] = useState("");
-  const [combineActualEstimatedCfYears, setCombineActualEstimatedCfYears] =
-    useState(true);
+  const [drilldown, setDrilldown] = useState<DrilldownState>({
+    year: null,
+    primaryKey: null,
+    primaryLabel: null,
+    secondaryKey: null,
+    secondaryLabel: null,
+  });
+
   const currentYear = new Date().getFullYear();
+  const effectiveSecondaryDimension =
+    secondaryDimension === primaryDimension
+      ? primaryDimension === "category"
+        ? "classification"
+        : "category"
+      : secondaryDimension;
 
-  const categoryOptions = useMemo(() => {
-    return distinctCategoryNames(allRecords).map((v) => ({
-      value: v,
-      label: categoryDisplayName(v),
-    }));
-  }, [allRecords]);
-
-  const classificationOptions = useMemo(() => {
-    return distinctClassifications(allRecords).map((v) => ({
-      value: v,
-      label: classificationLabel(v),
-    }));
-  }, [allRecords]);
-
-  const costCenterOptions = useMemo(
-    () => costCenterFilterOptions(allRecords),
+  const categoryOptions = useMemo(
+    () =>
+      distinctCategoryNames(allRecords).map((value) => ({
+        value,
+        label: categoryDisplayName(value),
+      })),
     [allRecords],
   );
 
-  const costCenterFilterSummary = useMemo(() => {
-    if (costCenters.length === 0) return "All";
-    const labelByKey = new Map(
-      costCenterOptions.map((o) => [o.key, o.label] as const),
-    );
-    return costCenters
-      .map((k) => labelByKey.get(k) ?? k)
-      .join(", ");
-  }, [costCenters, costCenterOptions]);
+  const classificationOptions = useMemo(() => {
+    const labels = new Map<string, string>();
+    allRecords.forEach((record) => {
+      const key = record.classification ?? "";
+      labels.set(
+        key,
+        classificationDisplayName(key, record.classification_name),
+      );
+    });
+    return distinctClassifications(allRecords).map((value) => ({
+      value,
+      label: labels.get(value) ?? classificationDisplayName(value),
+    }));
+  }, [allRecords]);
 
-  const comparisonTypes = useMemo(
-    () => comparisonRecordTypesForMode(comparisonMode),
-    [comparisonMode],
+  const vendorOptions = useMemo(
+    () =>
+      dimensionFilterOptions(allRecords, "vendor").map((option) => ({
+        value: option.key,
+        label: option.label,
+      })),
+    [allRecords],
   );
 
-  const isOnlyActual = comparisonMode === "only_actual";
+  const costCenterOptions = useMemo(
+    () =>
+      costCenterFilterOptions(allRecords).map((option) => ({
+        value: option.key,
+        label: option.label,
+      })),
+    [allRecords],
+  );
 
-  const filteredRecords = useMemo(
+  const baseFilteredRecords = useMemo(
     () =>
       filterCostRecords(allRecords, {
         categories,
-        source,
         classifications,
-        comparisonRecordTypes: comparisonTypes,
+        vendors,
         costCenters,
         fiscalYears: fiscalYearsFilter,
-      }),
-    [
-      allRecords,
-      categories,
-      source,
-      classifications,
-      comparisonTypes,
-      costCenters,
-      fiscalYearsFilter,
-    ],
-  );
-
-  const filteredRecordsAllTypes = useMemo(
-    () =>
-      filterCostRecords(allRecords, {
-        categories,
         source,
-        classifications,
-        comparisonRecordTypes: ["actual", "estimated", "budget"],
-        costCenters,
-        fiscalYears: fiscalYearsFilter,
       }),
-    [
-      allRecords,
-      categories,
-      source,
-      classifications,
-      costCenters,
-      fiscalYearsFilter,
-    ],
+    [allRecords, categories, classifications, vendors, costCenters, fiscalYearsFilter, source],
   );
 
-  const recordsForSelectedVisuals = useMemo(() => {
-    const selectedTypes = new Set(comparisonTypes);
-    return filteredRecordsAllTypes.filter((record) => {
-      if (record.record_type === "budget") {
-        return selectedTypes.has("budget");
-      }
-      if (record.record_type === "actual" || record.record_type === "estimated") {
-        if (
-          combineActualEstimatedCfYears &&
-          isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
-        ) {
-          return selectedTypes.has("actual") || selectedTypes.has("estimated");
-        }
-        return selectedTypes.has(record.record_type);
-      }
-      return selectedTypes.has(record.record_type as never);
-    });
-  }, [
-    comparisonTypes,
-    filteredRecordsAllTypes,
-    currentYear,
-    combineActualEstimatedCfYears,
-  ]);
-
-  const visualRecordsTypeA = useMemo(() => {
-    const typeA = comparisonTypes[0];
-    if (!typeA) return [];
-    return recordsForSelectedVisuals.filter((record) => {
-      if (
-        combineActualEstimatedCfYears &&
-        typeA === "actual" &&
-        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
-      ) {
-        return record.record_type === "actual" || record.record_type === "estimated";
-      }
-      if (
-        combineActualEstimatedCfYears &&
-        typeA === "estimated" &&
-        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
-      ) {
-        return record.record_type === "actual" || record.record_type === "estimated";
-      }
-      return record.record_type === typeA;
-    });
-  }, [
-    comparisonTypes,
-    recordsForSelectedVisuals,
-    currentYear,
-    combineActualEstimatedCfYears,
-  ]);
-
-  const visualRecordsTypeB = useMemo(() => {
-    const typeB = comparisonTypes[1];
-    if (!typeB) return [];
-    return recordsForSelectedVisuals.filter((record) => {
-      if (
-        combineActualEstimatedCfYears &&
-        typeB === "actual" &&
-        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
-      ) {
-        return record.record_type === "actual" || record.record_type === "estimated";
-      }
-      if (
-        combineActualEstimatedCfYears &&
-        typeB === "estimated" &&
-        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear)
-      ) {
-        return record.record_type === "actual" || record.record_type === "estimated";
-      }
-      return record.record_type === typeB;
-    });
-  }, [
-    comparisonTypes,
-    recordsForSelectedVisuals,
-    currentYear,
-    combineActualEstimatedCfYears,
-  ]);
-
-  const chartYears = useMemo(() => {
-    const ys = new Set(recordsForSelectedVisuals.map((r) => r.fiscal_year));
-    return Array.from(ys).sort((a, b) => a - b);
-  }, [recordsForSelectedVisuals]);
-
-  const displayYear = useMemo(() => {
-    if (chartYears.length === 0) return null;
-    if (focusYear !== null && chartYears.includes(focusYear)) return focusYear;
-    const cy = new Date().getFullYear();
-    if (chartYears.includes(cy)) return cy;
-    return chartYears[chartYears.length - 1];
-  }, [chartYears, focusYear]);
-
-  const costByYearA = useMemo(
-    () => totalByYear(visualRecordsTypeA, chartYears),
-    [visualRecordsTypeA, chartYears],
-  );
-
-  const costByYearB = useMemo(
-    () => totalByYear(visualRecordsTypeB, chartYears),
-    [visualRecordsTypeB, chartYears],
-  );
-  const combinedByYear = useMemo(() => {
-    if (!combineActualEstimatedCfYears) return {} as Record<number, number>;
-    return combinedActualEstimatedByYear(
-      recordsForSelectedVisuals,
-      chartYears,
-      currentYear,
-    );
-  }, [
-    combineActualEstimatedCfYears,
-    recordsForSelectedVisuals,
-    chartYears,
-    currentYear,
-  ]);
-  const visualCostByYearA = useMemo(() => {
-    if (!combineActualEstimatedCfYears) return costByYearA;
-    return chartYears.reduce<Record<number, number>>((acc, year) => {
-      acc[year] = visualAmountForRecordTypeAndYear(
-        comparisonTypes[0] ?? "",
-        year,
-        costByYearA[year] ?? 0,
-        combinedByYear[year] ?? 0,
-        currentYear,
-      );
-      return acc;
-    }, {});
-  }, [
-    combineActualEstimatedCfYears,
-    chartYears,
-    comparisonTypes,
-    costByYearA,
-    combinedByYear,
-    currentYear,
-  ]);
-  const visualCostByYearB = useMemo(() => {
-    if (!combineActualEstimatedCfYears) return costByYearB;
-    return chartYears.reduce<Record<number, number>>((acc, year) => {
-      acc[year] = visualAmountForRecordTypeAndYear(
-        comparisonTypes[1] ?? "",
-        year,
-        costByYearB[year] ?? 0,
-        combinedByYear[year] ?? 0,
-        currentYear,
-      );
-      return acc;
-    }, {});
-  }, [
-    combineActualEstimatedCfYears,
-    chartYears,
-    comparisonTypes,
-    costByYearB,
-    combinedByYear,
-    currentYear,
-  ]);
-
-  const yoyA =
-    displayYear !== null ? yoyPercent(visualCostByYearA, displayYear) : 0;
-  const yoyB =
-    displayYear !== null ? yoyPercent(visualCostByYearB, displayYear) : 0;
-
-  const categoryNamesForStackA = useMemo(
-    () => distinctCategoryNames(visualRecordsTypeA),
-    [visualRecordsTypeA],
-  );
-
-  const categoryNamesForStackB = useMemo(
-    () => distinctCategoryNames(visualRecordsTypeB),
-    [visualRecordsTypeB],
-  );
-
-  const stackedDataA = useMemo(
+  const visualRecords = useMemo(
     () =>
-      buildStackedYearData(visualRecordsTypeA, chartYears, categoryNamesForStackA),
-    [visualRecordsTypeA, chartYears, categoryNamesForStackA],
+      baseFilteredRecords.filter((record) =>
+        recordIncludedInVisuals(
+          record,
+          recordTypes,
+          includeEstimatedForecast,
+          currentYear,
+        ),
+      ),
+    [baseFilteredRecords, currentYear, includeEstimatedForecast, recordTypes],
   );
 
-  const stackedDataB = useMemo(
-    () =>
-      buildStackedYearData(visualRecordsTypeB, chartYears, categoryNamesForStackB),
-    [visualRecordsTypeB, chartYears, categoryNamesForStackB],
+  const yearsInScope = useMemo(() => {
+    const years = new Set(visualRecords.map((record) => record.fiscal_year));
+    return Array.from(years).sort((left, right) => left - right);
+  }, [visualRecords]);
+
+  const totalSpend = useMemo(
+    () => visualRecords.reduce((sum, record) => sum + record.amount, 0),
+    [visualRecords],
   );
 
-  const sortedDetail = useMemo(() => {
-    if (!combineActualEstimatedCfYears) {
-      return [...filteredRecords].sort((a, b) => {
-        if (b.fiscal_year !== a.fiscal_year) return b.fiscal_year - a.fiscal_year;
-        return b.amount - a.amount;
-      });
+  const groupedDimensionRows = useMemo(
+    () => totalsByDimension(visualRecords, primaryDimension),
+    [primaryDimension, visualRecords],
+  );
+
+  const stackedGroups = useMemo(() => {
+    if (analysisMode === "dimension") {
+      return buildStackedDimensionData(
+        visualRecords,
+        primaryDimension,
+        effectiveSecondaryDimension,
+      );
     }
-    const combinedRows = new Map<string, (typeof filteredRecords)[number]>();
-    const passthroughRows: (typeof filteredRecords)[number][] = [];
-    recordsForSelectedVisuals.forEach((record) => {
-      if (
-        isCurrentOrFutureFiscalYear(record.fiscal_year, currentYear) &&
-        (record.record_type === "actual" || record.record_type === "estimated")
-      ) {
-        const key = [
-          record.source,
-          record.service_id ?? "",
-          record.laptop_id ?? "",
-          record.service_name,
-          record.classification ?? "",
-          record.category_name ?? "",
-          record.cost_center_name ?? "",
-          record.fiscal_year,
-        ].join("|");
-        const existing = combinedRows.get(key);
-        if (existing) {
-          existing.amount += record.amount;
-          existing.record_type = "actual_estimated_combined";
-        } else {
-          combinedRows.set(key, {
-            ...record,
-            record_type: "actual_estimated_combined",
-          });
-        }
-      } else {
-        passthroughRows.push(record);
-      }
-    });
-    return [...passthroughRows, ...combinedRows.values()].sort((a, b) => {
-      if (b.fiscal_year !== a.fiscal_year) return b.fiscal_year - a.fiscal_year;
-      return b.amount - a.amount;
-    });
+
+    return timeStackGroups(visualRecords, yearsInScope, effectiveSecondaryDimension);
   }, [
-    combineActualEstimatedCfYears,
-    filteredRecords,
-    recordsForSelectedVisuals,
-    currentYear,
+    analysisMode,
+    effectiveSecondaryDimension,
+    primaryDimension,
+    visualRecords,
+    yearsInScope,
   ]);
 
-  function displayRecordTypeLabel(recordType: string, fiscalYear: number): string {
-    if (
-      combineActualEstimatedCfYears &&
-      isCurrentOrFutureFiscalYear(fiscalYear, currentYear) &&
-      (recordType === "actual" || recordType === "estimated")
-    ) {
-      return COMBINED_RECORD_TYPE_LABEL;
+  const chartBars = useMemo(() => {
+    if (analysisMode === "dimension") {
+      return groupedDimensionRows.map((row) => ({
+        label: row.label,
+        value: row.total,
+        color: dimensionColor(primaryDimension, row.key),
+      }));
     }
-    return RECORD_TYPE_LABELS[recordType] ?? recordType;
+
+    return yearsInScope.map((year) => ({
+      label: String(year),
+      value: visualRecords
+        .filter((record) => record.fiscal_year === year)
+        .reduce((sum, record) => sum + record.amount, 0),
+      color: year === currentYear ? "#4f46e5" : "#c7d2fe",
+    }));
+  }, [analysisMode, currentYear, groupedDimensionRows, primaryDimension, visualRecords, yearsInScope]);
+
+  const drilldownRecords = useMemo(() => {
+    return visualRecords.filter((record) => {
+      if (drilldown.year != null && record.fiscal_year !== drilldown.year) {
+        return false;
+      }
+
+      if (analysisMode === "dimension" && drilldown.primaryKey != null) {
+        const value = dimensionValueForRecord(record, primaryDimension);
+        if (value.key !== drilldown.primaryKey) {
+          return false;
+        }
+      }
+
+      if (drilldown.secondaryKey != null) {
+        const value = dimensionValueForRecord(record, effectiveSecondaryDimension);
+        if (value.key !== drilldown.secondaryKey) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    analysisMode,
+    drilldown.primaryKey,
+    drilldown.secondaryKey,
+    drilldown.year,
+    effectiveSecondaryDimension,
+    primaryDimension,
+    visualRecords,
+  ]);
+
+  const detailRows = useMemo<DetailRow[]>(
+    () =>
+      drilldownRecords
+        .slice()
+        .sort(
+          (left, right) =>
+            right.fiscal_year - left.fiscal_year ||
+            right.amount - left.amount ||
+            left.service_name.localeCompare(right.service_name),
+        )
+        .map((record) => ({
+          ...record,
+          id: record.cost_record_id,
+        })),
+    [drilldownRecords],
+  );
+
+  function resetFilters() {
+    setSource("all");
+    setCategories([]);
+    setClassifications([]);
+    setVendors([]);
+    setCostCenters([]);
+    setRecordTypes(["actual"]);
+    setFiscalYearsFilter([]);
+    setPrimaryDimension("vendor");
+    setSecondaryDimension("category");
+    setIncludeEstimatedForecast(true);
+    setDrilldown({
+      year: null,
+      primaryKey: null,
+      primaryLabel: null,
+      secondaryKey: null,
+      secondaryLabel: null,
+    });
   }
 
-  function yoyLabelForType(recordType: string, fiscalYear: number): string {
-    return `YoY ${displayRecordTypeLabel(recordType, fiscalYear)} (${fiscalYear})`;
+  function clearDrilldown() {
+    setDrilldown({
+      year: null,
+      primaryKey: null,
+      primaryLabel: null,
+      secondaryKey: null,
+      secondaryLabel: null,
+    });
   }
+
+  const handleQuickFilter = useCallback((
+    dimension: DashboardCostDimension | "fiscal_year",
+    key: string,
+  ) => {
+    clearDrilldown();
+    if (dimension === "fiscal_year") {
+      setFiscalYearsFilter([Number.parseInt(key, 10)]);
+      return;
+    }
+    if (dimension === "category") {
+      setCategories([key]);
+      return;
+    }
+    if (dimension === "classification") {
+      setClassifications([key]);
+      return;
+    }
+    if (dimension === "vendor") {
+      setVendors([key]);
+      return;
+    }
+    if (dimension === "cost_center") {
+      setCostCenters([key]);
+      return;
+    }
+    setSource(key as "service" | "hardware");
+  }, []);
 
   function handleDownloadCsv() {
     const headers = [
       "Source",
       "Name",
-      "Spending category",
+      "Vendor",
+      "Category",
       "Classification",
       "Cost center",
       "Fiscal year",
@@ -482,22 +524,20 @@ export function CostsReport() {
       "Record type",
       "Notes",
     ];
-    const rows = sortedDetail.map((r) => [
-      r.source,
-      r.service_name,
-      r.category_name ?? "",
-      r.classification ?? "",
-      r.cost_center_name ?? "",
-      String(r.fiscal_year),
-      String(r.amount),
-      r.record_type,
-      r.notes ?? "",
+    const rows = detailRows.map((row) => [
+      sourceDisplayName(row.source),
+      row.service_name,
+      vendorDisplayName(row.vendor_name ?? ""),
+      categoryDisplayName(row.category_name ?? ""),
+      classificationDisplayName(row.classification ?? "", row.classification_name),
+      row.cost_center_name ?? (row.source === "hardware" ? "Hardware (assets)" : "(No cost center)"),
+      String(row.fiscal_year),
+      String(row.amount),
+      formatRecordType(row.record_type),
+      row.notes ?? "",
     ]);
     const date = new Date().toISOString().slice(0, 10);
-    downloadCsvFile(
-      `catalogit-it-financial-report-${date}.csv`,
-      buildCsv(headers, rows),
-    );
+    downloadCsvFile(`catalogit-cost-report-${date}.csv`, buildCsv(headers, rows));
   }
 
   function handlePrint() {
@@ -510,13 +550,148 @@ export function CostsReport() {
     queueMicrotask(() => window.print());
   }
 
+  const detailColumns = useMemo<Column<DetailRow>[]>(
+    () => [
+      {
+        key: "service_name",
+        header: "Name",
+        render: (row) => {
+          const href =
+            row.source === "service" && row.service_id
+              ? `/services/${row.service_id}`
+              : row.laptop_id
+                ? `/hardware/${row.laptop_id}`
+                : null;
+
+          return href ? (
+            <Link
+              to={href}
+              className="text-brand-700 hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-brand-200"
+            >
+              {row.service_name}
+            </Link>
+          ) : (
+            row.service_name
+          );
+        },
+      },
+      {
+        key: "source",
+        header: "Source",
+        render: (row) => (
+          <QuickFilterButton
+            label={sourceDisplayName(row.source)}
+            onClick={() => handleQuickFilter("source", row.source)}
+          />
+        ),
+      },
+      {
+        key: "vendor_name",
+        header: "Vendor",
+        render: (row) =>
+          row.vendor_name ? (
+            <QuickFilterButton
+              label={vendorDisplayName(row.vendor_name)}
+              onClick={() => handleQuickFilter("vendor", row.vendor_name ?? "")}
+            />
+          ) : (
+            "—"
+          ),
+      },
+      {
+        key: "category_name",
+        header: "Category",
+        render: (row) => (
+          <QuickFilterButton
+            label={categoryDisplayName(row.category_name ?? "")}
+            onClick={() => handleQuickFilter("category", row.category_name ?? "")}
+          />
+        ),
+      },
+      {
+        key: "classification",
+        header: "Classification",
+        render: (row) => (
+          <QuickFilterButton
+            label={classificationDisplayName(row.classification ?? "", row.classification_name)}
+            onClick={() => handleQuickFilter("classification", row.classification ?? "")}
+          />
+        ),
+      },
+      {
+        key: "cost_center_name",
+        header: "Cost Center",
+        render: (row) => {
+          const key =
+            row.source === "hardware" ? "__hw__" : (row.cost_center_name ?? "");
+          const label =
+            row.source === "hardware"
+              ? "Hardware (assets)"
+              : row.cost_center_name || "(No cost center)";
+          return (
+            <QuickFilterButton
+              label={label}
+              onClick={() => handleQuickFilter("cost_center", key)}
+            />
+          );
+        },
+      },
+      {
+        key: "fiscal_year",
+        header: "Year",
+        render: (row) => (
+          <QuickFilterButton
+            label={String(row.fiscal_year)}
+            onClick={() => handleQuickFilter("fiscal_year", String(row.fiscal_year))}
+          />
+        ),
+      },
+      {
+        key: "amount",
+        header: "Amount",
+        render: (row) => fmtFull(row.amount),
+      },
+      {
+        key: "record_type",
+        header: "Type",
+        render: (row) => formatRecordType(row.record_type),
+      },
+      {
+        key: "notes",
+        header: "Notes",
+        render: (row) => row.notes?.trim() || "—",
+      },
+    ],
+    [handleQuickFilter],
+  );
+
+  const activeFilterSummary = [
+    categories.length > 0 ? `${categories.length} categories` : null,
+    classifications.length > 0 ? `${classifications.length} classifications` : null,
+    vendors.length > 0 ? `${vendors.length} vendors` : null,
+    costCenters.length > 0 ? `${costCenters.length} cost centers` : null,
+    fiscalYearsFilter.length > 0 ? `${fiscalYearsFilter.length} years` : null,
+    source !== "all" ? sourceDisplayName(source) : null,
+    recordTypes.length > 0 ? recordTypes.map(formatRecordType).join(", ") : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  const drilldownSummary = [
+    drilldown.year != null ? `Year ${drilldown.year}` : null,
+    drilldown.primaryLabel,
+    drilldown.secondaryLabel,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
   if (loading) {
     return (
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          IT Financial Report
+          Cost Report
         </h1>
-        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Loading…</p>
       </div>
     );
   }
@@ -525,7 +700,7 @@ export function CostsReport() {
     return (
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          IT Financial Report
+          Cost Report
         </h1>
         <p className="mt-4 text-sm text-red-600">
           Could not load cost data. Try again later.
@@ -534,494 +709,354 @@ export function CostsReport() {
     );
   }
 
-  const hasData = filteredRecords.length > 0;
-
   return (
     <PageTransition>
-    <div className="costs-report costs-report-print text-gray-900 dark:text-gray-100">
-      <style>{`
-        @media print {
-          .costs-report .print\\:hidden { display: none !important; }
-        }
-      `}</style>
-
-      <div className="print:hidden">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          IT Financial Report
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Default is actual-only; switch the view to compare pairs of record types, filter, export, or
-          print.
-        </p>
-      </div>
-
-      <div className="hidden print:block costs-report-print-summary">
-        <h1 className="costs-report-print-title">IT Financial Report</h1>
-        <p className="mt-2 text-[9.5pt] text-gray-800">
-          <strong>Generated</strong> {printGeneratedAt || "—"}
-        </p>
-        <ul className="mt-3 list-none space-y-1.5 text-[9.5pt]">
-          <li>
-            <strong>View:</strong> {COMPARISON_MODE_LABEL[comparisonMode]}
-          </li>
-          <li>
-            <strong>Source:</strong>{" "}
-            {source === "all"
-              ? "All"
-              : source === "service"
-                ? "Software only"
-                : "Hardware only"}
-          </li>
-          <li>
-            <strong>Spending categories:</strong>{" "}
-            {categories.length === 0
-              ? "All"
-              : categories.map(categoryDisplayName).join(", ")}
-          </li>
-          <li>
-            <strong>Classification:</strong>{" "}
-            {classifications.length === 0
-              ? "All"
-              : classifications.map(classificationLabel).join(", ")}
-          </li>
-          <li>
-            <strong>Cost center / hardware:</strong> {costCenterFilterSummary}
-          </li>
-          <li>
-            <strong>Fiscal years:</strong>{" "}
-            {fiscalYearsFilter.length === 0
-              ? "All (within filtered data)"
-              : [...fiscalYearsFilter].sort((a, b) => a - b).join(", ")}
-          </li>
-          <li>
-            <strong>Combine actual + estimated (current/future years):</strong>{" "}
-            {combineActualEstimatedCfYears ? "On" : "Off"}
-          </li>
-          <li>
-            <strong>Rows in report:</strong> {sortedDetail.length}
-          </li>
-        </ul>
-      </div>
-
-      <div className="print:hidden mt-6 space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MultiStringSelect
-            id="cr-cat"
-            label="Spending category"
-            options={categoryOptions}
-            values={categories}
-            onChange={setCategories}
-            hint="Empty = all categories."
-          />
+      <div className="costs-report costs-report-print space-y-6 text-gray-900 dark:text-gray-100">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Source
-            </span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(
-                [
-                  ["all", "All"],
-                  ["service", "Software"],
-                  ["hardware", "Hardware"],
-                ] as const
-              ).map(([val, lab]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setSource(val)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium ${
-                    source === val
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                  }`}
-                >
-                  {lab}
-                </button>
-              ))}
-            </div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+              Cost Report
+            </h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Explore spend by year or by business dimension, then drill into the exact records behind each aggregate.
+            </p>
+            {printGeneratedAt && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Print generated {printGeneratedAt}
+              </p>
+            )}
           </div>
-          <MultiStringSelect
-            id="cr-class"
-            label="Classification"
-            options={classificationOptions}
-            values={classifications}
-            onChange={setClassifications}
-            hint="Empty = all."
-          />
-          <MultiStringSelect
-            id="cr-cc"
-            label="Cost center / hardware"
-            options={costCenterOptions.map((o) => ({
-              value: o.key,
-              label: o.label,
-            }))}
-            values={costCenters}
-            onChange={setCostCenters}
-            hint="Empty = all. Hardware matches “Hardware (assets)”."
-          />
-          <MultiYearSelect
-            id="cr-yr"
-            label="Fiscal years"
-            years={apiYears}
-            values={fiscalYearsFilter}
-            onChange={setFiscalYearsFilter}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
-          <span className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-            View
-          </span>
-          {(
-            [
-              "only_actual",
-              "actual_vs_estimated",
-              "actual_vs_budget",
-              "estimated_vs_budget",
-            ] as const
-          ).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setComparisonMode(m)}
-              className={`rounded-md px-3 py-1 text-xs font-medium ${
-                comparisonMode === m
-                  ? "bg-brand-600 text-white"
-                  : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-              }`}
-            >
-              {COMPARISON_MODE_LABEL[m]}
-            </button>
-          ))}
-          <label className="flex w-full cursor-pointer items-start gap-2 text-sm text-gray-700 sm:w-auto dark:text-gray-300">
-            <input
-              id="cr-combine-ae"
-              type="checkbox"
-              checked={combineActualEstimatedCfYears}
-              onChange={(e) => setCombineActualEstimatedCfYears(e.target.checked)}
-              className="mt-0.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
-            />
-            <span>
-              Combine Actual and Estimated for current and future years
-            </span>
-          </label>
-          <div className="ml-auto flex flex-wrap gap-2">
+          <div className="print:hidden flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleDownloadCsv}
-              disabled={!hasData}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              disabled={detailRows.length === 0}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
             >
-              Download CSV
+              Export CSV
             </button>
             <button
               type="button"
               onClick={handlePrint}
-              disabled={!hasData}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
             >
               Print
             </button>
           </div>
         </div>
-      </div>
 
-      {!hasData && (
-        <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
-          No cost rows match the current filters.
-        </p>
-      )}
-
-      {hasData && (
-        <>
-          {displayYear !== null && (
-            <div
-              className={`mt-6 grid gap-3 print:grid-cols-2 ${
-                isOnlyActual
-                  ? "grid-cols-2 sm:max-w-2xl"
-                  : "grid-cols-2 sm:grid-cols-4 print:grid-cols-4"
-              }`}
-            >
-              <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {displayRecordTypeLabel(comparisonTypes[0] ?? "", displayYear)} ({displayYear})
-                </p>
-                <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-100">
-                  {fmtFull(visualCostByYearA[displayYear] ?? 0)}
-                </p>
-              </div>
-              {!isOnlyActual && comparisonTypes[1] !== undefined && (
-                <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                  <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {displayRecordTypeLabel(comparisonTypes[1], displayYear)} ({displayYear})
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-100">
-                    {fmtFull(visualCostByYearB[displayYear] ?? 0)}
-                  </p>
-                </div>
-              )}
-              <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {yoyLabelForType(comparisonTypes[0] ?? "", displayYear)}
-                </p>
-                <p
-                  className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
-                    yoyA < 0
-                      ? "text-emerald-600"
-                      : yoyA > 0
-                        ? "text-red-600"
-                        : "text-gray-900 dark:text-gray-100"
-                  }`}
-                >
-                  {`${yoyA >= 0 ? "+" : ""}${yoyA.toFixed(1)}%`}
-                </p>
-              </div>
-              {!isOnlyActual && comparisonTypes[1] !== undefined && (
-                <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                  <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {yoyLabelForType(comparisonTypes[1], displayYear)}
-                  </p>
-                  <p
-                    className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
-                      yoyB < 0
-                        ? "text-emerald-600"
-                        : yoyB > 0
-                          ? "text-red-600"
-                          : "text-gray-900 dark:text-gray-100"
-                    }`}
-                  >
-                    {`${yoyB >= 0 ? "+" : ""}${yoyB.toFixed(1)}%`}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="mt-2 print:hidden">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Focus year for KPIs:{" "}
-            </span>
-            {chartYears.map((y) => (
-              <button
-                key={y}
-                type="button"
-                onClick={() => setFocusYear(y)}
-                className={`mr-1 rounded px-2 py-0.5 text-xs font-medium ${
-                  displayYear === y
-                    ? "bg-brand-600 text-white"
-                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-                }`}
-              >
-                {y}
-              </button>
-            ))}
-          </div>
-
-          {isOnlyActual ? (
-            <div className="print-chart-card mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-              <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Total spend by year (actual)
+        <div className="print:hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Filters & Analysis
               </h2>
-              <BarChart
-                data={chartYears.map((y) => ({
-                  label: String(y),
-                  value: visualCostByYearA[y] ?? 0,
-                  color: y === displayYear ? "#4f46e5" : "#c7d2fe",
-                }))}
-                onBarClick={(i) => {
-                  const y = chartYears[i];
-                  if (y !== undefined) setFocusYear(y);
-                }}
-              />
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Click chart bars, stack segments, or table cells below to isolate a value quickly.
+              </p>
             </div>
-          ) : (
-            <div className="mt-6 grid gap-4 lg:grid-cols-2 print:grid-cols-1">
-              <div className="print-chart-card min-h-[280px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-                <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  {RECORD_TYPE_LABELS[comparisonTypes[0]]} — total by year
-                </h2>
-                <BarChart
-                  data={chartYears.map((y) => ({
-                    label: String(y),
-                    value: visualCostByYearA[y] ?? 0,
-                    color: y === displayYear ? "#4f46e5" : "#c7d2fe",
-                  }))}
-                  onBarClick={(i) => {
-                    const y = chartYears[i];
-                    if (y !== undefined) setFocusYear(y);
-                  }}
-                />
-              </div>
-              {comparisonTypes[1] !== undefined && (
-                <div className="print-chart-card min-h-[280px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-                  <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    {RECORD_TYPE_LABELS[comparisonTypes[1]]} — total by year
-                  </h2>
-                  <BarChart
-                    data={chartYears.map((y) => ({
-                      label: String(y),
-                      value: visualCostByYearB[y] ?? 0,
-                      color: y === displayYear ? "#0d9488" : "#99f6e4",
-                    }))}
-                    onBarClick={(i) => {
-                      const y = chartYears[i];
-                      if (y !== undefined) setFocusYear(y);
-                    }}
-                  />
-                </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={clearDrilldown}
+                disabled={!drilldownSummary}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                Clear drilldown
+              </button>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                Reset all
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                Analysis mode
+              </label>
+              <select
+                value={analysisMode}
+                onChange={(e) => setAnalysisMode(e.target.value as ReportAnalysisMode)}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              >
+                <option value="time">Time series</option>
+                <option value="dimension">Dimension ranking</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                Source
+              </label>
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value as "all" | "service" | "hardware")}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              >
+                <option value="all">All</option>
+                <option value="service">Software</option>
+                <option value="hardware">Hardware</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                Primary dimension
+              </label>
+              <select
+                value={primaryDimension}
+                onChange={(e) => setPrimaryDimension(e.target.value as DashboardCostDimension)}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                disabled={analysisMode !== "dimension"}
+              >
+                {REPORT_DIMENSIONS.map((dimension) => (
+                  <option key={dimension} value={dimension}>
+                    {DASHBOARD_COST_DIMENSION_LABEL[dimension]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                Breakdown dimension
+              </label>
+              <select
+                value={effectiveSecondaryDimension}
+                onChange={(e) => setSecondaryDimension(e.target.value as DashboardCostDimension)}
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              >
+                {REPORT_DIMENSIONS.filter((dimension) => dimension !== primaryDimension).map(
+                  (dimension) => (
+                    <option key={dimension} value={dimension}>
+                      {DASHBOARD_COST_DIMENSION_LABEL[dimension]}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
+            <MultiStringSelect
+              id="record-types"
+              label="Record types"
+              options={RECORD_TYPE_OPTIONS}
+              values={recordTypes}
+              onChange={(next) => setRecordTypes(next.length > 0 ? next : ["actual"])}
+              hint="Choose the rows that feed the charts and drilldowns."
+            />
+            <MultiStringSelect
+              id="categories"
+              label="Categories"
+              options={categoryOptions}
+              values={categories}
+              onChange={setCategories}
+            />
+            <MultiStringSelect
+              id="classifications"
+              label="Classifications"
+              options={classificationOptions}
+              values={classifications}
+              onChange={setClassifications}
+            />
+            <MultiStringSelect
+              id="vendors"
+              label="Vendors"
+              options={vendorOptions}
+              values={vendors}
+              onChange={setVendors}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <MultiStringSelect
+              id="cost-centers"
+              label="Cost centers"
+              options={costCenterOptions}
+              values={costCenters}
+              onChange={setCostCenters}
+            />
+            <MultiYearSelect
+              years={fiscalYears.length > 0 ? fiscalYears : yearsInScope}
+              values={fiscalYearsFilter}
+              onChange={setFiscalYearsFilter}
+            />
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-800 dark:bg-gray-950">
+              <input
+                type="checkbox"
+                checked={includeEstimatedForecast}
+                onChange={(e) => setIncludeEstimatedForecast(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-2 focus:ring-brand-500/30 dark:border-gray-600"
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Forecast future actuals with estimated rows
+                </span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400">
+                  When Actual is selected, include estimated records for the current and future fiscal years in charts and drilldowns.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          {(activeFilterSummary || drilldownSummary) && (
+            <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
+              {activeFilterSummary && (
+                <span className="rounded-full bg-gray-100 px-3 py-1 dark:bg-gray-800">
+                  Filters: {activeFilterSummary}
+                </span>
+              )}
+              {drilldownSummary && (
+                <span className="rounded-full bg-brand-100 px-3 py-1 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                  Drilldown: {drilldownSummary}
+                </span>
               )}
             </div>
           )}
+        </div>
 
-          {categoryNamesForStackA.length > 0 && (
-            <div className="print-chart-card mt-4 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  {isOnlyActual
-                    ? "Spend by category (actual)"
-                    : `${RECORD_TYPE_LABELS[comparisonTypes[0]]} — spend by category`}
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {categoryNamesForStackA.map((name) => (
-                    <span
-                      key={name}
-                      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
-                    >
-                      <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{
-                          background: getCategoryColor(
-                            name || "(Uncategorized)",
-                          ),
-                        }}
-                      />
-                      {categoryDisplayName(name)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <StackedBar
-                yearData={stackedDataA}
-                onYearClick={(y) => setFocusYear(y)}
-              />
-            </div>
-          )}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <SummaryCard
+            label="Spend in Scope"
+            value={fmtFull(totalSpend)}
+            subtext={`${visualRecords.length} records included`}
+          />
+          <SummaryCard
+            label="Drilldown Rows"
+            value={String(detailRows.length)}
+            subtext={drilldownSummary || "No chart drilldown applied"}
+          />
+          <SummaryCard
+            label="Coverage"
+            value={
+              yearsInScope.length > 0
+                ? `${yearsInScope[0]}-${yearsInScope[yearsInScope.length - 1]}`
+                : "—"
+            }
+            subtext={
+              analysisMode === "dimension"
+                ? `Ranking by ${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension].toLowerCase()}`
+                : `Stacked by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension].toLowerCase()}`
+            }
+          />
+        </div>
 
-          {!isOnlyActual && categoryNamesForStackB.length > 0 && comparisonTypes[1] !== undefined && (
-            <div className="print-chart-card mt-4 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  {RECORD_TYPE_LABELS[comparisonTypes[1]]} — spend by category
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {categoryNamesForStackB.map((name) => (
-                    <span
-                      key={name}
-                      className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
-                    >
-                      <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{
-                          background: getCategoryColor(
-                            name || "(Uncategorized)",
-                          ),
-                        }}
-                      />
-                      {categoryDisplayName(name)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <StackedBar
-                yearData={stackedDataB}
-                onYearClick={(y) => setFocusYear(y)}
-              />
-            </div>
-          )}
-
-          <div className="print-table-section mt-8 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 print:break-inside-avoid">
-            <h2 className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
-              Line items ({sortedDetail.length})
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {analysisMode === "dimension"
+                ? `Spend by ${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension]}`
+                : "Spend by fiscal year"}
             </h2>
-            <div className="costs-report-print-table-wrap max-h-[520px] overflow-auto print:max-h-none print:overflow-visible">
-              <table className="costs-report-data-table min-w-full divide-y divide-gray-200 text-base dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-950">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Source
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Category
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Class.
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Cost ctr.
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Year
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Type
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                  {sortedDetail.map((r, idx) => (
-                    <tr key={`${r.service_name}-${r.fiscal_year}-${idx}`}>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {r.source}
-                      </td>
-                      <td className="print-name-cell max-w-[220px] truncate px-4 py-3 text-gray-900 dark:text-gray-100">
-                        {r.service_name}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {categoryDisplayName(r.category_name ?? "")}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        <span
-                          className="inline-flex items-center gap-1"
-                          title={r.classification ?? ""}
-                        >
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{
-                              background: classificationBarColor(r.classification),
-                            }}
-                          />
-                          {classificationLabel(r.classification ?? "")}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {r.cost_center_name ?? (r.source === "hardware" ? "—" : "—")}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-base text-gray-700 tabular-nums dark:text-gray-300">
-                        {r.fiscal_year}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                        {fmtFull(r.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {r.record_type === "actual_estimated_combined"
-                          ? COMBINED_RECORD_TYPE_LABEL
-                          : RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              Click a bar to drill into the records behind that total.
+            </p>
+            <BarChart
+              data={chartBars}
+              onBarClick={(index) => {
+                if (analysisMode === "dimension") {
+                  const row = groupedDimensionRows[index];
+                  if (!row) return;
+                  setDrilldown({
+                    year: null,
+                    primaryKey: row.key,
+                    primaryLabel: row.label,
+                    secondaryKey: null,
+                    secondaryLabel: null,
+                  });
+                  return;
+                }
+
+                const year = yearsInScope[index];
+                if (year == null) return;
+                setDrilldown({
+                  year,
+                  primaryKey: null,
+                  primaryLabel: null,
+                  secondaryKey: null,
+                  secondaryLabel: null,
+                });
+              }}
+            />
           </div>
-        </>
-      )}
-    </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {analysisMode === "dimension"
+                ? `${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension]} split by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension]}`
+                : `Fiscal year split by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension]}`}
+            </h2>
+            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              Click a stack to drill into a group, or click a segment to isolate a specific slice.
+            </p>
+            <StackedBar
+              groups={stackedGroups}
+              onGroupClick={(group) => {
+                if (analysisMode === "dimension") {
+                  setDrilldown({
+                    year: null,
+                    primaryKey: group.key,
+                    primaryLabel: group.label,
+                    secondaryKey: null,
+                    secondaryLabel: null,
+                  });
+                  return;
+                }
+
+                setDrilldown({
+                  year: Number.parseInt(group.key, 10),
+                  primaryKey: null,
+                  primaryLabel: null,
+                  secondaryKey: null,
+                  secondaryLabel: null,
+                });
+              }}
+              onSliceClick={(group, slice) => {
+                if (analysisMode === "dimension") {
+                  setDrilldown({
+                    year: null,
+                    primaryKey: group.key,
+                    primaryLabel: group.label,
+                    secondaryKey: slice.id,
+                    secondaryLabel: slice.name,
+                  });
+                  return;
+                }
+
+                setDrilldown({
+                  year: Number.parseInt(group.key, 10),
+                  primaryKey: null,
+                  primaryLabel: null,
+                  secondaryKey: slice.id,
+                  secondaryLabel: slice.name,
+                });
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Underlying Records
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Use the clickable values in the table to isolate category, classification, vendor, cost center, source, or year instantly.
+              </p>
+            </div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {detailRows.length} rows
+            </p>
+          </div>
+          <div className="mt-4">
+            <DataTable columns={detailColumns} data={detailRows} primaryColumnKey="service_name" />
+          </div>
+        </div>
+      </div>
     </PageTransition>
   );
 }
