@@ -20,12 +20,20 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 class CostRecordOut(BaseModel):
+    cost_record_id: str
     source: Literal["service", "hardware"] = "service"
     service_id: str | None = None
     laptop_id: str | None = None
     service_name: str
+    purchase_year: int | None = None
+    vendor_id: str | None = None
+    vendor_name: str | None = None
+    category_id: str | None = None
     classification: str | None
+    classification_id: str | None = None
+    classification_name: str | None = None
     category_name: str | None
+    cost_center_id: str | None = None
     cost_center_name: str | None = None
     fiscal_year: int
     amount: float
@@ -52,6 +60,7 @@ async def get_dashboard(
 
     svc_result = await db.execute(
         select(Service).options(
+            selectinload(Service.vendor),
             selectinload(Service.cost_center),
             selectinload(Service.service_classification),
         )
@@ -80,16 +89,32 @@ async def get_dashboard(
             cc_name = svc.cost_center.name if svc.cost_center else None
             out.append(
                 CostRecordOut(
+                    cost_record_id=str(r.id),
                     source="service",
                     service_id=str(r.service_id),
                     laptop_id=None,
                     service_name=svc.name,
+                    purchase_year=r.purchase_year,
+                    vendor_id=str(svc.vendor.id) if svc.vendor else None,
+                    vendor_name=svc.vendor.name if svc.vendor else None,
+                    category_id=str(svc.category_id) if svc.category_id else None,
                     classification=(
                         svc.service_classification.slug
                         if svc.service_classification
                         else None
                     ),
+                    classification_id=(
+                        str(svc.service_classification.id)
+                        if svc.service_classification
+                        else None
+                    ),
+                    classification_name=(
+                        svc.service_classification.name
+                        if svc.service_classification
+                        else None
+                    ),
                     category_name=cat_name,
+                    cost_center_id=str(svc.cost_center.id) if svc.cost_center else None,
                     cost_center_name=cc_name,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
@@ -104,12 +129,20 @@ async def get_dashboard(
             label = f"{lap.model_name} ({lap.serial_number})"
             out.append(
                 CostRecordOut(
+                    cost_record_id=str(r.id),
                     source="hardware",
                     service_id=None,
                     laptop_id=str(r.laptop_id),
                     service_name=label,
+                    purchase_year=r.purchase_year,
+                    vendor_id=None,
+                    vendor_name=None,
+                    category_id=None,
                     classification="hardware",
+                    classification_id=None,
+                    classification_name="Hardware",
                     category_name="Hardware",
+                    cost_center_id=None,
                     cost_center_name=None,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),

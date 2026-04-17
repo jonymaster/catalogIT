@@ -5,33 +5,33 @@ interface CatSlice {
   color: string;
 }
 
-interface YearData {
-  year: number;
+interface GroupData {
+  key: string;
+  label: string;
   cats: CatSlice[];
 }
 
 interface Props {
-  yearData: YearData[];
+  groups: GroupData[];
   width?: number;
   height?: number;
-  /** Called with fiscal year when a year column is clicked (dashboard). */
-  onYearClick?: (year: number) => void;
+  onGroupClick?: (group: GroupData) => void;
+  onSliceClick?: (group: GroupData, slice: CatSlice) => void;
 }
 
 const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `$${n}`;
 
 export function StackedBar({
-  yearData,
+  groups,
   width = 640,
   height = 300,
-  onYearClick,
+  onGroupClick,
+  onSliceClick,
 }: Props) {
-  const max = yearData.length
+  const max = groups.length
     ? Math.max(
-        ...yearData.map((yd) =>
-          yd.cats.reduce((s, c) => s + c.value, 0),
-        ),
+        ...groups.map((group) => group.cats.reduce((s, c) => s + c.value, 0)),
         1,
       )
     : 1;
@@ -41,7 +41,7 @@ export function StackedBar({
   const chartTop = topInset;
   const chartBottom = height - bottomPad;
   const chartH = chartBottom - chartTop;
-  const n = Math.max(yearData.length, 1);
+  const n = Math.max(groups.length, 1);
   const slot = (width - startX - 20) / n;
   const bw = Math.min(104, Math.max(28, slot - 12));
 
@@ -76,18 +76,18 @@ export function StackedBar({
           </g>
         );
       })}
-      {yearData.map((yd, i) => {
-        const colW = (width - startX - 20) / Math.max(yearData.length, 1);
+      {groups.map((group, i) => {
+        const colW = (width - startX - 20) / Math.max(groups.length, 1);
         const x = startX + i * colW + (colW - bw) / 2;
         let cumH = 0;
-        const total = yd.cats.reduce((s, c) => s + c.value, 0);
+        const total = group.cats.reduce((s, c) => s + c.value, 0);
         return (
           <g
-            key={i}
-            className={onYearClick ? "cursor-pointer" : undefined}
-            onClick={() => onYearClick?.(yd.year)}
+            key={group.key || i}
+            className={onGroupClick ? "cursor-pointer" : undefined}
+            onClick={() => onGroupClick?.(group)}
           >
-            {yd.cats.map((c, ci) => {
+            {group.cats.map((c, ci) => {
               const bh = (c.value / max) * chartH;
               const y = chartTop + chartH - cumH - bh;
               cumH += bh;
@@ -101,6 +101,12 @@ export function StackedBar({
                   rx="3"
                   fill={c.color}
                   opacity="0.8"
+                  className={onSliceClick ? "cursor-pointer" : undefined}
+                  onClick={(event) => {
+                    if (!onSliceClick) return;
+                    event.stopPropagation();
+                    onSliceClick(group, c);
+                  }}
                 />
               );
             })}
@@ -122,7 +128,7 @@ export function StackedBar({
               fontWeight="600"
               className="fill-gray-700 dark:fill-gray-300"
             >
-              {yd.year}
+              {group.label}
             </text>
           </g>
         );

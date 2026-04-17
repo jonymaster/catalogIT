@@ -1,13 +1,27 @@
 export type DashboardCostSource = "service" | "hardware";
+export type DashboardCostDimension =
+  | "category"
+  | "classification"
+  | "vendor"
+  | "cost_center"
+  | "source";
 
 /** Mirrors GET /api/dashboard/ cost_records rows. */
 export interface DashboardCostRecord {
+  cost_record_id: string;
   source: DashboardCostSource;
   service_id: string | null;
   laptop_id: string | null;
   service_name: string;
+  purchase_year: number | null;
+  vendor_id: string | null;
+  vendor_name: string | null;
+  category_id: string | null;
   classification: string | null;
+  classification_id: string | null;
+  classification_name: string | null;
   category_name: string | null;
+  cost_center_id: string | null;
   cost_center_name: string | null;
   fiscal_year: number;
   amount: number;
@@ -19,6 +33,19 @@ export interface DashboardCostPayload {
   cost_records: DashboardCostRecord[];
   fiscal_years: number[];
 }
+
+export const DASHBOARD_COST_DIMENSION_LABEL: Record<
+  DashboardCostDimension,
+  string
+> = {
+  category: "Category",
+  classification: "Classification",
+  vendor: "Vendor",
+  cost_center: "Cost center",
+  source: "Source",
+};
+
+export type ReportAnalysisMode = "time" | "dimension";
 
 export type CostSourceFilter = "all" | "service" | "hardware";
 
