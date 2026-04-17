@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.schemas.hardware_location import HardwareLocationRead
 from app.schemas.hardware_status import HardwareStatusRead
@@ -22,6 +22,14 @@ class LaptopCreate(BaseModel):
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
 
+    @field_validator("serial_number", "model_name")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("field cannot be blank")
+        return cleaned
+
 
 class LaptopUpdate(BaseModel):
     serial_number: str | None = None
@@ -34,6 +42,16 @@ class LaptopUpdate(BaseModel):
     hardware_location_id: uuid.UUID | None = None
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
+
+    @field_validator("serial_number", "model_name")
+    @classmethod
+    def validate_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("field cannot be blank")
+        return cleaned
 
 
 class LaptopRead(BaseModel):

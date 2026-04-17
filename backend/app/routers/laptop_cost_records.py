@@ -12,7 +12,7 @@ from app.models.cost_record import CostRecord
 from app.models.laptop import Laptop
 from app.models.payment_method import PaymentMethod
 from app.models.user import User
-from app.routers.cost_records import to_cost_record_read
+from app.routers.cost_records import _ensure_payment_method, to_cost_record_read
 from app.schemas.cost_record import CostRecordCreate, CostRecordRead, CostRecordUpdate
 
 router = APIRouter(
@@ -88,10 +88,11 @@ async def create_laptop_cost_record(
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_laptop(laptop_id, db, for_write=True)
+    payment_method_id = await _ensure_payment_method(db, body.payment_method_id)
     record = CostRecord(
         service_id=None,
         laptop_id=laptop_id,
-        payment_method_id=body.payment_method_id,
+        payment_method_id=payment_method_id,
         fiscal_year=body.fiscal_year,
         purchase_year=body.purchase_year,
         amount=body.amount,
@@ -123,7 +124,14 @@ async def update_laptop_cost_record(
     if not record or record.laptop_id != laptop_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
 
-    for field, value in body.model_dump(exclude_unset=True).items():
+    update_data = body.model_dump(exclude_unset=True)
+    if "payment_method_id" in update_data:
+        update_data["payment_method_id"] = await _ensure_payment_method(
+            db,
+            update_data["payment_method_id"],
+        )
+
+    for field, value in update_data.items():
         setattr(record, field, value)
 
     await db.flush()

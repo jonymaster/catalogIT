@@ -13,6 +13,30 @@ from app.schemas.service_status import ServiceStatusRead
 from app.schemas.user import UserRead
 from app.schemas.vendor import VendorRead
 
+ALLOWED_BILLING_SCHEDULES = {"", "monthly", "annually", "na", "on_demand"}
+ALLOWED_CRITICALITY_VALUES = {"Critical", "High", "Medium", "Low"}
+
+
+def _normalize_name(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError("name cannot be blank")
+    return cleaned
+
+
+def _normalize_optional_choice(
+    value: str | None,
+    *,
+    label: str,
+    allowed: set[str],
+) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if cleaned not in allowed:
+        raise ValueError(f"{label} must be one of: {', '.join(sorted(v or '(blank)' for v in allowed))}")
+    return cleaned
+
 
 class ServiceCreate(BaseModel):
     name: str
@@ -46,6 +70,40 @@ class ServiceCreate(BaseModel):
         if v is not None and v < 1:
             raise ValueError("total_seats must be at least 1 when set")
         return v
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return _normalize_name(value)
+
+    @field_validator("billing_schedule")
+    @classmethod
+    def validate_billing_schedule(cls, value: str) -> str:
+        return _normalize_optional_choice(
+            value,
+            label="billing_schedule",
+            allowed=ALLOWED_BILLING_SCHEDULES,
+        ) or ""
+
+    @field_validator("criticality")
+    @classmethod
+    def validate_criticality(cls, value: str | None) -> str | None:
+        return _normalize_optional_choice(
+            value,
+            label="criticality",
+            allowed=ALLOWED_CRITICALITY_VALUES,
+        )
+
+    @field_validator("renewal_offsets_days")
+    @classmethod
+    def validate_offsets(cls, value: list[int] | None) -> list[int] | None:
+        if value is None:
+            return value
+        if any(offset <= 0 for offset in value):
+            raise ValueError("renewal_offsets_days must contain only positive integers")
+        if len(set(value)) != len(value):
+            raise ValueError("renewal_offsets_days must not contain duplicates")
+        return value
 
 
 class ServiceUpdate(BaseModel):
@@ -81,6 +139,36 @@ class ServiceUpdate(BaseModel):
         if v is not None and v < 1:
             raise ValueError("total_seats must be at least 1 when set")
         return v
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        return _normalize_name(value)
+
+    @field_validator("billing_schedule")
+    @classmethod
+    def validate_billing_schedule(cls, value: str | None) -> str | None:
+        return _normalize_optional_choice(
+            value,
+            label="billing_schedule",
+            allowed=ALLOWED_BILLING_SCHEDULES,
+        )
+
+    @field_validator("criticality")
+    @classmethod
+    def validate_criticality(cls, value: str | None) -> str | None:
+        return _normalize_optional_choice(
+            value,
+            label="criticality",
+            allowed=ALLOWED_CRITICALITY_VALUES,
+        )
+
+    @field_validator("renewal_offsets_days")
+    @classmethod
+    def validate_offsets(cls, value: list[int] | None) -> list[int] | None:
+        return ServiceCreate.validate_offsets(value)
 
 
 class ServiceRead(BaseModel):
