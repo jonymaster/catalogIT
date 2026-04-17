@@ -59,6 +59,20 @@ Enable seamless cross-navigation between related entities through contextual lin
 
 ---
 
+## 4) Data Validation and Guardrails
+
+### Goal
+Prevent invalid or extreme inputs from entering the system while keeping data-entry UX clear and predictable.
+
+### Work items
+- Introduce phased validation rules across the stack:
+  - Start with UI-level validation for immediate feedback on create/edit forms.
+  - Mark critical fields as required based on entity type.
+  - Enforce numeric/date constraints (e.g., non-negative amounts, allowed min/max ranges).
+  - Expand and mirror the same rules at API level to guarantee server-side data integrity.
+
+---
+
 ## Notes
 
 - Main effort is UX/navigation polish; core data appears mostly available.
