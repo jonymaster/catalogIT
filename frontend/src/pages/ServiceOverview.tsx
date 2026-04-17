@@ -15,6 +15,7 @@ import {
   SERVICE_VIEW_SECTIONS,
   type ServiceFieldKey,
 } from "../service/serviceViewLayout";
+import { UserLinkList } from "../components/UserLinks";
 import type { Service, UserPreferences } from "../types/models";
 import { formatDateOnly } from "../utils/formatting";
 
@@ -59,11 +60,7 @@ function renderField(
     case "owners":
       return (
         <Field label={SERVICE_FIELD_LABELS.owners}>
-          {service.owners.length > 0
-            ? service.owners
-                .map((o) => `${o.first_name} ${o.last_name}`)
-                .join(", ")
-            : "--"}
+          <UserLinkList users={service.owners} />
         </Field>
       );
     case "total_seats": {
