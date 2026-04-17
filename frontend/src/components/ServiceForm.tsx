@@ -47,6 +47,12 @@ interface FormData {
   total_seats: string;
 }
 
+type ServiceFieldErrorKey =
+  | "name"
+  | "owner_ids"
+  | "renewal_offsets_input"
+  | "total_seats";
+
 const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
 
@@ -87,6 +93,9 @@ export function ServiceForm({ initial }: Props) {
   const [form, setForm] = useState<FormData>(() => toFormData(initial));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<ServiceFieldErrorKey, string>>
+  >({});
 
   const [users, setUsers] = useState<User[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -167,12 +176,29 @@ export function ServiceForm({ initial }: Props) {
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key in fieldErrors) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as ServiceFieldErrorKey];
+        return next;
+      });
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const nextErrors: Partial<Record<ServiceFieldErrorKey, string>> = {};
+    const trimmedName = form.name.trim();
+
+    if (!trimmedName) {
+      nextErrors.name = "Name is required.";
+    }
+
+    if (form.owner_ids.length === 0) {
+      nextErrors.owner_ids = "Select at least one owner.";
+    }
 
     let renewal_offsets_days: number[] | null = null;
     if (form.renewal_use_custom_offsets) {
@@ -181,18 +207,22 @@ export function ServiceForm({ initial }: Props) {
       for (const p of parts) {
         const n = parseInt(p, 10);
         if (Number.isNaN(n) || n <= 0) {
-          setError(
-            "Custom reminder offsets must be positive integers (e.g. 30, 14, 7, 1).",
-          );
-          setSaving(false);
-          return;
+          nextErrors.renewal_offsets_input =
+            "Custom reminder offsets must be positive integers (e.g. 30, 14, 7, 1).";
+          break;
         }
         renewal_offsets_days.push(n);
       }
-      if (renewal_offsets_days.length === 0) {
-        setError("Enter at least one reminder offset, or turn off custom offsets.");
-        setSaving(false);
-        return;
+      if (!nextErrors.renewal_offsets_input && renewal_offsets_days.length === 0) {
+        nextErrors.renewal_offsets_input =
+          "Enter at least one reminder offset, or turn off custom offsets.";
+      }
+      if (
+        !nextErrors.renewal_offsets_input &&
+        new Set(renewal_offsets_days).size !== renewal_offsets_days.length
+      ) {
+        nextErrors.renewal_offsets_input =
+          "Custom reminder offsets must not contain duplicates.";
       }
     }
 
@@ -200,15 +230,24 @@ export function ServiceForm({ initial }: Props) {
     if (form.total_seats.trim() !== "") {
       const n = parseInt(form.total_seats, 10);
       if (Number.isNaN(n) || n < 1) {
-        setError("Number of seats must be a positive integer, or leave blank for unlimited.");
-        setSaving(false);
-        return;
+        nextErrors.total_seats =
+          "Number of seats must be a positive integer, or leave blank for unlimited.";
+      } else {
+        total_seats = n;
       }
-      total_seats = n;
     }
 
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      setError("Fix the highlighted fields and try again.");
+      setSaving(false);
+      return;
+    }
+
+    setFieldErrors({});
+
     const payload = {
-      name: form.name,
+      name: trimmedName,
       description: form.description.trim() || null,
       status: form.status,
       billing_schedule: form.billing_schedule,
@@ -254,6 +293,14 @@ export function ServiceForm({ initial }: Props) {
   const inputCls =
     "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
   const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200";
+  const withError = (key: ServiceFieldErrorKey, extra = "") =>
+    [
+      inputCls,
+      fieldErrors[key] ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "",
+      extra,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
   function renderFieldControl(key: ServiceFieldKey) {
     switch (key) {
@@ -298,7 +345,7 @@ export function ServiceForm({ initial }: Props) {
             <label className={labelCls}>{SERVICE_FIELD_LABELS.owners}</label>
             <select
               multiple
-              className={inputCls + " h-28"}
+              className={withError("owner_ids", "h-28")}
               value={form.owner_ids}
               onChange={(e) =>
                 set(
@@ -316,6 +363,9 @@ export function ServiceForm({ initial }: Props) {
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Hold Ctrl/Cmd to select multiple
             </p>
+            {fieldErrors.owner_ids && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.owner_ids}</p>
+            )}
           </div>
         );
       case "classification":
@@ -486,9 +536,16 @@ export function ServiceForm({ initial }: Props) {
               <input
                 type="checkbox"
                 checked={form.renewal_use_custom_offsets}
-                onChange={(e) =>
-                  set("renewal_use_custom_offsets", e.target.checked)
-                }
+                onChange={(e) => {
+                  set("renewal_use_custom_offsets", e.target.checked);
+                  if (!e.target.checked) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.renewal_offsets_input;
+                      return next;
+                    });
+                  }
+                }}
                 className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
               />
               Use custom reminder offsets (instead of global defaults)
@@ -498,13 +555,18 @@ export function ServiceForm({ initial }: Props) {
                 <label className={labelCls}>Custom days before renewal</label>
                 <input
                   type="text"
-                  className={inputCls}
+                  className={withError("renewal_offsets_input")}
                   value={form.renewal_offsets_input}
                   onChange={(e) =>
                     set("renewal_offsets_input", e.target.value)
                   }
                   placeholder="30, 14, 7, 1"
                 />
+                {fieldErrors.renewal_offsets_input && (
+                  <p className="mt-1 text-xs text-red-600">
+                    {fieldErrors.renewal_offsets_input}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -591,7 +653,7 @@ export function ServiceForm({ initial }: Props) {
             <input
               type="number"
               min={1}
-              className={inputCls}
+              className={withError("total_seats")}
               value={form.total_seats}
               onChange={(e) => set("total_seats", e.target.value)}
               placeholder="Unlimited if empty"
@@ -599,6 +661,9 @@ export function ServiceForm({ initial }: Props) {
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Total licensed seats for this service. Leave empty if not capped.
             </p>
+            {fieldErrors.total_seats && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.total_seats}</p>
+            )}
           </div>
         );
       case "notes":
@@ -648,10 +713,13 @@ export function ServiceForm({ initial }: Props) {
         <label className={labelCls}>Name *</label>
         <input
           required
-          className={inputCls + " mt-1 max-w-xl"}
+          className={withError("name", "mt-1 max-w-xl")}
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
         />
+        {fieldErrors.name && (
+          <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+        )}
       </div>
 
       <div>

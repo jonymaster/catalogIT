@@ -23,6 +23,12 @@ interface FormData {
   purchase_cost: string;
 }
 
+type LaptopFieldErrorKey =
+  | "serial_number"
+  | "model_name"
+  | "purchase_year"
+  | "purchase_cost";
+
 function toFormData(l?: Laptop): FormData {
   return {
     serial_number: l?.serial_number ?? "",
@@ -47,6 +53,9 @@ export function LaptopForm({ initial }: Props) {
   const [form, setForm] = useState<FormData>(() => toFormData(initial));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<LaptopFieldErrorKey, string>>
+  >({});
   const [users, setUsers] = useState<User[]>([]);
   const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>([]);
   const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>([]);
@@ -105,16 +114,68 @@ export function LaptopForm({ initial }: Props) {
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key in fieldErrors) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as LaptopFieldErrorKey];
+        return next;
+      });
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const nextErrors: Partial<Record<LaptopFieldErrorKey, string>> = {};
+    const trimmedSerial = form.serial_number.trim();
+    const trimmedModel = form.model_name.trim();
+
+    if (!trimmedSerial) {
+      nextErrors.serial_number = "Serial number is required.";
+    }
+    if (!trimmedModel) {
+      nextErrors.model_name = "Model name is required.";
+    }
+
+    const pyRaw = form.purchase_year.trim();
+    let purchaseYear: number | null = null;
+    if (pyRaw) {
+      const parsedYear = Number(pyRaw);
+      if (
+        !Number.isInteger(parsedYear) ||
+        parsedYear < 1900 ||
+        parsedYear > 2100
+      ) {
+        nextErrors.purchase_year = "Purchase year must be between 1900 and 2100.";
+      } else {
+        purchaseYear = parsedYear;
+      }
+    }
+
+    const costRaw = form.purchase_cost.trim();
+    let purchaseCost = 0;
+    if (costRaw) {
+      const parsedCost = Number(costRaw);
+      if (!Number.isFinite(parsedCost) || parsedCost < 0) {
+        nextErrors.purchase_cost = "Cost must be zero or greater.";
+      } else {
+        purchaseCost = parsedCost;
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      setError("Fix the highlighted fields and try again.");
+      setSaving(false);
+      return;
+    }
+
+    setFieldErrors({});
 
     const payload = {
-      serial_number: form.serial_number,
-      model_name: form.model_name,
+      serial_number: trimmedSerial,
+      model_name: trimmedModel,
       cpu: form.cpu,
       ram: form.ram,
       storage_size: form.storage_size,
@@ -129,26 +190,18 @@ export function LaptopForm({ initial }: Props) {
       if (isEdit) {
         await client.put(`/api/laptops/${initial.id}`, payload);
         if (initial.is_active) {
-          const pyRaw = form.purchase_year.trim();
-          const py = pyRaw ? Number(pyRaw) : null;
-          const costRaw = form.purchase_cost.trim();
-          const costAmt = costRaw ? Number(costRaw) : 0;
           await client.put(`/api/laptops/${initial.id}/hardware-cost`, {
-            amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-            purchase_year: py != null && Number.isFinite(py) ? py : null,
+            amount: purchaseCost,
+            purchase_year: purchaseYear,
           });
         }
         navigate(`/hardware/${initial.id}`);
       } else {
         const res = await client.post<Laptop>("/api/laptops/", payload);
         const laptopId = res.data.id;
-        const pyRaw = form.purchase_year.trim();
-        const py = pyRaw ? Number(pyRaw) : null;
-        const costRaw = form.purchase_cost.trim();
-        const costAmt = costRaw ? Number(costRaw) : 0;
         await client.put(`/api/laptops/${laptopId}/hardware-cost`, {
-          amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-          purchase_year: py != null && Number.isFinite(py) ? py : null,
+          amount: purchaseCost,
+          purchase_year: purchaseYear,
         });
         navigate(`/hardware/${laptopId}`);
       }
@@ -164,6 +217,13 @@ export function LaptopForm({ initial }: Props) {
   const inputCls =
     "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
   const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200";
+  const withError = (key: LaptopFieldErrorKey) =>
+    [
+      inputCls,
+      fieldErrors[key] ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
   const rowGridCls = "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3";
 
@@ -180,20 +240,26 @@ export function LaptopForm({ initial }: Props) {
           <label className={labelCls}>Serial Number *</label>
           <input
             required
-            className={inputCls}
+            className={withError("serial_number")}
             value={form.serial_number}
             onChange={(e) => set("serial_number", e.target.value)}
           />
+          {fieldErrors.serial_number && (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.serial_number}</p>
+          )}
         </div>
 
         <div>
           <label className={labelCls}>Model Name *</label>
           <input
             required
-            className={inputCls}
+            className={withError("model_name")}
             value={form.model_name}
             onChange={(e) => set("model_name", e.target.value)}
           />
+          {fieldErrors.model_name && (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.model_name}</p>
+          )}
         </div>
       </div>
 
@@ -297,11 +363,14 @@ export function LaptopForm({ initial }: Props) {
                 type="number"
                 min={1900}
                 max={2100}
-                className={inputCls}
+                className={withError("purchase_year")}
                 value={form.purchase_year}
                 onChange={(e) => set("purchase_year", e.target.value)}
                 placeholder="Optional"
               />
+              {fieldErrors.purchase_year && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.purchase_year}</p>
+              )}
             </div>
 
             <div>
@@ -310,11 +379,14 @@ export function LaptopForm({ initial }: Props) {
                 type="number"
                 step="0.01"
                 min="0"
-                className={inputCls}
+                className={withError("purchase_cost")}
                 value={form.purchase_cost}
                 onChange={(e) => set("purchase_cost", e.target.value)}
                 placeholder="Optional"
               />
+              {fieldErrors.purchase_cost && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.purchase_cost}</p>
+              )}
             </div>
           </div>
         )}

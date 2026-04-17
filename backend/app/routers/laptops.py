@@ -83,6 +83,44 @@ async def _get_hardware_location(
     return row
 
 
+async def _get_assigned_user(
+    db: AsyncSession,
+    user_id: uuid.UUID | None,
+) -> User | None:
+    if user_id is None:
+        return None
+    row = await db.get(User, user_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assigned user not found",
+        )
+    return row
+
+
+async def _ensure_unique_serial_number(
+    db: AsyncSession,
+    serial_number: str,
+    *,
+    current_id: uuid.UUID | None = None,
+) -> None:
+    row = await db.scalar(
+        select(Laptop).where(
+            func.lower(Laptop.serial_number) == serial_number.lower(),
+            *(
+                []
+                if current_id is None
+                else [Laptop.id != current_id]
+            ),
+        )
+    )
+    if row is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A laptop with this serial number already exists",
+        )
+
+
 @router.get("/", response_model=list[LaptopRead])
 async def list_laptops(
     archived: bool = Query(False),
@@ -193,12 +231,14 @@ async def get_laptop(laptop_id: uuid.UUID, db: AsyncSession = Depends(get_audite
 
 @router.post("/", response_model=LaptopRead, status_code=status.HTTP_201_CREATED)
 async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
+    await _ensure_unique_serial_number(db, body.serial_number)
     hw_status = await _resolve_hardware_status(
         db,
         hardware_status_id=body.hardware_status_id,
         status_name=body.status,
     )
     hw_location = await _get_hardware_location(db, body.hardware_location_id)
+    assigned_user = await _get_assigned_user(db, body.assigned_to_id)
 
     laptop = Laptop(
         serial_number=body.serial_number,
@@ -209,7 +249,7 @@ async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: 
         status=hw_status.name if hw_status else body.status,
         hardware_status_id=hw_status.id if hw_status else None,
         hardware_location_id=hw_location.id if hw_location else None,
-        assigned_to_id=body.assigned_to_id,
+        assigned_to_id=assigned_user.id if assigned_user else None,
         notes=body.notes,
     )
     db.add(laptop)
@@ -240,6 +280,9 @@ async def update_laptop(
         update_data.pop("hardware_status_id", None) if "hardware_status_id" in update_data else ...
     )
     status_name = update_data.pop("status", None) if "status" in update_data else ...
+    assigned_to_id = update_data.pop("assigned_to_id", None) if "assigned_to_id" in update_data else ...
+    serial_number = update_data.pop("serial_number", None) if "serial_number" in update_data else ...
+    model_name = update_data.pop("model_name", None) if "model_name" in update_data else ...
 
     if hardware_location_id is not ...:
         if hardware_location_id is None:
@@ -265,6 +308,17 @@ async def update_laptop(
             laptop.status = status_name
             matched = await _find_hardware_status_by_name(status_name, db)
             laptop.hardware_status_id = matched.id if matched else None
+
+    if assigned_to_id is not ...:
+        assigned_user = await _get_assigned_user(db, assigned_to_id)
+        laptop.assigned_to_id = assigned_user.id if assigned_user else None
+
+    if serial_number is not ...:
+        await _ensure_unique_serial_number(db, serial_number, current_id=laptop.id)
+        laptop.serial_number = serial_number
+
+    if model_name is not ...:
+        laptop.model_name = model_name
 
     for field, value in update_data.items():
         setattr(laptop, field, value)

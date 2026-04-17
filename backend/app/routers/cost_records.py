@@ -38,6 +38,21 @@ def to_cost_record_read(record: CostRecord) -> CostRecordRead:
     recorded_by_name = (
         record.recorded_by.first_name + " " + record.recorded_by.last_name if record.recorded_by else None
     )
+
+
+async def _ensure_payment_method(
+    db: AsyncSession,
+    payment_method_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if payment_method_id is None:
+        return None
+    row = await db.get(PaymentMethod, payment_method_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment method not found",
+        )
+    return row.id
     return CostRecordRead(
         id=record.id,
         service_id=record.service_id,
@@ -108,10 +123,11 @@ async def create_cost_record(
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_service(service_id, db, for_write=True)
+    payment_method_id = await _ensure_payment_method(db, body.payment_method_id)
     record = CostRecord(
         service_id=service_id,
         laptop_id=None,
-        payment_method_id=body.payment_method_id,
+        payment_method_id=payment_method_id,
         fiscal_year=body.fiscal_year,
         purchase_year=body.purchase_year,
         amount=body.amount,
@@ -143,7 +159,14 @@ async def update_cost_record(
     if not record or record.service_id != service_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
 
-    for field, value in body.model_dump(exclude_unset=True).items():
+    update_data = body.model_dump(exclude_unset=True)
+    if "payment_method_id" in update_data:
+        update_data["payment_method_id"] = await _ensure_payment_method(
+            db,
+            update_data["payment_method_id"],
+        )
+
+    for field, value in update_data.items():
         setattr(record, field, value)
 
     await db.flush()
