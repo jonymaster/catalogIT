@@ -41,6 +41,34 @@ export interface UserPreferences {
   locale: string | null;
   timezone: string | null;
   theme: "light" | "dark";
+  ui_preferences: UserUiPreferences;
+}
+
+export type DashboardWidgetId =
+  | "global_search"
+  | "inventory_stats"
+  | "financial_kpis"
+  | "spend_by_year"
+  | "financial_report";
+
+export interface DashboardPreferences {
+  visible_widget_ids?: DashboardWidgetId[];
+}
+
+export interface ServiceListSortPreference {
+  key: string | null;
+  direction: "asc" | "desc" | null;
+}
+
+export interface ServiceListPreferences {
+  visible_columns?: string[];
+  filters?: Record<string, string | string[]>;
+  sort?: ServiceListSortPreference;
+}
+
+export interface UserUiPreferences {
+  dashboard?: DashboardPreferences;
+  service_list?: ServiceListPreferences;
 }
 
 export interface Vendor {

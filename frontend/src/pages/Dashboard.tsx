@@ -17,6 +17,86 @@ import {
   visualAmountForRecordTypeAndYear,
   yoyPercent,
 } from "../utils/dashboardCostAggregates";
+import type {
+  DashboardPreferences,
+  DashboardWidgetId,
+  UserPreferences,
+} from "../types/models";
+
+const DASHBOARD_PREFERENCES_STORAGE_KEY = "catalogit:dashboard:preferences";
+
+const DASHBOARD_WIDGET_OPTIONS: {
+  id: DashboardWidgetId;
+  label: string;
+  description: string;
+  requiresFinancialView?: boolean;
+}[] = [
+  {
+    id: "global_search",
+    label: "Search",
+    description: "Keep the dashboard search bar on the landing page.",
+  },
+  {
+    id: "inventory_stats",
+    label: "Inventory stats",
+    description: "Show the top-line service and hardware counts.",
+  },
+  {
+    id: "financial_kpis",
+    label: "Financial KPIs",
+    description: "Show fiscal-year KPIs and drillable category/classification totals.",
+    requiresFinancialView: true,
+  },
+  {
+    id: "spend_by_year",
+    label: "Spend chart",
+    description: "Show the year-over-year spend bar chart.",
+    requiresFinancialView: true,
+  },
+  {
+    id: "financial_report",
+    label: "Financial report shortcut",
+    description: "Keep the jump-off card to the IT Financial Report.",
+    requiresFinancialView: true,
+  },
+];
+
+const DEFAULT_DASHBOARD_WIDGET_IDS = DASHBOARD_WIDGET_OPTIONS.map(
+  (widget) => widget.id,
+);
+
+function normalizeDashboardPreferences(
+  raw: DashboardPreferences | null | undefined,
+): DashboardPreferences {
+  const visibleWidgetIds = raw?.visible_widget_ids;
+  if (!Array.isArray(visibleWidgetIds)) {
+    return { visible_widget_ids: [...DEFAULT_DASHBOARD_WIDGET_IDS] };
+  }
+
+  return {
+    visible_widget_ids: Array.from(
+      new Set(
+        visibleWidgetIds.filter((widgetId): widgetId is DashboardWidgetId =>
+          DEFAULT_DASHBOARD_WIDGET_IDS.includes(widgetId),
+        ),
+      ),
+    ),
+  };
+}
+
+function readStoredDashboardPreferences(): DashboardPreferences {
+  try {
+    const stored = localStorage.getItem(DASHBOARD_PREFERENCES_STORAGE_KEY);
+    if (!stored) {
+      return normalizeDashboardPreferences(null);
+    }
+    return normalizeDashboardPreferences(
+      JSON.parse(stored) as DashboardPreferences,
+    );
+  } catch {
+    return normalizeDashboardPreferences(null);
+  }
+}
 
 function matchesServiceSearch(service: Service, query: string) {
   const cat = (service.category_rel?.name ?? "").toLowerCase();
@@ -93,8 +173,18 @@ export function Dashboard() {
   const emptyCategoryKey = "__uncategorized__";
   const emptyClassificationLabel = "(None)";
   const emptyCategoryLabel = "(Uncategorized)";
-  const { user, canFinancialView } = useAuth();
+  const {
+    user,
+    canFinancialView,
+    preferences,
+    preferencesLoading,
+    setPreferences,
+  } = useAuth();
   const navigate = useNavigate();
+  const storedDashboardPreferences = useMemo(
+    () => readStoredDashboardPreferences(),
+    [],
+  );
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
   const [laptops, setLaptops] = useState<Laptop[]>([]);
@@ -105,7 +195,13 @@ export function Dashboard() {
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
   const [dashboardSearch, setDashboardSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [visibleWidgetIds, setVisibleWidgetIds] = useState<DashboardWidgetId[]>(
+    storedDashboardPreferences.visible_widget_ids ?? [...DEFAULT_DASHBOARD_WIDGET_IDS],
+  );
   const searchRef = useRef<HTMLDivElement>(null);
+  const dashboardPreferencesHydratedRef = useRef(false);
+  const lastSyncedDashboardSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -144,6 +240,92 @@ export function Dashboard() {
   const years = fiscalYears;
   const loading = inventoryLoading || costLoading;
   const normalizedSearch = dashboardSearch.trim().toLowerCase();
+  const profileDashboardPreferences = useMemo(
+    () => normalizeDashboardPreferences(preferences?.ui_preferences.dashboard),
+    [preferences],
+  );
+  const dashboardPreferenceState = useMemo(
+    () => normalizeDashboardPreferences({ visible_widget_ids: visibleWidgetIds }),
+    [visibleWidgetIds],
+  );
+  const visibleWidgetIdSet = useMemo(
+    () => new Set(dashboardPreferenceState.visible_widget_ids),
+    [dashboardPreferenceState],
+  );
+  const financialWidgetsVisible =
+    canFinancialView &&
+    visibleWidgetIdSet.has("financial_kpis") &&
+    records.length > 0;
+  const spendChartVisible =
+    canFinancialView &&
+    visibleWidgetIdSet.has("spend_by_year") &&
+    records.length > 0;
+  const financialShortcutVisible =
+    canFinancialView &&
+    visibleWidgetIdSet.has("financial_report") &&
+    records.length > 0;
+  const showYearSelector = financialWidgetsVisible || spendChartVisible;
+
+  useEffect(() => {
+    if (preferencesLoading || dashboardPreferencesHydratedRef.current) {
+      return;
+    }
+
+    const hasProfilePreferences = preferences?.ui_preferences.dashboard !== undefined;
+    const sourcePreferences = hasProfilePreferences
+      ? profileDashboardPreferences
+      : storedDashboardPreferences;
+
+    const timeoutId = window.setTimeout(() => {
+      setVisibleWidgetIds(sourcePreferences.visible_widget_ids ?? []);
+      lastSyncedDashboardSignatureRef.current = hasProfilePreferences
+        ? JSON.stringify(profileDashboardPreferences)
+        : null;
+      dashboardPreferencesHydratedRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    preferences,
+    preferencesLoading,
+    profileDashboardPreferences,
+    storedDashboardPreferences,
+  ]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(dashboardPreferenceState);
+
+    try {
+      localStorage.setItem(DASHBOARD_PREFERENCES_STORAGE_KEY, serialized);
+    } catch {
+      // Ignore storage failures; per-user persistence still attempts to save.
+    }
+
+    if (!dashboardPreferencesHydratedRef.current) {
+      return;
+    }
+    if (serialized === lastSyncedDashboardSignatureRef.current) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      client
+        .patch<UserPreferences>("/api/me/preferences", {
+          ui_preferences: {
+            dashboard: dashboardPreferenceState,
+          },
+        })
+        .then((response) => {
+          lastSyncedDashboardSignatureRef.current = serialized;
+          setPreferences(response.data);
+        })
+        .catch(() => {
+          // Keep the local fallback in place if profile sync fails.
+        });
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [dashboardPreferenceState, setPreferences]);
 
   const actualRecords = useMemo(
     () => records.filter((r) => r.record_type === "actual"),
@@ -298,17 +480,99 @@ export function Dashboard() {
   }
 
   const hasCostData = records.length > 0;
+  const hasVisibleSections =
+    visibleWidgetIdSet.has("global_search") ||
+    visibleWidgetIdSet.has("inventory_stats") ||
+    financialWidgetsVisible ||
+    spendChartVisible ||
+    financialShortcutVisible;
+
+  function toggleWidget(widgetId: DashboardWidgetId) {
+    setVisibleWidgetIds((current) =>
+      current.includes(widgetId)
+        ? current.filter((value) => value !== widgetId)
+        : [...current, widgetId],
+    );
+  }
+
+  function resetDashboardPreferences() {
+    setVisibleWidgetIds([...DEFAULT_DASHBOARD_WIDGET_IDS]);
+  }
 
   return (
     <PageTransition>
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Welcome{user?.email ? `, ${user.email}` : ""}.
-      </p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Welcome{user?.email ? `, ${user.email}` : ""}.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setPreferencesOpen((open) => !open)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            {preferencesOpen ? "Hide customization" : "Customize dashboard"}
+          </button>
+          <button
+            type="button"
+            onClick={resetDashboardPreferences}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Reset widgets
+          </button>
+        </div>
+      </div>
 
-      <div className="mt-8 flex justify-center">
-        <div className="relative w-full max-w-3xl" ref={searchRef}>
+      {preferencesOpen && (
+        <div className="mt-6 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Visible dashboard sections
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Changes save to your profile automatically and fall back locally if profile sync is unavailable.
+              </p>
+            </div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {dashboardPreferenceState.visible_widget_ids?.length ?? 0} visible
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {DASHBOARD_WIDGET_OPTIONS.filter(
+              (widget) => !widget.requiresFinancialView || canFinancialView,
+            ).map((widget) => (
+              <label
+                key={widget.id}
+                className="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-950 p-4"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleWidgetIdSet.has(widget.id)}
+                  onChange={() => toggleWidget(widget.id)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-brand-600 focus:ring-2 focus:ring-brand-500/30"
+                />
+                <span className="space-y-1">
+                  <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {widget.label}
+                  </span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">
+                    {widget.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {visibleWidgetIdSet.has("global_search") && (
+        <div className="mt-8 flex justify-center">
+          <div className="relative w-full max-w-3xl" ref={searchRef}>
           <div className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 shadow-sm">
             <SearchInput
               value={dashboardSearch}
@@ -413,109 +677,113 @@ export function Dashboard() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Inventory stats */}
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard
-          label="Total Services"
-          value={services.length}
-          onClick={() => navigate("/services")}
-          stagger={1}
-        />
-        <StatCard
-          label="Total Laptops"
-          value={laptops.length}
-          onClick={() => navigate("/hardware")}
-          stagger={2}
-        />
-        <StatCard
-          label="Assigned Laptops"
-          value={laptops.filter((l) => l.status === "Assigned").length}
-          stagger={3}
-        />
-        <StatCard
-          label="In Stock"
-          value={laptops.filter((l) => l.status === "In Stock").length}
-          stagger={4}
-        />
-      </div>
+      {visibleWidgetIdSet.has("inventory_stats") && (
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard
+            label="Total Services"
+            value={services.length}
+            onClick={() => navigate("/services")}
+            stagger={1}
+          />
+          <StatCard
+            label="Total Laptops"
+            value={laptops.length}
+            onClick={() => navigate("/hardware")}
+            stagger={2}
+          />
+          <StatCard
+            label="Assigned Laptops"
+            value={laptops.filter((l) => l.status === "Assigned").length}
+            stagger={3}
+          />
+          <StatCard
+            label="In Stock"
+            value={laptops.filter((l) => l.status === "In Stock").length}
+            stagger={4}
+          />
+        </div>
+      )}
 
       {canFinancialView && hasCostData && (
         <>
-          {/* Year selector */}
-          <div className="mt-8 flex items-center gap-3">
-            <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Fiscal year:
-            </span>
-            <div className="inline-flex gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
-              {years.map((y) => (
-                <button
-                  key={y}
-                  onClick={() => setDashYear(y)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-150 ${
-                    dashYear === y
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {y}
-                </button>
-              ))}
+          {showYearSelector && (
+            <div className="mt-8 flex items-center gap-3">
+              <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Fiscal year:
+              </span>
+              <div className="inline-flex gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+                {years.map((y) => (
+                  <button
+                    key={y}
+                    onClick={() => setDashYear(y)}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-150 ${
+                      dashYear === y
+                        ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Cost KPIs (actual + estimated for current/future years) */}
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatCard
-              label={
-                showProjectedValues
-                  ? "Total spend (actual + estimated)"
-                  : "Total spend (actual)"
-              }
-              value={fmtFull(costByYear[dashYear] ?? 0)}
-            />
-            <StatCard
-              label={
-                showProjectedValues
-                  ? "YoY change (actual + estimated)"
-                  : "YoY change (actual)"
-              }
-              value={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`}
-              color={yoyChange < 0 ? "text-emerald-600" : yoyChange > 0 ? "text-red-600" : "text-gray-900 dark:text-gray-100"}
-            />
-            <StatCard
-              label={
-                showProjectedValues
-                  ? `Classification: ${selectedClassificationLabel} (actual + estimated)`
-                  : `Classification: ${selectedClassificationLabel} (actual)`
-              }
-              value={fmtFull(classificationTotal)}
-              color="text-purple-700"
-              subtext="Click to cycle"
-              onClick={() =>
-                setSelectedClassificationIndex((prev) =>
-                  classificationOptions.length === 0
-                    ? 0
-                    : (prev + 1) % classificationOptions.length,
-                )
-              }
-            />
-            <StatCard
-              label={
-                showProjectedValues
-                  ? `Category: ${selectedCategoryLabel} (actual + estimated)`
-                  : `Category: ${selectedCategoryLabel} (actual)`
-              }
-              value={fmtFull(categoryTotal)}
-              color="text-blue-700"
-              subtext="Click to cycle"
-              onClick={() =>
-                setSelectedCategoryIndex((prev) =>
-                  categoryOptions.length === 0 ? 0 : (prev + 1) % categoryOptions.length,
-                )
-              }
-            />
-          </div>
+          {financialWidgetsVisible && (
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <StatCard
+                label={
+                  showProjectedValues
+                    ? "Total spend (actual + estimated)"
+                    : "Total spend (actual)"
+                }
+                value={fmtFull(costByYear[dashYear] ?? 0)}
+              />
+              <StatCard
+                label={
+                  showProjectedValues
+                    ? "YoY change (actual + estimated)"
+                    : "YoY change (actual)"
+                }
+                value={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`}
+                color={yoyChange < 0 ? "text-emerald-600" : yoyChange > 0 ? "text-red-600" : "text-gray-900 dark:text-gray-100"}
+              />
+              <StatCard
+                label={
+                  showProjectedValues
+                    ? `Classification: ${selectedClassificationLabel} (actual + estimated)`
+                    : `Classification: ${selectedClassificationLabel} (actual)`
+                }
+                value={fmtFull(classificationTotal)}
+                color="text-purple-700"
+                subtext="Click to cycle"
+                onClick={() =>
+                  setSelectedClassificationIndex((prev) =>
+                    classificationOptions.length === 0
+                      ? 0
+                      : (prev + 1) % classificationOptions.length,
+                  )
+                }
+              />
+              <StatCard
+                label={
+                  showProjectedValues
+                    ? `Category: ${selectedCategoryLabel} (actual + estimated)`
+                    : `Category: ${selectedCategoryLabel} (actual)`
+                }
+                value={fmtFull(categoryTotal)}
+                color="text-blue-700"
+                subtext="Click to cycle"
+                onClick={() =>
+                  setSelectedCategoryIndex((prev) =>
+                    categoryOptions.length === 0 ? 0 : (prev + 1) % categoryOptions.length,
+                  )
+                }
+              />
+            </div>
+          )}
 
           {records.length > 0 && actualRecords.length === 0 && (
             <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
@@ -523,41 +791,50 @@ export function Dashboard() {
             </p>
           )}
 
-          {/* Total spend by year */}
-          <div className="mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Total spend by year (actual; current/future includes estimated)
-            </h3>
-            <BarChart
-              data={years.map((y) => ({
-                label: String(y),
-                value: costByYear[y] ?? 0,
-                color: y === dashYear ? "var(--color-brand-600)" : "var(--color-brand-200)",
-              }))}
-              onBarClick={(i) => {
-                const y = years[i];
-                if (y !== undefined) setDashYear(y);
-              }}
-            />
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50/80 p-5 dark:border-brand-900 dark:bg-brand-950/40 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                IT Financial Report
-              </p>
-              <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
-                Compare actual, estimated, and budget; filter, export, and print.
-              </p>
+          {spendChartVisible && (
+            <div className="mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Total spend by year (actual; current/future includes estimated)
+              </h3>
+              <BarChart
+                data={years.map((y) => ({
+                  label: String(y),
+                  value: costByYear[y] ?? 0,
+                  color: y === dashYear ? "var(--color-brand-600)" : "var(--color-brand-200)",
+                }))}
+                onBarClick={(i) => {
+                  const y = years[i];
+                  if (y !== undefined) setDashYear(y);
+                }}
+              />
             </div>
-            <Link
-              to="/costs"
-              className="inline-flex shrink-0 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            >
-              Open IT Financial Report
-            </Link>
-          </div>
+          )}
+
+          {financialShortcutVisible && (
+            <div className="mt-6 flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50/80 p-5 dark:border-brand-900 dark:bg-brand-950/40 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  IT Financial Report
+                </p>
+                <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+                  Compare actual, estimated, and budget; filter, export, and print.
+                </p>
+              </div>
+              <Link
+                to="/costs"
+                className="inline-flex shrink-0 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+              >
+                Open IT Financial Report
+              </Link>
+            </div>
+          )}
         </>
+      )}
+
+      {!hasVisibleSections && (
+        <div className="mt-8 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/60 p-6 text-sm text-gray-600 dark:text-gray-300">
+          All dashboard sections are hidden. Use <span className="font-medium">Customize dashboard</span> to turn widgets back on.
+        </div>
       )}
     </div>
     </PageTransition>

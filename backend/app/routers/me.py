@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,23 @@ from app.models.user import User
 from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferencesUpdate, UserRead, user_read_from_orm
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+
+
+def _normalized_ui_preferences(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _deep_merge_preferences(
+    current: dict[str, Any],
+    updates: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(current)
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_preferences(merged[key], value)
+            continue
+        merged[key] = value
+    return merged
 
 
 @router.get("/profile", response_model=UserRead)
@@ -120,11 +139,22 @@ async def update_preferences(
     db: AsyncSession = Depends(get_audited_db),
 ):
     user = await db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     update_data = body.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
         if field == "theme":
             user.theme = value if value in ("light", "dark") else "light"
+            continue
+        if field == "ui_preferences":
+            if value is None:
+                user.ui_preferences = {}
+            else:
+                user.ui_preferences = _deep_merge_preferences(
+                    _normalized_ui_preferences(user.ui_preferences),
+                    value,
+                )
             continue
         setattr(user, field, value.strip() or None if isinstance(value, str) else value)
 

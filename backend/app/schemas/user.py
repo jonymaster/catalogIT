@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -111,14 +111,21 @@ class UserPreferencesRead(BaseModel):
     locale: str | None = None
     timezone: str | None = None
     theme: Literal["light", "dark"] = "light"
+    ui_preferences: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"from_attributes": True}
+
+    @field_validator("ui_preferences", mode="before")
+    @classmethod
+    def default_ui_preferences(cls, value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
 
 
 class UserPreferencesUpdate(BaseModel):
     locale: str | None = None
     timezone: str | None = None
     theme: Literal["light", "dark"] | None = None
+    ui_preferences: dict[str, Any] | None = None
 
 
 def user_read_from_orm(user: UserOrm) -> UserRead:
