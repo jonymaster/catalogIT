@@ -8,6 +8,7 @@ import { AuditTimeline } from "../components/AuditTimeline";
 import { PencilSquareIcon } from "../components/Icons";
 import { ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
+import { UserLink } from "../components/UserLinks";
 import { useAuth } from "../context/useAuth";
 import type { CostRecord, Laptop } from "../types/models";
 
@@ -103,7 +104,7 @@ export function LaptopDetail() {
             </Field>
             <Field label="Assigned To">
               {laptop.assigned_to
-                ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name} (${laptop.assigned_to.email})`
+                ? <UserLink user={laptop.assigned_to} showEmail />
                 : "Unassigned"}
             </Field>
             <Field label="Location">

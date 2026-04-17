@@ -13,6 +13,7 @@ import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
 import { ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
+import { UserLink } from "../components/UserLinks";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import type { Laptop } from "../types/models";
@@ -165,7 +166,8 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     filterPlaceholder: "Filter by assignee...",
     getFilterValue: getAssigneeName,
     getSortValue: getAssigneeName,
-    render: getAssigneeName,
+    render: (laptop) =>
+      laptop.assigned_to ? <UserLink user={laptop.assigned_to} /> : "--",
   },
 ];
 

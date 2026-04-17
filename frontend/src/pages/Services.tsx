@@ -22,6 +22,7 @@ import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
+import { UserLinkList } from "../components/UserLinks";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { formatBillingSchedule } from "../service/serviceBilling";
@@ -297,7 +298,7 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     filterPlaceholder: "Filter by owner...",
     getFilterValue: (service) => getOwnerNames(service) || "--",
     getSortValue: (service) => getOwnerNames(service),
-    render: (service) => getOwnerNames(service) || "--",
+    render: (service) => <UserLinkList users={service.owners} />,
   },
 ];
 

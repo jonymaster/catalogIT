@@ -16,6 +16,16 @@ interface Props<T> {
   primaryColumnKey?: string;
 }
 
+function clickCameFromInteractiveElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return target.closest(
+    'a, button, input, select, textarea, label, summary, [role="button"], [role="link"]',
+  ) != null;
+}
+
 function columnsInOrder<T>(columns: Column<T>[], visibleKeys: string[]): Column<T>[] {
   const byKey = new Map(columns.map((c) => [c.key, c]));
   return visibleKeys.map((key) => byKey.get(key)).filter((c): c is Column<T> => c != null);
@@ -73,7 +83,12 @@ export function DataTable<T extends { id: string }>({
             {data.map((row) => (
               <tr
                 key={row.id}
-                onClick={() => onRowClick?.(row)}
+                onClick={(event) => {
+                  if (!onRowClick || clickCameFromInteractiveElement(event.target)) {
+                    return;
+                  }
+                  onRowClick(row);
+                }}
                 className={
                   striped
                     ? [

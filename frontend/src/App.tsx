@@ -25,6 +25,11 @@ import { LaptopCreate } from "./pages/LaptopCreate";
 import { LaptopEdit } from "./pages/LaptopEdit";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
+import { UserDetail } from "./pages/UserDetail";
+import { UserOverview } from "./pages/UserOverview";
+import { UserOwnedServices } from "./pages/UserOwnedServices";
+import { UserAssignedServices } from "./pages/UserAssignedServices";
+import { UserAssignedAssets } from "./pages/UserAssignedAssets";
 import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
 import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
@@ -75,6 +80,12 @@ export default function App() {
                 <Route path="/hardware/new" element={<LaptopCreate />} />
                 <Route path="/hardware/:id" element={<LaptopDetail />} />
                 <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
+                <Route path="/users/:id" element={<UserDetail />}>
+                  <Route index element={<UserOverview />} />
+                  <Route path="owned-services" element={<UserOwnedServices />} />
+                  <Route path="assigned-services" element={<UserAssignedServices />} />
+                  <Route path="assigned-assets" element={<UserAssignedAssets />} />
+                </Route>
                 <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
             </Route>
