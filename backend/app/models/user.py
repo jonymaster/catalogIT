@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String, func
+from sqlalchemy import JSON, Boolean, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,6 +26,7 @@ class User(Base):
     locale: Mapped[str | None] = mapped_column(String(20), nullable=True)
     timezone: Mapped[str | None] = mapped_column(String(100), nullable=True)
     theme: Mapped[str] = mapped_column(String(10), default="light")
+    ui_preferences: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     receive_renewal_notifications: Mapped[bool] = mapped_column(default=True)
 

@@ -15,7 +15,6 @@ import {
 } from "../components/Badge";
 import {
   ColumnHeaderMenu,
-  type SortDirection,
 } from "../components/ColumnHeaderMenu";
 import { ColumnSelector } from "../components/ColumnSelector";
 import type { Column } from "../components/DataTable";
@@ -24,9 +23,13 @@ import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
 import { UserLinkList } from "../components/UserLinks";
 import { useAuth } from "../context/useAuth";
-import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { formatBillingSchedule } from "../service/serviceBilling";
-import type { Service, UserPreferences } from "../types/models";
+import type {
+  Service,
+  ServiceListPreferences,
+  ServiceListSortPreference,
+  UserPreferences,
+} from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import { formatDateOnly } from "../utils/formatting";
 
@@ -45,16 +48,21 @@ interface ServiceColumnDefinition {
 
 type ServiceFilters = Record<string, string | string[]>;
 
-interface SortState {
-  key: string | null;
-  direction: SortDirection | null;
-}
+type SortState = ServiceListSortPreference;
 
 interface HoveredDescriptionState {
   text: string;
   left: number;
   top: number;
 }
+
+interface ResolvedServiceListPreferences {
+  visible_columns: string[];
+  filters: ServiceFilters;
+  sort: SortState;
+}
+
+const SERVICE_LIST_PREFERENCES_STORAGE_KEY = "catalogit:services:preferences";
 
 function getOwnerNames(service: Service) {
   return service.owners.map((owner) => `${owner.first_name} ${owner.last_name}`).join(", ");
@@ -122,6 +130,15 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     filterPlaceholder: "Filter by name...",
     getFilterValue: (service) => service.name,
     getSortValue: (service) => service.name,
+  },
+  {
+    key: "description",
+    label: "Description",
+    filterType: "text",
+    filterPlaceholder: "Filter by description...",
+    getFilterValue: (service) => service.description ?? "",
+    getSortValue: (service) => service.description ?? "",
+    render: (service) => service.description?.trim() || "—",
   },
   {
     key: "status",
@@ -300,9 +317,162 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getSortValue: (service) => getOwnerNames(service),
     render: (service) => <UserLinkList users={service.owners} />,
   },
+  {
+    key: "seat_usage",
+    label: "Seat Usage",
+    filterType: "text",
+    filterPlaceholder: "Filter by seat usage...",
+    getFilterValue: (service) => {
+      const occupied = service.assignees?.length ?? 0;
+      const capacity = service.total_seats != null ? String(service.total_seats) : "Unlimited";
+      return `${occupied} / ${capacity}`;
+    },
+    getSortValue: (service) => service.assignees?.length ?? 0,
+    render: (service) => {
+      const occupied = service.assignees?.length ?? 0;
+      return `${occupied} / ${service.total_seats ?? "Unlimited"}`;
+    },
+  },
+  {
+    key: "point_of_contact",
+    label: "Point of Contact",
+    filterType: "text",
+    filterPlaceholder: "Filter by contact...",
+    getFilterValue: (service) => service.point_of_contact ?? "",
+    getSortValue: (service) => service.point_of_contact ?? "",
+    render: (service) => service.point_of_contact?.trim() || "—",
+  },
 ];
 
 const ALL_COLUMN_KEYS = columnDefinitions.map((column) => column.key);
+const DEFAULT_VISIBLE_COLUMN_KEYS = [
+  "name",
+  "status",
+  "spending_category",
+  "cost_center",
+  "classification",
+  "criticality",
+  "nonprofit_pricing",
+  "yearly_cost",
+  "payment_method",
+  "billing_schedule",
+  "renewal_date",
+  "sso_integrated",
+  "scim_enabled",
+  "vendor",
+  "owners",
+];
+
+function createDefaultServiceFilters(): ServiceFilters {
+  return Object.fromEntries(
+    columnDefinitions.map((column) => [
+      column.key,
+      column.filterType === "select" ? [] : "",
+    ]),
+  ) as ServiceFilters;
+}
+
+function cloneServiceFilters(filters: ServiceFilters): ServiceFilters {
+  return Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? [...value] : value,
+    ]),
+  ) as ServiceFilters;
+}
+
+function normalizeVisibleColumns(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [...DEFAULT_VISIBLE_COLUMN_KEYS];
+  }
+
+  const valid = Array.from(
+    new Set(
+      raw.filter(
+        (key): key is string =>
+          typeof key === "string" && ALL_COLUMN_KEYS.includes(key),
+      ),
+    ),
+  );
+
+  return valid.length > 0 ? valid : [...DEFAULT_VISIBLE_COLUMN_KEYS];
+}
+
+function normalizeSortPreference(raw: unknown): SortState {
+  if (!raw || typeof raw !== "object") {
+    return { key: null, direction: null };
+  }
+
+  const candidate = raw as { key?: unknown; direction?: unknown };
+  const key =
+    typeof candidate.key === "string" && ALL_COLUMN_KEYS.includes(candidate.key)
+      ? candidate.key
+      : null;
+  const direction =
+    candidate.direction === "asc" || candidate.direction === "desc"
+      ? candidate.direction
+      : null;
+
+  if (!key || !direction) {
+    return { key: null, direction: null };
+  }
+
+  return { key, direction };
+}
+
+function normalizeFilters(raw: unknown): ServiceFilters {
+  const defaults = createDefaultServiceFilters();
+  if (!raw || typeof raw !== "object") {
+    return defaults;
+  }
+
+  const source = raw as Record<string, unknown>;
+  return Object.fromEntries(
+    columnDefinitions.map((column) => {
+      const value = source[column.key];
+      if (column.filterType === "select") {
+        const selected = Array.isArray(value)
+          ? Array.from(
+              new Set(
+                value.filter(
+                  (entry): entry is string =>
+                    typeof entry === "string" && entry.trim().length > 0,
+                ),
+              ),
+            )
+          : [];
+        return [column.key, selected];
+      }
+
+      return [column.key, typeof value === "string" ? value : ""];
+    }),
+  ) as ServiceFilters;
+}
+
+function normalizeServiceListPreferences(
+  raw: ServiceListPreferences | null | undefined,
+): ResolvedServiceListPreferences {
+  return {
+    visible_columns: normalizeVisibleColumns(raw?.visible_columns),
+    filters: normalizeFilters(raw?.filters),
+    sort: normalizeSortPreference(raw?.sort),
+  };
+}
+
+function readStoredServiceListPreferences(): ResolvedServiceListPreferences {
+  try {
+    const stored = localStorage.getItem(SERVICE_LIST_PREFERENCES_STORAGE_KEY);
+    if (!stored) {
+      return normalizeServiceListPreferences(null);
+    }
+
+    return normalizeServiceListPreferences(
+      JSON.parse(stored) as ServiceListPreferences,
+    );
+  } catch {
+    return normalizeServiceListPreferences(null);
+  }
+}
 
 function todayFilenameDate(): string {
   const d = new Date();
@@ -331,30 +501,107 @@ function getServiceExportValue(
 
 export function Services() {
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const storedServiceListPreferences = useMemo(
+    () => readStoredServiceListPreferences(),
+    [],
+  );
   const [services, setServices] = useState<Service[]>([]);
   const [view, setView] = useState<"active" | "archived">("active");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<ServiceFilters>(() =>
-    Object.fromEntries(
-      columnDefinitions.map((column) => [
-        column.key,
-        column.filterType === "select" ? [] : "",
-      ]),
-    ) as ServiceFilters,
+    cloneServiceFilters(storedServiceListPreferences.filters),
   );
-  const [sortState, setSortState] = useState<SortState>({
-    key: null,
-    direction: null,
-  });
+  const [sortState, setSortState] = useState<SortState>(() => ({
+    ...storedServiceListPreferences.sort,
+  }));
   const [hoveredDescription, setHoveredDescription] =
     useState<HoveredDescriptionState | null>(null);
-  const [visibleKeys, setVisibleKeys] = useColumnPrefs(
-    "catalogit:services:columns",
-    ALL_COLUMN_KEYS,
+  const [visibleKeys, setVisibleKeys] = useState<string[]>(
+    () => [...storedServiceListPreferences.visible_columns],
   );
-  const { canEdit, preferences } = useAuth();
+  const { canEdit, preferences, preferencesLoading, setPreferences } = useAuth();
   const navigate = useNavigate();
+  const serviceListPreferencesHydratedRef = useRef(false);
+  const lastSyncedServiceListSignatureRef = useRef<string | null>(null);
+
+  const profileServiceListPreferences = useMemo(
+    () => normalizeServiceListPreferences(preferences?.ui_preferences.service_list),
+    [preferences],
+  );
+  const currentServiceListPreferences = useMemo(
+    () =>
+      normalizeServiceListPreferences({
+        visible_columns: visibleKeys,
+        filters,
+        sort: sortState,
+      }),
+    [filters, sortState, visibleKeys],
+  );
+
+  useEffect(() => {
+    if (preferencesLoading || serviceListPreferencesHydratedRef.current) {
+      return;
+    }
+
+    const hasProfilePreferences =
+      preferences?.ui_preferences.service_list !== undefined;
+    const sourcePreferences = hasProfilePreferences
+      ? profileServiceListPreferences
+      : storedServiceListPreferences;
+
+    const timeoutId = window.setTimeout(() => {
+      setVisibleKeys([...sourcePreferences.visible_columns]);
+      setFilters(cloneServiceFilters(sourcePreferences.filters));
+      setSortState({ ...sourcePreferences.sort });
+      lastSyncedServiceListSignatureRef.current = hasProfilePreferences
+        ? JSON.stringify(profileServiceListPreferences)
+        : null;
+      serviceListPreferencesHydratedRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    preferences,
+    preferencesLoading,
+    profileServiceListPreferences,
+    storedServiceListPreferences,
+  ]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(currentServiceListPreferences);
+
+    try {
+      localStorage.setItem(SERVICE_LIST_PREFERENCES_STORAGE_KEY, serialized);
+    } catch {
+      // Ignore storage failures; per-user persistence still attempts to save.
+    }
+
+    if (!serviceListPreferencesHydratedRef.current) {
+      return;
+    }
+    if (serialized === lastSyncedServiceListSignatureRef.current) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      client
+        .patch<UserPreferences>("/api/me/preferences", {
+          ui_preferences: {
+            service_list: currentServiceListPreferences,
+          },
+        })
+        .then((response) => {
+          lastSyncedServiceListSignatureRef.current = serialized;
+          setPreferences(response.data);
+        })
+        .catch(() => {
+          // Keep local fallback state if profile sync fails.
+        });
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentServiceListPreferences, setPreferences]);
 
   useEffect(() => {
     setLoading(true);
@@ -471,6 +718,14 @@ export function Services() {
 
   const hideDescriptionTooltip = useCallback(() => {
     setHoveredDescription(null);
+  }, []);
+
+  const resetServiceListView = useCallback(() => {
+    const defaults = normalizeServiceListPreferences(null);
+    setSearch("");
+    setVisibleKeys([...defaults.visible_columns]);
+    setFilters(cloneServiceFilters(defaults.filters));
+    setSortState({ ...defaults.sort });
   }, []);
 
   const hasActiveFilters = useMemo(() => {
@@ -663,6 +918,13 @@ export function Services() {
               visibleKeys={visibleKeys}
               onChange={setVisibleKeys}
             />
+            <button
+              type="button"
+              onClick={resetServiceListView}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Reset view
+            </button>
           </div>
           <DataTable
             columns={columns}

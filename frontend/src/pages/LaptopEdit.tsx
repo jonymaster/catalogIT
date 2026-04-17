@@ -112,6 +112,9 @@ export function LaptopEdit() {
             Editing
           </span>
         </div>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          S/N: {laptop.serial_number}
+        </p>
         <div className="mt-3 flex gap-2">
           <button
             type="button"

@@ -301,6 +301,8 @@ export function ServiceForm({ initial }: Props) {
     ]
       .filter(Boolean)
       .join(" ");
+  const sectionCardCls =
+    "rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm";
 
   function renderFieldControl(key: ServiceFieldKey) {
     switch (key) {
@@ -709,39 +711,46 @@ export function ServiceForm({ initial }: Props) {
         </div>
       )}
 
-      <div>
-        <label className={labelCls}>Name *</label>
-        <input
-          required
-          className={withError("name", "mt-1 max-w-xl")}
-          value={form.name}
-          onChange={(e) => set("name", e.target.value)}
-        />
-        {fieldErrors.name && (
-          <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
-        )}
-      </div>
+      <div className={sectionCardCls}>
+        <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+          Service Summary
+        </h2>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div>
+            <label className={labelCls}>Name *</label>
+            <input
+              required
+              className={withError("name", "mt-1")}
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+            />
+            {fieldErrors.name && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+            )}
+          </div>
 
-      <div>
-        <label className={labelCls}>Description</label>
-        <input
-          maxLength={255}
-          className={inputCls + " mt-1 max-w-xl"}
-          value={form.description}
-          onChange={(e) => set("description", e.target.value)}
-          placeholder="Short service description"
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {form.description.length}/255 characters
-        </p>
+          <div>
+            <label className={labelCls}>Description</label>
+            <input
+              maxLength={255}
+              className={inputCls + " mt-1"}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="Short service description"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {form.description.length}/255 characters
+            </p>
+          </div>
+        </div>
       </div>
 
       {SERVICE_VIEW_SECTIONS.map((section) => (
-        <div key={section.id} className="space-y-4">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+        <div key={section.id} className={sectionCardCls}>
+          <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
             {section.title}
           </h2>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {section.fields.map((key) => (
               <div
                 key={key}
