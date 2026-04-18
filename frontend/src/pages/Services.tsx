@@ -507,7 +507,7 @@ export function Services() {
   );
   const [services, setServices] = useState<Service[]>([]);
   const [view, setView] = useState<"active" | "archived">("active");
-  const [loading, setLoading] = useState(true);
+  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<ServiceFilters>(() =>
     cloneServiceFilters(storedServiceListPreferences.filters),
@@ -522,6 +522,7 @@ export function Services() {
   );
   const { canEdit, preferences, preferencesLoading, setPreferences } = useAuth();
   const navigate = useNavigate();
+  const loading = loadedView !== view;
   const serviceListPreferencesHydratedRef = useRef(false);
   const lastSyncedServiceListSignatureRef = useRef<string | null>(null);
 
@@ -604,11 +605,23 @@ export function Services() {
   }, [currentServiceListPreferences, setPreferences]);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     client
       .get<Service[]>("/api/services/", { params: { archived: view === "archived" } })
-      .then((r) => setServices(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!cancelled) {
+          setServices(r.data);
+          setLoadedView(view);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadedView(view);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [view]);
 
   const filtered = useMemo(() => {

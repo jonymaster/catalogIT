@@ -22,19 +22,24 @@ export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
   const { canEdit } = useAuth();
   const [service, setService] = useState<Service | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedServiceId, setLoadedServiceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    setLoading(true);
     client
       .get<Service>(`/api/services/${id}`)
       .then((r) => {
-        if (!cancelled) setService(r.data);
+        if (!cancelled) {
+          setService(r.data);
+          setLoadedServiceId(id);
+        }
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch(() => {
+        if (!cancelled) {
+          setService(null);
+          setLoadedServiceId(id);
+        }
       });
     return () => {
       cancelled = true;
@@ -45,6 +50,8 @@ export function ServiceDetail() {
     if (!id) return;
     client.get<Service>(`/api/services/${id}`).then((r) => setService(r.data));
   }, [id]);
+
+  const loading = id != null && loadedServiceId !== id;
 
   if (loading) return <DetailPageSkeleton />;
   if (!service)

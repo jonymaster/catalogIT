@@ -4,6 +4,7 @@ import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import { FormSkeleton } from "../components/Skeleton";
 import { ServiceForm } from "../components/ServiceForm";
+import { SERVICE_FIELD_LABELS } from "../service/serviceViewLayout";
 import type { Service } from "../types/models";
 
 export function ServiceEdit() {
@@ -60,6 +61,12 @@ export function ServiceEdit() {
   if (!service)
     return <p className="text-sm text-red-600">Service not found.</p>;
 
+  const sectionCardCls =
+    "rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm";
+  const inputCls =
+    "w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm";
+  const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1";
+
   return (
     <PageTransition>
     <div className="space-y-6">
@@ -96,44 +103,58 @@ export function ServiceEdit() {
         {service.is_active ? (
           <ServiceForm initial={service} />
         ) : (
-          <form onSubmit={saveArchivedMetadata} className="space-y-4">
+          <form onSubmit={saveArchivedMetadata} className="space-y-6">
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Archived services support metadata-only updates.
+              Archived services keep the same section structure, but only metadata fields remain editable until the record is unarchived.
             </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                Status
-              </label>
-              <input
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-              />
+            <div className={sectionCardCls}>
+              <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+                General
+              </h2>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <label className={labelCls}>{SERVICE_FIELD_LABELS.status}</label>
+                  <input
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Description</label>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    {service.description?.trim() || "—"}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-                Point of contact
-              </label>
-              <input
-                value={pointOfContact}
-                onChange={(event) => setPointOfContact(event.target.value)}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-                placeholder="e.g. Jane Doe (Vendor Account Manager)"
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Main person to contact for account management or vendor support.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+            <div className={sectionCardCls}>
+              <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
                 Notes
-              </label>
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={4}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-              />
+              </h2>
+              <div className="space-y-5">
+                <div>
+                  <label className={labelCls}>{SERVICE_FIELD_LABELS.point_of_contact}</label>
+                  <input
+                    value={pointOfContact}
+                    onChange={(event) => setPointOfContact(event.target.value)}
+                    className={inputCls}
+                    placeholder="e.g. Jane Doe (Vendor Account Manager)"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Main person to contact for account management or vendor support.
+                  </p>
+                </div>
+                <div>
+                  <label className={labelCls}>{SERVICE_FIELD_LABELS.notes}</label>
+                  <textarea
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    rows={4}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
             </div>
             <button
               type="submit"

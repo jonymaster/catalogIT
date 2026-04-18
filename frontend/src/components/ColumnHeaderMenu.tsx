@@ -54,6 +54,11 @@ export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  function closeMenu() {
+    setOpenMenu(null);
+    setMenuPosition(null);
+  }
+
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as Node;
@@ -68,11 +73,6 @@ export function ColumnHeaderMenu(props: ColumnHeaderMenuProps) {
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
-
-  function closeMenu() {
-    setOpenMenu(null);
-    setMenuPosition(null);
-  }
 
   function cycleSort() {
     if (sortDirection === null) {

@@ -48,6 +48,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         classification_id = uuid.uuid4()
         service_record_id = uuid.uuid4()
         hardware_record_id = uuid.uuid4()
+        owner_id = uuid.uuid4()
 
         service_record = SimpleNamespace(
             id=service_record_id,
@@ -80,6 +81,9 @@ class DashboardReportingPayloadTest(unittest.TestCase):
                 slug="core_saas",
                 name="Core SaaS",
             ),
+            subcategory="Collaboration",
+            environment="Production",
+            owners=[SimpleNamespace(id=owner_id, department="IT Operations")],
         )
         laptop = SimpleNamespace(
             id=laptop_id,
@@ -113,6 +117,9 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         self.assertEqual(service_row.category_name, "Productivity")
         self.assertEqual(service_row.cost_center_id, str(cost_center_id))
         self.assertEqual(service_row.cost_center_name, "Finance")
+        self.assertEqual(service_row.subcategory_name, "Collaboration")
+        self.assertEqual(service_row.environment_name, "Production")
+        self.assertEqual(service_row.team_name, "IT Operations")
         self.assertEqual(service_row.classification_id, str(classification_id))
         self.assertEqual(service_row.classification, "core_saas")
         self.assertEqual(service_row.classification_name, "Core SaaS")
@@ -126,6 +133,9 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         self.assertEqual(hardware_row.category_name, "Hardware")
         self.assertEqual(hardware_row.classification, "hardware")
         self.assertEqual(hardware_row.classification_name, "Hardware")
+        self.assertIsNone(hardware_row.subcategory_name)
+        self.assertIsNone(hardware_row.environment_name)
+        self.assertIsNone(hardware_row.team_name)
         self.assertIsNone(hardware_row.vendor_id)
         self.assertIsNone(hardware_row.vendor_name)
         self.assertIsNone(hardware_row.cost_center_id)

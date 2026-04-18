@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import client from "../api/client";
 import { Attachments } from "../components/Attachments";
@@ -39,27 +39,9 @@ export function LaptopDetail() {
   const { canEdit } = useAuth();
   const [laptop, setLaptop] = useState<Laptop | null>(null);
   const [loading, setLoading] = useState(true);
-  const [costLoading, setCostLoading] = useState(true);
+  const [loadedCostLaptopId, setLoadedCostLaptopId] = useState<string | null>(null);
   const [purchaseYear, setPurchaseYear] = useState("");
   const [costAmount, setCostAmount] = useState("");
-
-  const loadCost = useCallback(() => {
-    if (!id) return;
-    setCostLoading(true);
-    client
-      .get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`)
-      .then((r) => {
-        const cost = r.data;
-        if (cost) {
-          setPurchaseYear(cost.purchase_year != null ? String(cost.purchase_year) : "");
-          setCostAmount(String(cost.amount));
-        } else {
-          setPurchaseYear("");
-          setCostAmount("");
-        }
-      })
-      .finally(() => setCostLoading(false));
-  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -70,8 +52,37 @@ export function LaptopDetail() {
   }, [id]);
 
   useEffect(() => {
-    loadCost();
-  }, [loadCost]);
+    if (!id) return;
+    let cancelled = false;
+    client
+      .get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`)
+      .then((r) => {
+        if (cancelled) {
+          return;
+        }
+        const cost = r.data;
+        if (cost) {
+          setPurchaseYear(cost.purchase_year != null ? String(cost.purchase_year) : "");
+          setCostAmount(String(cost.amount));
+        } else {
+          setPurchaseYear("");
+          setCostAmount("");
+        }
+        setLoadedCostLaptopId(id);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPurchaseYear("");
+          setCostAmount("");
+          setLoadedCostLaptopId(id);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const costLoading = id != null && loadedCostLaptopId !== id;
 
   if (loading) return <DetailPageSkeleton />;
   if (!laptop) return <p className="text-sm text-red-600">Laptop not found.</p>;

@@ -28,10 +28,13 @@ interface FormData {
   status: string;
   billing_schedule: string;
   renewal_date: string;
+  subcategory: string;
+  environment: string;
   sso_integrated: boolean;
   point_of_contact: string;
   notes: string;
   owner_ids: string[];
+  related_service_ids: string[];
   vendor_id: string;
   category_id: string;
   cost_center_id: string;
@@ -63,10 +66,13 @@ function toFormData(s?: Service): FormData {
     status: s?.status ?? "Contract",
     billing_schedule: s?.billing_schedule ?? "",
     renewal_date: s?.renewal_date ?? "",
+    subcategory: s?.subcategory ?? "",
+    environment: s?.environment ?? "",
     sso_integrated: s?.sso_integrated ?? false,
     point_of_contact: s?.point_of_contact ?? "",
     notes: s?.notes ?? "",
     owner_ids: s?.owners.map((o) => o.id) ?? [],
+    related_service_ids: s?.related_services.map((related) => related.id) ?? [],
     vendor_id: s?.vendor_id ?? "",
     category_id: s?.category_id ?? "",
     cost_center_id: s?.cost_center_id ?? "",
@@ -98,6 +104,7 @@ export function ServiceForm({ initial }: Props) {
   >({});
 
   const [users, setUsers] = useState<User[]>([]);
+  const [serviceOptions, setServiceOptions] = useState<Service[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -110,14 +117,16 @@ export function ServiceForm({ initial }: Props) {
   useEffect(() => {
     Promise.all([
       client.get<User[]>("/api/users/"),
+      client.get<Service[]>("/api/services/"),
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
       client.get<ServiceStatus[]>("/api/service-statuses/"),
       client.get<ServiceClassification[]>("/api/service-classifications/"),
-    ]).then(([u, v, c, cc, p, s, cl]) => {
+    ]).then(([u, serviceRes, v, c, cc, p, s, cl]) => {
       setUsers(u.data);
+      setServiceOptions(serviceRes.data);
       setVendors(v.data);
       setCategories(c.data);
       setCostCenters(cc.data);
@@ -252,10 +261,13 @@ export function ServiceForm({ initial }: Props) {
       status: form.status,
       billing_schedule: form.billing_schedule,
       renewal_date: form.renewal_date || null,
+      subcategory: form.subcategory.trim() || null,
+      environment: form.environment.trim() || null,
       sso_integrated: form.sso_integrated,
       point_of_contact: form.point_of_contact.trim() || null,
       notes: form.notes || null,
       owner_ids: form.owner_ids,
+      related_service_ids: form.related_service_ids,
       assignee_ids: isEdit
         ? (initial?.assignees ?? []).map((a) => a.id)
         : [],
@@ -390,6 +402,34 @@ export function ServiceForm({ initial }: Props) {
             </select>
           </div>
         );
+      case "related_services":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.related_services}</label>
+            <select
+              multiple
+              className={inputCls + " h-28"}
+              value={form.related_service_ids}
+              onChange={(e) =>
+                set(
+                  "related_service_ids",
+                  Array.from(e.target.selectedOptions, (option) => option.value),
+                )
+              }
+            >
+              {serviceOptions
+                .filter((service) => service.id !== initial?.id)
+                .map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Hold Ctrl/Cmd to select multiple related services.
+            </p>
+          </div>
+        );
       case "criticality":
         return (
           <div>
@@ -472,6 +512,32 @@ export function ServiceForm({ initial }: Props) {
                 </option>
               ))}
             </select>
+          </div>
+        );
+      case "subcategory":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.subcategory}</label>
+            <input
+              type="text"
+              className={inputCls}
+              value={form.subcategory}
+              onChange={(e) => set("subcategory", e.target.value)}
+              placeholder="e.g. Collaboration"
+            />
+          </div>
+        );
+      case "environment":
+        return (
+          <div>
+            <label className={labelCls}>{SERVICE_FIELD_LABELS.environment}</label>
+            <input
+              type="text"
+              className={inputCls}
+              value={form.environment}
+              onChange={(e) => set("environment", e.target.value)}
+              placeholder="e.g. Production"
+            />
           </div>
         );
       case "cost_center":

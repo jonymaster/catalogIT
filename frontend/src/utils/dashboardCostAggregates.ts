@@ -117,8 +117,20 @@ export function categoryDisplayName(raw: string): string {
   return raw === "" ? "(Uncategorized)" : raw;
 }
 
+export function subcategoryDisplayName(raw: string): string {
+  return raw === "" ? "(No subcategory)" : raw;
+}
+
 export function vendorDisplayName(raw: string): string {
   return raw === "" ? "(No vendor)" : raw;
+}
+
+export function teamDisplayName(raw: string): string {
+  return raw === "" ? "(No team)" : raw;
+}
+
+export function environmentDisplayName(raw: string): string {
+  return raw === "" ? "(No environment)" : raw;
 }
 
 export function sourceDisplayName(raw: CostSourceFilter | DashboardCostRecord["source"]): string {
@@ -181,6 +193,11 @@ export function dimensionValueForRecord(
         key: record.category_name ?? "",
         label: categoryDisplayName(record.category_name ?? ""),
       };
+    case "subcategory":
+      return {
+        key: record.subcategory_name ?? "",
+        label: subcategoryDisplayName(record.subcategory_name ?? ""),
+      };
     case "classification":
       return {
         key: record.classification ?? "",
@@ -193,6 +210,16 @@ export function dimensionValueForRecord(
       return {
         key: record.vendor_name ?? "",
         label: vendorDisplayName(record.vendor_name ?? ""),
+      };
+    case "team":
+      return {
+        key: record.team_name ?? "",
+        label: teamDisplayName(record.team_name ?? ""),
+      };
+    case "environment":
+      return {
+        key: record.environment_name ?? "",
+        label: environmentDisplayName(record.environment_name ?? ""),
       };
     case "cost_center":
       return costCenterDimensionValue(record);
@@ -360,12 +387,17 @@ export const COST_CENTER_HARDWARE_KEY = "__hw__";
 export interface CostFilterCriteria {
   /** Internal keys: "" means uncategorized */
   categories?: readonly string[];
+  subcategories?: readonly string[];
   source?: CostSourceFilter;
   classifications?: readonly string[];
   /** Include only rows whose record_type is in this list (one or two types). */
   recordTypes?: readonly string[];
   costCenters?: readonly string[];
   vendors?: readonly string[];
+  teams?: readonly string[];
+  environments?: readonly string[];
+  amounts?: readonly string[];
+  noteValues?: readonly string[];
   /** Empty = all years present in `records` baseline (caller passes allowed years) */
   fiscalYears?: readonly number[];
 }
@@ -389,6 +421,11 @@ export function filterCostRecords(
       if (!f.classifications?.includes(key)) return false;
     }
 
+    if ((f.subcategories?.length ?? 0) > 0) {
+      const key = r.subcategory_name ?? "";
+      if (!f.subcategories?.includes(key)) return false;
+    }
+
     if ((f.recordTypes?.length ?? 0) > 0) {
       const allowedTypes = new Set(f.recordTypes);
       if (!allowedTypes.has(r.record_type)) {
@@ -403,9 +440,37 @@ export function filterCostRecords(
       }
     }
 
+    if ((f.teams?.length ?? 0) > 0) {
+      const key = r.team_name ?? "";
+      if (!f.teams?.includes(key)) {
+        return false;
+      }
+    }
+
+    if ((f.environments?.length ?? 0) > 0) {
+      const key = r.environment_name ?? "";
+      if (!f.environments?.includes(key)) {
+        return false;
+      }
+    }
+
     if ((f.costCenters?.length ?? 0) > 0) {
       const { key } = costCenterDimensionValue(r);
       if (!f.costCenters?.includes(key)) return false;
+    }
+
+    if ((f.amounts?.length ?? 0) > 0) {
+      const key = String(r.amount);
+      if (!f.amounts?.includes(key)) {
+        return false;
+      }
+    }
+
+    if ((f.noteValues?.length ?? 0) > 0) {
+      const key = r.notes?.trim() ?? "";
+      if (!f.noteValues?.includes(key)) {
+        return false;
+      }
     }
 
     if ((f.fiscalYears?.length ?? 0) > 0 && !f.fiscalYears?.includes(r.fiscal_year)) {

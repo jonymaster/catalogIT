@@ -184,7 +184,7 @@ function todayFilenameDate(): string {
 export function Hardware() {
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const [view, setView] = useState<"active" | "archived">("active");
-  const [loading, setLoading] = useState(true);
+  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<HardwareFilters>(() =>
     Object.fromEntries(
@@ -204,13 +204,26 @@ export function Hardware() {
   );
   const { canEdit } = useAuth();
   const navigate = useNavigate();
+  const loading = loadedView !== view;
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     client
       .get<Laptop[]>("/api/laptops/", { params: { archived: view === "archived" } })
-      .then((r) => setLaptops(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!cancelled) {
+          setLaptops(r.data);
+          setLoadedView(view);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadedView(view);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [view]);
 
   const filtered = useMemo(() => {

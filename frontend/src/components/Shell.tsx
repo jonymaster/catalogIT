@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
-import { SidebarProvider, useSidebar } from "../context/SidebarContext";
+import { SidebarProvider } from "../context/SidebarContext";
+import { useSidebar } from "../context/sidebar-context";
 
 function ShellInner() {
   const { collapsed } = useSidebar();

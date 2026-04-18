@@ -15,8 +15,6 @@ export function useDashboardCostData() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     client
       .get<DashboardCostPayload>("/api/dashboard/")
       .then((res) => {

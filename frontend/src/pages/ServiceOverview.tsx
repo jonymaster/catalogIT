@@ -1,4 +1,4 @@
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
 import {
@@ -79,6 +79,26 @@ function renderField(
           <ClassificationBadge classification={service.service_classification} />
         </Field>
       );
+    case "related_services":
+      return (
+        <Field label={SERVICE_FIELD_LABELS.related_services}>
+          {service.related_services.length > 0 ? (
+            <span className="flex flex-wrap gap-2">
+              {service.related_services.map((related) => (
+                <Link
+                  key={related.id}
+                  to={`/services/${related.id}`}
+                  className="text-brand-700 hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-brand-200"
+                >
+                  {related.name}
+                </Link>
+              ))}
+            </span>
+          ) : (
+            "—"
+          )}
+        </Field>
+      );
     case "criticality":
       return (
         <Field label={SERVICE_FIELD_LABELS.criticality}>
@@ -114,6 +134,18 @@ function renderField(
           ) : (
             "--"
           )}
+        </Field>
+      );
+    case "subcategory":
+      return (
+        <Field label={SERVICE_FIELD_LABELS.subcategory}>
+          {service.subcategory?.trim() ? service.subcategory : "—"}
+        </Field>
+      );
+    case "environment":
+      return (
+        <Field label={SERVICE_FIELD_LABELS.environment}>
+          {service.environment?.trim() ? service.environment : "—"}
         </Field>
       );
     case "cost_center":

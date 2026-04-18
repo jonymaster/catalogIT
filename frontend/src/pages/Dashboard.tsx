@@ -189,10 +189,11 @@ export function Dashboard() {
   const [services, setServices] = useState<Service[]>([]);
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const { records, fiscalYears, loading: costLoading } = useDashboardCostData();
-  const [dashYear, setDashYear] = useState<number>(new Date().getFullYear());
-  const [dashYearInitialized, setDashYearInitialized] = useState(false);
-  const [selectedClassificationIndex, setSelectedClassificationIndex] = useState(0);
-  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
+  const [dashYearSelection, setDashYearSelection] = useState<number | null>(null);
+  const [selectedClassificationKeyState, setSelectedClassificationKeyState] =
+    useState<string | null>(null);
+  const [selectedCategoryKeyState, setSelectedCategoryKeyState] =
+    useState<string | null>(null);
   const [dashboardSearch, setDashboardSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -214,17 +215,6 @@ export function Dashboard() {
       })
       .finally(() => setInventoryLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (dashYearInitialized || fiscalYears.length === 0) return;
-    const currentYear = new Date().getFullYear();
-    setDashYear(
-      fiscalYears.includes(currentYear)
-        ? currentYear
-        : fiscalYears[fiscalYears.length - 1],
-    );
-    setDashYearInitialized(true);
-  }, [fiscalYears, dashYearInitialized]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -265,6 +255,15 @@ export function Dashboard() {
     visibleWidgetIdSet.has("financial_report") &&
     records.length > 0;
   const showYearSelector = financialWidgetsVisible || spendChartVisible;
+  const defaultDashYear = useMemo(() => {
+    if (fiscalYears.length === 0) {
+      return new Date().getFullYear();
+    }
+    const currentYear = new Date().getFullYear();
+    return fiscalYears.includes(currentYear)
+      ? currentYear
+      : fiscalYears[fiscalYears.length - 1];
+  }, [fiscalYears]);
 
   useEffect(() => {
     if (preferencesLoading || dashboardPreferencesHydratedRef.current) {
@@ -336,6 +335,9 @@ export function Dashboard() {
     [records],
   );
   const currentYear = new Date().getFullYear();
+  const dashYear = fiscalYears.includes(dashYearSelection ?? Number.NaN)
+    ? (dashYearSelection as number)
+    : defaultDashYear;
   const showProjectedValues = isCurrentOrFutureFiscalYear(dashYear, currentYear);
 
   const classificationOptions = useMemo(() => {
@@ -353,24 +355,23 @@ export function Dashboard() {
     });
     return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [records]);
-
-  useEffect(() => {
-    setSelectedClassificationIndex((prev) =>
-      classificationOptions.length === 0
-        ? 0
-        : Math.min(prev, classificationOptions.length - 1),
-    );
-  }, [classificationOptions]);
-
-  useEffect(() => {
-    setSelectedCategoryIndex((prev) =>
-      categoryOptions.length === 0 ? 0 : Math.min(prev, categoryOptions.length - 1),
-    );
-  }, [categoryOptions]);
-
   const selectedClassificationKey =
-    classificationOptions[selectedClassificationIndex] ?? emptyClassificationKey;
-  const selectedCategoryKey = categoryOptions[selectedCategoryIndex] ?? emptyCategoryKey;
+    selectedClassificationKeyState &&
+    classificationOptions.includes(selectedClassificationKeyState)
+      ? selectedClassificationKeyState
+      : (classificationOptions[0] ?? emptyClassificationKey);
+  const selectedCategoryKey =
+    selectedCategoryKeyState && categoryOptions.includes(selectedCategoryKeyState)
+      ? selectedCategoryKeyState
+      : (categoryOptions[0] ?? emptyCategoryKey);
+  const selectedClassificationIndex = Math.max(
+    0,
+    classificationOptions.indexOf(selectedClassificationKey),
+  );
+  const selectedCategoryIndex = Math.max(
+    0,
+    categoryOptions.indexOf(selectedCategoryKey),
+  );
 
   const selectedClassificationLabel =
     selectedClassificationKey === emptyClassificationKey
@@ -717,7 +718,7 @@ export function Dashboard() {
                 {years.map((y) => (
                   <button
                     key={y}
-                    onClick={() => setDashYear(y)}
+                    onClick={() => setDashYearSelection(y)}
                     className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-150 ${
                       dashYear === y
                         ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
@@ -760,10 +761,12 @@ export function Dashboard() {
                 color="text-purple-700"
                 subtext="Click to cycle"
                 onClick={() =>
-                  setSelectedClassificationIndex((prev) =>
+                  setSelectedClassificationKeyState(
                     classificationOptions.length === 0
-                      ? 0
-                      : (prev + 1) % classificationOptions.length,
+                      ? null
+                      : classificationOptions[
+                          (selectedClassificationIndex + 1) % classificationOptions.length
+                        ],
                   )
                 }
               />
@@ -777,8 +780,12 @@ export function Dashboard() {
                 color="text-blue-700"
                 subtext="Click to cycle"
                 onClick={() =>
-                  setSelectedCategoryIndex((prev) =>
-                    categoryOptions.length === 0 ? 0 : (prev + 1) % categoryOptions.length,
+                  setSelectedCategoryKeyState(
+                    categoryOptions.length === 0
+                      ? null
+                      : categoryOptions[
+                          (selectedCategoryIndex + 1) % categoryOptions.length
+                        ],
                   )
                 }
               />
@@ -804,7 +811,7 @@ export function Dashboard() {
                 }))}
                 onBarClick={(i) => {
                   const y = years[i];
-                  if (y !== undefined) setDashYear(y);
+                  if (y !== undefined) setDashYearSelection(y);
                 }}
               />
             </div>

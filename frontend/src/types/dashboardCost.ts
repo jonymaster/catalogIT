@@ -1,8 +1,11 @@
 export type DashboardCostSource = "service" | "hardware";
 export type DashboardCostDimension =
   | "category"
+  | "subcategory"
   | "classification"
   | "vendor"
+  | "team"
+  | "environment"
   | "cost_center"
   | "source";
 
@@ -23,6 +26,9 @@ export interface DashboardCostRecord {
   category_name: string | null;
   cost_center_id: string | null;
   cost_center_name: string | null;
+  subcategory_name: string | null;
+  environment_name: string | null;
+  team_name: string | null;
   fiscal_year: number;
   amount: number;
   record_type: string;
@@ -39,8 +45,11 @@ export const DASHBOARD_COST_DIMENSION_LABEL: Record<
   string
 > = {
   category: "Category",
+  subcategory: "Subcategory",
   classification: "Classification",
   vendor: "Vendor",
+  team: "Team",
+  environment: "Environment",
   cost_center: "Cost center",
   source: "Source",
 };
