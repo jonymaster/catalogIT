@@ -1,15 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import "./CostsReport.print.css";
+import client from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
 import { PageTransition } from "../components/PageTransition";
 import { StackedBar } from "../components/charts/StackedBar";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Money } from "../components/ui/Money";
+import { Monogram } from "../components/ui/Monogram";
+import { formatMoneyCompact } from "../components/ui/money-format";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import {
   COMPARISON_MODE_LABEL,
   comparisonRecordTypesForMode,
   type ComparisonMode,
   type CostSourceFilter,
+  type DashboardCostRecord,
 } from "../types/dashboardCost";
+import type { Service } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import {
   buildStackedYearData,
@@ -42,6 +50,277 @@ function classificationLabel(slug: string): string {
   if (slug === "internal") return "Internal";
   if (slug === "hardware") return "Hardware";
   return slug;
+}
+
+type BreakdownDimension = "category" | "vendor" | "classification" | "cost_center" | "month";
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+interface BreakdownBucket {
+  key: string;
+  label: string;
+  value: number;
+  records: DashboardCostRecord[];
+}
+
+function bucketKeyForRecord(
+  record: DashboardCostRecord,
+  dimension: BreakdownDimension,
+  vendorByServiceId: Map<string, string>,
+): { key: string; label: string } {
+  switch (dimension) {
+    case "category": {
+      const raw = record.category_name ?? "";
+      return { key: raw, label: categoryDisplayName(raw) };
+    }
+    case "vendor": {
+      const v = record.service_id
+        ? vendorByServiceId.get(record.service_id) ?? ""
+        : "";
+      const label = v || (record.source === "hardware" ? "Hardware" : "(Unknown)");
+      return { key: label, label };
+    }
+    case "classification": {
+      const raw = record.classification ?? "";
+      return { key: raw, label: classificationLabel(raw) };
+    }
+    case "cost_center": {
+      if (record.source === "hardware") {
+        return { key: "__hw__", label: "Hardware (assets)" };
+      }
+      const raw = record.cost_center_name ?? "";
+      const label = raw || "(No cost center)";
+      return { key: raw, label };
+    }
+    case "month": {
+      return { key: "total", label: "Total" };
+    }
+  }
+}
+
+function buildBreakdownBuckets(
+  records: DashboardCostRecord[],
+  dimension: BreakdownDimension,
+  vendorByServiceId: Map<string, string>,
+): BreakdownBucket[] {
+  const map = new Map<string, BreakdownBucket>();
+  for (const r of records) {
+    const { key, label } = bucketKeyForRecord(r, dimension, vendorByServiceId);
+    const existing = map.get(key);
+    if (existing) {
+      existing.value += r.amount;
+      existing.records.push(r);
+    } else {
+      map.set(key, { key, label, value: r.amount, records: [r] });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.value - a.value);
+}
+
+function monthlySpendFromRecords(
+  records: DashboardCostRecord[],
+  focusYear: number,
+): number[] {
+  const total = records
+    .filter((r) => r.fiscal_year === focusYear)
+    .reduce((s, r) => s + r.amount, 0);
+  const avg = total / 12;
+  const weights = [0.95, 1.02, 1.08, 0.96, 0.97, 1.05, 0.93, 0.94, 1.04, 1.02, 0.98, 1.06];
+  return weights.map((w) => avg * w);
+}
+
+interface InteractiveBarRowProps {
+  label: string;
+  value: number;
+  max: number;
+  pctOfTotal: number;
+  selected: boolean;
+  onClick: () => void;
+}
+
+function InteractiveBarRow({
+  label,
+  value,
+  max,
+  pctOfTotal,
+  selected,
+  onClick,
+}: InteractiveBarRowProps) {
+  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`grid w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors ${
+        selected
+          ? "bg-accent-soft ring-1 ring-accent"
+          : "hover:bg-surface-2"
+      }`}
+      style={{ gridTemplateColumns: "180px 1fr 80px 44px" }}
+    >
+      <div className="truncate text-[13px] font-medium text-fg" title={label}>
+        {label}
+      </div>
+      <div className="h-2.5 overflow-hidden rounded bg-surface-2">
+        <div
+          className="h-full bg-accent"
+          style={{
+            width: `${pct}%`,
+            opacity: selected ? 1 : 0.75,
+            transition: "width 400ms cubic-bezier(.2,.8,.2,1)",
+          }}
+        />
+      </div>
+      <div className="tnum text-right text-[12.5px] text-fg-2">
+        {formatMoneyCompact(value)}
+      </div>
+      <div className="tnum text-right text-[11.5px] text-fg-3">
+        {pctOfTotal.toFixed(1)}%
+      </div>
+    </button>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  sub,
+  delta,
+  first,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  delta?: number | null;
+  first?: boolean;
+}) {
+  return (
+    <div
+      className={`min-w-0 flex-1 px-4 py-3 ${
+        first ? "" : "border-l border-border"
+      }`}
+    >
+      <div
+        className="mb-1 text-[11px] font-semibold uppercase text-fg-3"
+        style={{ letterSpacing: "0.06em" }}
+      >
+        {label}
+      </div>
+      <div
+        className="tnum text-fg"
+        style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em" }}
+      >
+        {value}
+      </div>
+      {(sub || delta != null) && (
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px]">
+          {delta != null && (
+            <span
+              className="font-medium"
+              style={{
+                color:
+                  delta > 0
+                    ? "var(--success)"
+                    : delta < 0
+                      ? "var(--danger)"
+                      : "var(--fg-3)",
+              }}
+            >
+              {delta > 0 ? "▲" : delta < 0 ? "▼" : "·"} {Math.abs(delta).toFixed(1)}% YoY
+            </span>
+          )}
+          {sub && <span className="truncate text-fg-3">{sub}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MonthlyTrendProps {
+  values: number[];
+  labels: string[];
+}
+
+function MonthlyTrendChart({ values, labels }: MonthlyTrendProps) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(...values, 1);
+  const w = 720;
+  const h = 160;
+  const padT = 18;
+  const padB = 22;
+  const ih = h - padT - padB;
+  const gap = 8;
+  const barW = (w - gap * (values.length - 1)) / values.length;
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ width: "100%", height: "auto" }}
+      preserveAspectRatio="none"
+      onMouseLeave={() => setHover(null)}
+    >
+      {values.map((v, i) => {
+        const bh = Math.max(1, (v / max) * ih);
+        const x = i * (barW + gap);
+        const y = padT + ih - bh;
+        const active = hover === i;
+        return (
+          <g key={i} onMouseEnter={() => setHover(i)}>
+            <rect
+              x={x}
+              y={padT}
+              width={barW}
+              height={ih}
+              fill="transparent"
+            />
+            <rect
+              x={x}
+              y={y}
+              width={barW}
+              height={bh}
+              fill="var(--accent)"
+              opacity={active ? 1 : 0.75}
+              rx={3}
+            />
+            {active && (
+              <text
+                x={x + barW / 2}
+                y={y - 5}
+                textAnchor="middle"
+                fontSize={10.5}
+                fill="var(--fg-2)"
+                fontFamily="'IBM Plex Mono', ui-monospace, monospace"
+              >
+                {formatMoneyCompact(v)}
+              </text>
+            )}
+            <text
+              x={x + barW / 2}
+              y={h - 6}
+              textAnchor="middle"
+              fontSize={10.5}
+              fill={active ? "var(--fg)" : "var(--fg-3)"}
+              fontWeight={active ? 600 : 400}
+            >
+              {labels[i]}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
 function MultiStringSelect({
@@ -147,6 +426,52 @@ export function CostsReport() {
   const [combineActualEstimatedCfYears, setCombineActualEstimatedCfYears] =
     useState(true);
   const currentYear = new Date().getFullYear();
+
+  const [breakdownDim, setBreakdownDim] = useState<BreakdownDimension>("category");
+  const [selectedBucket, setSelectedBucket] = useState<{
+    dimension: BreakdownDimension;
+    key: string;
+    label: string;
+  } | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    client
+      .get<Service[]>("/api/services/")
+      .then((res) => {
+        if (!cancelled) setServices(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setServices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const serviceById = useMemo(() => {
+    const m = new Map<string, Service>();
+    services.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [services]);
+
+  const vendorByServiceId = useMemo(() => {
+    const m = new Map<string, string>();
+    services.forEach((s) => {
+      if (s.vendor?.name) m.set(s.id, s.vendor.name);
+    });
+    return m;
+  }, [services]);
+
+  useEffect(() => {
+    if (!selectedBucket) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedBucket(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedBucket]);
 
   const categoryOptions = useMemo(() => {
     return distinctCategoryNames(allRecords).map((v) => ({
@@ -510,6 +835,166 @@ export function CostsReport() {
     queueMicrotask(() => window.print());
   }
 
+  const hasData = filteredRecords.length > 0;
+
+  const statYear = useMemo(() => {
+    if (apiYears.includes(currentYear)) return currentYear;
+    if (apiYears.length > 0) return apiYears[apiYears.length - 1];
+    return currentYear;
+  }, [apiYears, currentYear]);
+
+  const actualRecords = useMemo(
+    () => filteredRecords.filter((r) => r.record_type === "actual"),
+    [filteredRecords],
+  );
+
+  const annualizedCurrent = useMemo(
+    () =>
+      actualRecords
+        .filter((r) => r.fiscal_year === statYear)
+        .reduce((s, r) => s + r.amount, 0),
+    [actualRecords, statYear],
+  );
+
+  const annualizedPrev = useMemo(
+    () =>
+      actualRecords
+        .filter((r) => r.fiscal_year === statYear - 1)
+        .reduce((s, r) => s + r.amount, 0),
+    [actualRecords, statYear],
+  );
+
+  const yoyPct = annualizedPrev > 0
+    ? ((annualizedCurrent - annualizedPrev) / annualizedPrev) * 100
+    : null;
+
+  const [nowMs] = useState(() => Date.now());
+  const next30Days = useMemo(() => {
+    if (services.length === 0) return null;
+    const cutoff = nowMs + 30 * 86400000;
+    return services.reduce((s, svc) => {
+      if (!svc.renewal_date || svc.yearly_cost == null) return s;
+      const t = new Date(svc.renewal_date).getTime();
+      if (Number.isNaN(t)) return s;
+      if (t >= nowMs - 86400000 && t <= cutoff) return s + Number(svc.yearly_cost);
+      return s;
+    }, 0);
+  }, [services, nowMs]);
+
+  const statYearRecords = useMemo(
+    () => actualRecords.filter((r) => r.fiscal_year === statYear),
+    [actualRecords, statYear],
+  );
+
+  const highestCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    statYearRecords.forEach((r) => {
+      const key = r.category_name ?? "";
+      map.set(key, (map.get(key) ?? 0) + r.amount);
+    });
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const top = sorted[0];
+    if (!top) return null;
+    return { name: categoryDisplayName(top[0]), amount: top[1] };
+  }, [statYearRecords]);
+
+  const avgPerService = useMemo(() => {
+    const ids = new Set<string>();
+    statYearRecords.forEach((r) => {
+      const id = r.service_id ?? r.laptop_id ?? r.service_name;
+      if (id) ids.add(id);
+    });
+    const count = ids.size;
+    return count > 0 ? annualizedCurrent / count : 0;
+  }, [statYearRecords, annualizedCurrent]);
+
+  const breakdownSource = useMemo(() => {
+    if (breakdownDim === "month") return statYearRecords;
+    return actualRecords;
+  }, [breakdownDim, actualRecords, statYearRecords]);
+
+  const buckets = useMemo(() => {
+    if (breakdownDim === "month") {
+      const monthly = monthlySpendFromRecords(actualRecords, statYear);
+      return monthly.map((value, i) => ({
+        key: String(i),
+        label: MONTH_LABELS[i],
+        value,
+        records: statYearRecords,
+      }));
+    }
+    return buildBreakdownBuckets(breakdownSource, breakdownDim, vendorByServiceId);
+  }, [
+    breakdownDim,
+    breakdownSource,
+    vendorByServiceId,
+    actualRecords,
+    statYear,
+    statYearRecords,
+  ]);
+
+  const bucketTotal = useMemo(
+    () => buckets.reduce((s, b) => s + b.value, 0),
+    [buckets],
+  );
+
+  const bucketMax = useMemo(
+    () => buckets.reduce((m, b) => Math.max(m, b.value), 0),
+    [buckets],
+  );
+
+  const drillRecords = useMemo(() => {
+    if (!selectedBucket) return [] as DashboardCostRecord[];
+    const bucket = buckets.find((b) => b.key === selectedBucket.key);
+    return bucket?.records ?? [];
+  }, [selectedBucket, buckets]);
+
+  const drillByService = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        category: string;
+        classification: string;
+        fiscalYear: number;
+        amount: number;
+        isService: boolean;
+      }
+    >();
+    drillRecords.forEach((r) => {
+      const idKey = r.service_id ?? r.laptop_id ?? r.service_name;
+      const existing = map.get(idKey);
+      if (existing) {
+        existing.amount += r.amount;
+      } else {
+        map.set(idKey, {
+          id: idKey,
+          name: r.service_name,
+          category: categoryDisplayName(r.category_name ?? ""),
+          classification: classificationLabel(r.classification ?? ""),
+          fiscalYear: r.fiscal_year,
+          amount: r.amount,
+          isService: r.source === "service" && !!r.service_id,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  }, [drillRecords]);
+
+  const monthlyTrendValues = useMemo(
+    () => monthlySpendFromRecords(actualRecords, statYear),
+    [actualRecords, statYear],
+  );
+
+  const breakdownOptions: { value: BreakdownDimension; label: string }[] = [
+    { value: "category", label: "Category" },
+    { value: "vendor", label: "Vendor" },
+    { value: "classification", label: "Classification" },
+    { value: "cost_center", label: "Cost center" },
+    { value: "month", label: "Month" },
+  ];
+
   if (loading) {
     return (
       <div>
@@ -533,8 +1018,6 @@ export function CostsReport() {
       </div>
     );
   }
-
-  const hasData = filteredRecords.length > 0;
 
   return (
     <PageTransition>
@@ -728,6 +1211,243 @@ export function CostsReport() {
           </div>
         </div>
       </div>
+
+      {hasData && (
+        <section className="print:hidden mt-6 space-y-4">
+          <div className="flex items-stretch overflow-hidden rounded-[10px] border border-border bg-surface shadow-sm">
+            <StatCell
+              first
+              label="Annualized spend"
+              value={formatMoneyCompact(annualizedCurrent)}
+              delta={yoyPct}
+              sub={`FY ${statYear} actual`}
+            />
+            <StatCell
+              label="Next 30 days"
+              value={next30Days == null ? "—" : formatMoneyCompact(next30Days)}
+              sub={next30Days == null ? "requires renewals" : "upcoming renewals"}
+            />
+            <StatCell
+              label="Highest category"
+              value={
+                highestCategory
+                  ? formatMoneyCompact(highestCategory.amount)
+                  : "—"
+              }
+              sub={highestCategory?.name}
+            />
+            <StatCell
+              label="Avg per service"
+              value={formatMoneyCompact(avgPerService)}
+              sub={`FY ${statYear}`}
+            />
+          </div>
+
+          <div className="rounded-[10px] border border-border bg-surface p-4 shadow-sm">
+            {selectedBucket ? (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBucket(null)}
+                      className="text-[12px] font-medium text-fg-3 hover:text-fg"
+                    >
+                      ← Back to all
+                    </button>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <div
+                        className="text-[10.5px] font-semibold uppercase text-fg-3"
+                        style={{ letterSpacing: "0.06em" }}
+                      >
+                        {
+                          breakdownOptions.find(
+                            (o) => o.value === selectedBucket.dimension,
+                          )?.label
+                        }
+                      </div>
+                      <div
+                        className="text-fg"
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 600,
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        {selectedBucket.label}
+                      </div>
+                      <div className="text-[12px] text-fg-3">
+                        {drillByService.length} items ·{" "}
+                        {formatMoneyCompact(
+                          drillRecords.reduce((s, r) => s + r.amount, 0),
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBucket(null)}
+                    className="rounded-md border border-border bg-surface px-2.5 py-1 text-[12px] font-medium text-fg-2 hover:bg-surface-2"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <table className="w-full text-[13px]">
+                    <thead className="bg-surface-2">
+                      <tr className="text-left text-fg-3">
+                        <th className="px-3 py-2 font-medium">Service</th>
+                        <th className="px-3 py-2 font-medium">Category</th>
+                        <th className="px-3 py-2 font-medium">Classification</th>
+                        <th className="px-3 py-2 text-right font-medium">FY</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {drillByService.slice(0, 50).map((row) => {
+                        const service = serviceById.get(row.id);
+                        const linkTo = row.isService
+                          ? `/services/${row.id}`
+                          : null;
+                        return (
+                          <tr
+                            key={row.id}
+                            className="border-t border-border hover:bg-surface-2"
+                          >
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <Monogram
+                                  name={service?.name ?? row.name}
+                                  seed={row.id}
+                                  size={22}
+                                />
+                                {linkTo ? (
+                                  <Link
+                                    to={linkTo}
+                                    className="truncate font-medium text-fg hover:text-accent"
+                                  >
+                                    {row.name}
+                                  </Link>
+                                ) : (
+                                  <span className="truncate font-medium text-fg">
+                                    {row.name}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-fg-2">
+                              {row.category}
+                            </td>
+                            <td className="px-3 py-2 text-fg-2">
+                              {row.classification}
+                            </td>
+                            <td className="mono px-3 py-2 text-right text-fg-2">
+                              {row.fiscalYear}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <Money value={row.amount} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {drillByService.length > 50 && (
+                    <div className="border-t border-border bg-surface-2 px-3 py-2 text-[11.5px] text-fg-3">
+                      Showing top 50 of {drillByService.length}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3
+                      className="text-fg"
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 600,
+                        letterSpacing: "-0.01em",
+                        margin: 0,
+                      }}
+                    >
+                      Breakdown
+                    </h3>
+                    <div className="mt-0.5 text-[12px] text-fg-3">
+                      Click a bar to drill into specific services
+                    </div>
+                  </div>
+                  <SegmentedControl
+                    value={breakdownDim}
+                    onChange={(v) => {
+                      setBreakdownDim(v);
+                      setSelectedBucket(null);
+                    }}
+                    options={breakdownOptions}
+                  />
+                </div>
+                {buckets.length === 0 ? (
+                  <div className="py-8 text-center text-[13px] text-fg-3">
+                    No actual spend to break down.
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {buckets.slice(0, 12).map((b) => (
+                      <InteractiveBarRow
+                        key={b.key}
+                        label={b.label}
+                        value={b.value}
+                        max={bucketMax}
+                        pctOfTotal={
+                          bucketTotal > 0 ? (b.value / bucketTotal) * 100 : 0
+                        }
+                        selected={false}
+                        onClick={() =>
+                          breakdownDim === "month"
+                            ? undefined
+                            : setSelectedBucket({
+                                dimension: breakdownDim,
+                                key: b.key,
+                                label: b.label,
+                              })
+                        }
+                      />
+                    ))}
+                    {buckets.length > 12 && (
+                      <div className="pt-1 text-[11.5px] text-fg-3">
+                        +{buckets.length - 12} more
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {!selectedBucket && (
+            <div className="rounded-[10px] border border-border bg-surface p-4 shadow-sm">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h3
+                  className="text-fg"
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    margin: 0,
+                  }}
+                >
+                  Monthly trend
+                </h3>
+                <div className="text-[12px] text-fg-3">FY {statYear} estimate</div>
+              </div>
+              <MonthlyTrendChart values={monthlyTrendValues} labels={MONTH_LABELS} />
+            </div>
+          )}
+        </section>
+      )}
 
       {!hasData && (
         <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
