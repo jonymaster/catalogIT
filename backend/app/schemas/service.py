@@ -180,6 +180,8 @@ class ServiceUpdate(BaseModel):
     @field_validator("billing_schedule")
     @classmethod
     def validate_billing_schedule(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("billing_schedule cannot be null")
         return _normalize_optional_choice(
             value,
             label="billing_schedule",
