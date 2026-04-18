@@ -209,10 +209,15 @@ export function Calendar() {
   return (
     <PageTransition>
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Calendar</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h1
+            className="text-fg"
+            style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+          >
+            Renewals
+          </h1>
+          <p className="mt-1 text-[13px] text-fg-3">
             Renewal events are derived from each service renewal date and its
             monthly or annual billing schedule.
           </p>
@@ -222,14 +227,14 @@ export function Calendar() {
             type="button"
             aria-label="Previous month"
             onClick={() => setDisplayMonth((current) => shiftMonth(current, -1))}
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 p-2 text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2"
           >
-            <ChevronLeftIcon className="h-5 w-5" aria-hidden />
+            <ChevronLeftIcon className="h-4 w-4" aria-hidden />
           </button>
           <button
             type="button"
             onClick={() => setDisplayMonth(monthStart(new Date()))}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
+            className="rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2"
           >
             Today
           </button>
@@ -237,9 +242,9 @@ export function Calendar() {
             type="button"
             aria-label="Next month"
             onClick={() => setDisplayMonth((current) => shiftMonth(current, 1))}
-            className="inline-flex items-center justify-center rounded-md border border-gray-300 p-2 text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2"
           >
-            <ChevronRightIcon className="h-5 w-5" aria-hidden />
+            <ChevronRightIcon className="h-4 w-4" aria-hidden />
           </button>
         </div>
       </div>

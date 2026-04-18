@@ -546,10 +546,13 @@ export function CostsReport() {
       `}</style>
 
       <div className="print:hidden">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+        <h1
+          className="text-fg"
+          style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+        >
           IT Financial Report
         </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-[13px] text-fg-3">
           Default is actual-only; switch the view to compare pairs of record types, filter, export, or
           print.
         </p>

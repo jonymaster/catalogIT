@@ -1,111 +1,445 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import { useAuth } from "../context/useAuth";
-import { BarChart } from "../components/charts/BarChart";
-import { SearchInput } from "../components/SearchInput";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import type { Service, Laptop } from "../types/models";
 import { DashboardSkeleton } from "../components/Skeleton";
+import { BarRow } from "../components/ui/BarRow";
+import { Monogram } from "../components/ui/Monogram";
+import { formatMoneyCompact } from "../components/ui/money-format";
 import {
-  combinedActualEstimatedByYear,
-  fmtFull,
-  isCurrentOrFutureFiscalYear,
-  sumForYearAndClassification,
   totalByYear,
+  combinedActualEstimatedByYear,
   visualAmountForRecordTypeAndYear,
   yoyPercent,
 } from "../utils/dashboardCostAggregates";
 
-function matchesServiceSearch(service: Service, query: string) {
-  const cat = (service.category_rel?.name ?? "").toLowerCase();
+function greetingForNow(email?: string | null): string {
+  const h = new Date().getHours();
+  const prefix = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const name = email?.split("@")[0]?.split(".")[0];
+  const pretty = name ? name.charAt(0).toUpperCase() + name.slice(1) : null;
+  return pretty ? `${prefix}, ${pretty}.` : `${prefix}.`;
+}
+
+function WidgetCard({
+  title,
+  right,
+  children,
+  className = "",
+  span = 6,
+}: {
+  title: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  span?: number;
+}) {
   return (
-    service.name.toLowerCase().includes(query) ||
-    cat.includes(query) ||
-    (service.service_status?.name ?? service.status).toLowerCase().includes(query) ||
-    (service.vendor?.name ?? "").toLowerCase().includes(query) ||
-    (service.service_classification?.name ?? "")
-      .toLowerCase()
-      .includes(query) ||
-    service.owners.some(
-      (owner) =>
-        owner.first_name.toLowerCase().includes(query) ||
-        owner.last_name.toLowerCase().includes(query),
-    )
+    <div
+      className={`rounded-[10px] border border-border bg-surface p-4 shadow-sm animate-fade-in ${className}`}
+      style={{ gridColumn: `span ${span} / span ${span}` }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div
+          className="text-[11.5px] font-semibold uppercase text-fg-3"
+          style={{ letterSpacing: "0.06em" }}
+        >
+          {title}
+        </div>
+        {right}
+      </div>
+      {children}
+    </div>
   );
 }
 
-function matchesLaptopSearch(laptop: Laptop, query: string) {
-  const assignedTo = laptop.assigned_to
-    ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name}`
-    : "";
-
-  return (
-    laptop.serial_number.toLowerCase().includes(query) ||
-    laptop.model_name.toLowerCase().includes(query) ||
-    laptop.cpu.toLowerCase().includes(query) ||
-    laptop.status.toLowerCase().includes(query) ||
-    assignedTo.toLowerCase().includes(query)
-  );
-}
-
-function StatCard({
+function Kpi({
   label,
   value,
-  subtext,
-  color,
+  delta,
+  sub,
+  first,
   onClick,
-  stagger,
 }: {
   label: string;
   value: string | number;
-  subtext?: string;
-  color?: string;
+  delta?: number | null;
+  sub?: string;
+  first?: boolean;
   onClick?: () => void;
-  stagger?: 1 | 2 | 3 | 4 | 5 | 6;
 }) {
-  const staggerClass = stagger ? `animate-stagger-${stagger}` : "";
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm ${staggerClass} ${
-        onClick
-          ? "cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-brand-200 dark:hover:border-brand-800"
-          : ""
+      className={`min-w-0 flex-1 px-4 py-3 ${first ? "" : "border-l border-border"} ${
+        onClick ? "cursor-pointer transition-colors hover:bg-surface-2/60" : ""
       }`}
     >
-      <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+      <div
+        className="mb-1 text-[11px] font-semibold uppercase text-fg-3"
+        style={{ letterSpacing: "0.06em" }}
+      >
         {label}
-      </p>
-      <p
-        className={`mt-1 text-3xl font-semibold tabular-nums tracking-tight ${color ?? "text-gray-900 dark:text-gray-100"}`}
+      </div>
+      <div
+        className="tnum text-fg"
+        style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}
       >
         {value}
-      </p>
-      {subtext && <p className="mt-0.5 text-xs text-gray-400">{subtext}</p>}
+      </div>
+      {(delta != null || sub) && (
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px]">
+          {delta != null && (
+            <span
+              className="font-medium"
+              style={{
+                color:
+                  delta > 0
+                    ? "var(--success)"
+                    : delta < 0
+                      ? "var(--danger)"
+                      : "var(--fg-3)",
+              }}
+            >
+              {delta > 0 ? "▲" : delta < 0 ? "▼" : "·"} {Math.abs(delta).toFixed(1)}%
+            </span>
+          )}
+          {sub && <span className="text-fg-3">{sub}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpendTrendChart({
+  years,
+  costByYear,
+  activeYear,
+  onSelectYear,
+}: {
+  years: number[];
+  costByYear: Record<number, number>;
+  activeYear: number;
+  onSelectYear: (y: number) => void;
+}) {
+  const w = 640;
+  const h = 180;
+  const padL = 40;
+  const padR = 10;
+  const padT = 10;
+  const padB = 26;
+  const iw = w - padL - padR;
+  const ih = h - padT - padB;
+
+  const values = years.map((y) => costByYear[y] ?? 0);
+  const max = Math.max(...values, 1);
+
+  const pts = years.map((y, i) => ({
+    x: years.length === 1 ? padL + iw / 2 : padL + (i / (years.length - 1)) * iw,
+    y: padT + ih - ((costByYear[y] ?? 0) / max) * ih,
+    year: y,
+    value: costByYear[y] ?? 0,
+  }));
+  const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+  const areaPath =
+    linePath +
+    ` L${pts[pts.length - 1].x},${padT + ih} L${pts[0].x},${padT + ih} Z`;
+
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ width: "100%", height: "auto" }}
+      preserveAspectRatio="none"
+    >
+      {[0.25, 0.5, 0.75, 1].map((f) => (
+        <line
+          key={f}
+          x1={padL}
+          x2={w - padR}
+          y1={padT + ih * (1 - f)}
+          y2={padT + ih * (1 - f)}
+          stroke="var(--border)"
+          strokeWidth={1}
+        />
+      ))}
+      <path d={areaPath} fill="var(--accent)" opacity={0.1} />
+      <path
+        d={linePath}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={1.75}
+        strokeLinejoin="round"
+      />
+      {pts.map((p) => (
+        <g key={p.year} style={{ cursor: "pointer" }} onClick={() => onSelectYear(p.year)}>
+          <circle
+            cx={p.x}
+            cy={p.y}
+            r={p.year === activeYear ? 4 : 2.5}
+            fill="var(--accent)"
+          />
+          <text
+            x={p.x}
+            y={h - 8}
+            fontSize={10.5}
+            textAnchor="middle"
+            fill={p.year === activeYear ? "var(--fg)" : "var(--fg-3)"}
+            fontFamily="'IBM Plex Mono', ui-monospace, monospace"
+            fontWeight={p.year === activeYear ? 600 : 400}
+          >
+            {p.year}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function UpcomingRenewals({ services }: { services: Service[] }) {
+  const navigate = useNavigate();
+  const today = useMemo(() => new Date(), []);
+  const upcoming = useMemo(() => {
+    return services
+      .filter((s) => !!s.renewal_date)
+      .map((s) => ({
+        s,
+        days: Math.round(
+          (new Date(s.renewal_date!).getTime() - today.getTime()) / 86400000,
+        ),
+      }))
+      .filter(({ days }) => days >= -2 && days <= 120)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 8);
+  }, [services, today]);
+
+  if (upcoming.length === 0) {
+    return (
+      <div className="py-6 text-center text-sm text-fg-3">
+        No renewals coming up in the next 120 days.
+      </div>
+    );
+  }
+
+  return (
+    <div className="-mx-1 flex flex-col">
+      {upcoming.map(({ s, days }) => {
+        const bg =
+          days < 30
+            ? "var(--danger-soft)"
+            : days < 60
+              ? "var(--warn-soft)"
+              : "var(--surface-2)";
+        const fg =
+          days < 30
+            ? "var(--danger)"
+            : days < 60
+              ? "var(--warn)"
+              : "var(--fg-3)";
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => navigate(`/services/${s.id}`)}
+            className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
+          >
+            <div
+              className="flex w-9 shrink-0 flex-col items-center justify-center rounded-md py-0.5 text-[10px] font-medium"
+              style={{ background: bg, color: fg }}
+            >
+              <span className="tnum" style={{ fontSize: 14, fontWeight: 600 }}>
+                {days}
+              </span>
+              <span>d</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div
+                className="truncate text-[13px] font-medium text-fg"
+                title={s.name}
+              >
+                {s.name}
+              </div>
+              <div className="truncate text-[11.5px] text-fg-3">
+                {s.vendor?.name ?? "—"}
+                {s.category_rel?.name ? ` · ${s.category_rel.name}` : ""}
+              </div>
+            </div>
+            {s.yearly_cost != null && (
+              <div className="tnum shrink-0 text-[12.5px] text-fg-2">
+                {formatMoneyCompact(Number(s.yearly_cost))}
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SpendByCategory({
+  records,
+  fiscalYear,
+}: {
+  records: { category_name: string | null; amount: number; fiscal_year: number }[];
+  fiscalYear: number;
+}) {
+  const byCat = useMemo(() => {
+    const map = new Map<string, number>();
+    records.forEach((r) => {
+      if (r.fiscal_year !== fiscalYear) return;
+      const key = (r.category_name ?? "").trim() || "(Uncategorized)";
+      map.set(key, (map.get(key) ?? 0) + r.amount);
+    });
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+  }, [records, fiscalYear]);
+
+  const total = byCat.reduce((s, d) => s + d.value, 0);
+  const max = byCat[0]?.value ?? 0;
+
+  if (byCat.length === 0) {
+    return <div className="py-6 text-center text-sm text-fg-3">No cost data for {fiscalYear}.</div>;
+  }
+
+  const tones: Array<"accent" | "info" | "purple" | "success" | "warn" | "danger"> = [
+    "accent",
+    "info",
+    "purple",
+    "success",
+    "warn",
+    "danger",
+  ];
+
+  return (
+    <div>
+      <div className="mb-3 flex h-2 overflow-hidden rounded bg-surface-2">
+        {byCat.map((d, i) => (
+          <div
+            key={d.name}
+            title={`${d.name}: ${formatMoneyCompact(d.value)}`}
+            style={{
+              width: `${(d.value / (total || 1)) * 100}%`,
+              background: `var(--${tones[i % tones.length]})`,
+              opacity: 0.85,
+              transition: "width 400ms cubic-bezier(.2,.8,.2,1)",
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        {byCat.map((d, i) => (
+          <BarRow
+            key={d.name}
+            label={d.name}
+            value={d.value}
+            max={max}
+            tone={tones[i % tones.length]}
+            rightLabel={formatMoneyCompact(d.value)}
+            labelWidth={150}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HardwareSnapshot({ laptops }: { laptops: Laptop[] }) {
+  const byStatus = useMemo(() => {
+    const m = new Map<string, number>();
+    laptops.forEach((l) => {
+      const key = l.hardware_status?.name ?? l.status ?? "—";
+      m.set(key, (m.get(key) ?? 0) + 1);
+    });
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  }, [laptops]);
+
+  const max = byStatus[0]?.[1] ?? 0;
+  const toneFor = (name: string): "accent" | "info" | "purple" | "success" | "warn" | "danger" => {
+    const n = name.toLowerCase();
+    if (n.includes("use") || n.includes("assigned")) return "success";
+    if (n.includes("stock")) return "info";
+    if (n.includes("repair") || n.includes("pending")) return "warn";
+    if (n.includes("retir") || n.includes("lost")) return "danger";
+    return "accent";
+  };
+
+  return (
+    <div>
+      <div className="mb-3 flex items-baseline gap-2">
+        <div
+          className="tnum text-fg"
+          style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}
+        >
+          {laptops.length}
+        </div>
+        <div className="text-[12px] text-fg-3">laptops tracked</div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {byStatus.map(([name, n]) => (
+          <BarRow
+            key={name}
+            label={name}
+            value={n}
+            max={max}
+            tone={toneFor(name)}
+            rightLabel={n}
+            labelWidth={120}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TopServicesBySpend({ services }: { services: Service[] }) {
+  const top = useMemo(() => {
+    return [...services]
+      .filter((s) => s.yearly_cost != null && Number(s.yearly_cost) > 0)
+      .sort((a, b) => Number(b.yearly_cost) - Number(a.yearly_cost))
+      .slice(0, 6);
+  }, [services]);
+
+  if (top.length === 0) {
+    return <div className="py-6 text-center text-sm text-fg-3">No services with spend yet.</div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {top.map((s) => (
+        <Link
+          key={s.id}
+          to={`/services/${s.id}`}
+          className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-surface-2"
+        >
+          <Monogram name={s.name} seed={s.id} size={24} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-medium text-fg">{s.name}</div>
+            <div className="truncate text-[11.5px] text-fg-3">
+              {s.vendor?.name ?? "—"}
+              {s.category_rel?.name ? ` · ${s.category_rel.name}` : ""}
+            </div>
+          </div>
+          <div className="tnum shrink-0 text-[12.5px] font-medium text-fg-2">
+            {formatMoneyCompact(Number(s.yearly_cost))}
+          </div>
+        </Link>
+      ))}
     </div>
   );
 }
 
 export function Dashboard() {
-  const emptyClassificationKey = "__none__";
-  const emptyCategoryKey = "__uncategorized__";
-  const emptyClassificationLabel = "(None)";
-  const emptyCategoryLabel = "(Uncategorized)";
   const { user, canFinancialView } = useAuth();
   const navigate = useNavigate();
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const { records, fiscalYears, loading: costLoading } = useDashboardCostData();
-  const [dashYear, setDashYear] = useState<number>(new Date().getFullYear());
-  const [dashYearInitialized, setDashYearInitialized] = useState(false);
-  const [selectedClassificationIndex, setSelectedClassificationIndex] = useState(0);
-  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
-  const [dashboardSearch, setDashboardSearch] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const [dashYearOverride, setDashYearOverride] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -119,178 +453,94 @@ export function Dashboard() {
       .finally(() => setInventoryLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (dashYearInitialized || fiscalYears.length === 0) return;
-    const currentYear = new Date().getFullYear();
-    setDashYear(
-      fiscalYears.includes(currentYear)
-        ? currentYear
-        : fiscalYears[fiscalYears.length - 1],
-    );
-    setDashYearInitialized(true);
-  }, [fiscalYears, dashYearInitialized]);
+  const currentYearValue = new Date().getFullYear();
+  const defaultDashYear =
+    fiscalYears.length === 0
+      ? currentYearValue
+      : fiscalYears.includes(currentYearValue)
+        ? currentYearValue
+        : fiscalYears[fiscalYears.length - 1];
+  const dashYear = dashYearOverride ?? defaultDashYear;
+  const setDashYear = (y: number) => setDashYearOverride(y);
 
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setSearchOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, []);
-
-  const years = fiscalYears;
   const loading = inventoryLoading || costLoading;
-  const normalizedSearch = dashboardSearch.trim().toLowerCase();
 
   const actualRecords = useMemo(
     () => records.filter((r) => r.record_type === "actual"),
     [records],
   );
-  const estimatedRecords = useMemo(
-    () => records.filter((r) => r.record_type === "estimated"),
-    [records],
+  const currentYear = currentYearValue;
+
+  const actualByYear = useMemo(
+    () => totalByYear(actualRecords, fiscalYears),
+    [actualRecords, fiscalYears],
   );
-  const currentYear = new Date().getFullYear();
-  const showProjectedValues = isCurrentOrFutureFiscalYear(dashYear, currentYear);
-
-  const classificationOptions = useMemo(() => {
-    const unique = new Set<string>();
-    records.forEach((record) => {
-      unique.add((record.classification ?? "").trim() || emptyClassificationKey);
-    });
-    return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [records]);
-
-  const categoryOptions = useMemo(() => {
-    const unique = new Set<string>();
-    records.forEach((record) => {
-      unique.add((record.category_name ?? "").trim() || emptyCategoryKey);
-    });
-    return Array.from(unique).sort((a, b) => a.localeCompare(b));
-  }, [records]);
-
-  useEffect(() => {
-    setSelectedClassificationIndex((prev) =>
-      classificationOptions.length === 0
-        ? 0
-        : Math.min(prev, classificationOptions.length - 1),
-    );
-  }, [classificationOptions]);
-
-  useEffect(() => {
-    setSelectedCategoryIndex((prev) =>
-      categoryOptions.length === 0 ? 0 : Math.min(prev, categoryOptions.length - 1),
-    );
-  }, [categoryOptions]);
-
-  const selectedClassificationKey =
-    classificationOptions[selectedClassificationIndex] ?? emptyClassificationKey;
-  const selectedCategoryKey = categoryOptions[selectedCategoryIndex] ?? emptyCategoryKey;
-
-  const selectedClassificationLabel =
-    selectedClassificationKey === emptyClassificationKey
-      ? emptyClassificationLabel
-      : selectedClassificationKey;
-  const selectedCategoryLabel =
-    selectedCategoryKey === emptyCategoryKey ? emptyCategoryLabel : selectedCategoryKey;
-
-  const serviceMatches = useMemo(() => {
-    if (!normalizedSearch) {
-      return [];
-    }
-
-    return services
-      .filter((service) => matchesServiceSearch(service, normalizedSearch))
-      .slice(0, 5);
-  }, [normalizedSearch, services]);
-
-  const laptopMatches = useMemo(() => {
-    if (!normalizedSearch) {
-      return [];
-    }
-
-    return laptops
-      .filter((laptop) => matchesLaptopSearch(laptop, normalizedSearch))
-      .slice(0, 5);
-  }, [laptops, normalizedSearch]);
-
-  const actualCostByYear = useMemo(
-    () => totalByYear(actualRecords, years),
-    [actualRecords, years],
-  );
-  const combinedActualEstimatedCostByYear = useMemo(
-    () => combinedActualEstimatedByYear(records, years, currentYear),
-    [records, years, currentYear],
+  const combinedByYear = useMemo(
+    () => combinedActualEstimatedByYear(records, fiscalYears, currentYear),
+    [records, fiscalYears, currentYear],
   );
   const costByYear = useMemo(
     () =>
-      years.reduce<Record<number, number>>((acc, year) => {
+      fiscalYears.reduce<Record<number, number>>((acc, year) => {
         acc[year] = visualAmountForRecordTypeAndYear(
           "actual",
           year,
-          actualCostByYear[year] ?? 0,
-          combinedActualEstimatedCostByYear[year] ?? 0,
+          actualByYear[year] ?? 0,
+          combinedByYear[year] ?? 0,
           currentYear,
         );
         return acc;
       }, {}),
-    [years, actualCostByYear, combinedActualEstimatedCostByYear, currentYear],
+    [fiscalYears, actualByYear, combinedByYear, currentYear],
   );
 
-  const yoyChange = useMemo(
-    () => yoyPercent(costByYear, dashYear),
-    [costByYear, dashYear],
-  );
+  const yoyChange = useMemo(() => yoyPercent(costByYear, dashYear), [costByYear, dashYear]);
 
-  const classificationTotal = useMemo(
+  const today = useMemo(() => new Date(), []);
+  const upcoming30 = useMemo(
     () =>
-      showProjectedValues
-        ? sumForYearAndClassification(
-            actualRecords,
-            dashYear,
-            selectedClassificationKey,
-          ) +
-          sumForYearAndClassification(
-            estimatedRecords,
-            dashYear,
-            selectedClassificationKey,
-          )
-        : sumForYearAndClassification(
-            actualRecords,
-            dashYear,
-            selectedClassificationKey,
-          ),
-    [
-      showProjectedValues,
-      actualRecords,
-      estimatedRecords,
-      dashYear,
-      selectedClassificationKey,
-    ],
+      services.filter((s) => {
+        if (!s.renewal_date) return false;
+        const d =
+          (new Date(s.renewal_date).getTime() - today.getTime()) / 86400000;
+        return d >= 0 && d <= 30;
+      }).length,
+    [services, today],
+  );
+  const upcoming90 = useMemo(
+    () =>
+      services.filter((s) => {
+        if (!s.renewal_date) return false;
+        const d =
+          (new Date(s.renewal_date).getTime() - today.getTime()) / 86400000;
+        return d >= 0 && d <= 90;
+      }).length,
+    [services, today],
   );
 
-  const categoryTotal = useMemo(
-    () => {
-      const selectedCategoryAmount = (collection: typeof records) =>
-        collection.reduce((total, record) => {
-          if (record.fiscal_year !== dashYear) return total;
-          const key = (record.category_name ?? "").trim() || emptyCategoryKey;
-          return key === selectedCategoryKey ? total + record.amount : total;
-        }, 0);
-      return showProjectedValues
-        ? selectedCategoryAmount(actualRecords) + selectedCategoryAmount(estimatedRecords)
-        : selectedCategoryAmount(actualRecords);
-    },
-    [
-      showProjectedValues,
-      actualRecords,
-      estimatedRecords,
-      dashYear,
-      selectedCategoryKey,
-    ],
+  const laptopsInUse = useMemo(() => {
+    return laptops.filter((l) => {
+      const n = (l.hardware_status?.name ?? l.status ?? "").toLowerCase();
+      return n.includes("assigned") || n.includes("use");
+    }).length;
+  }, [laptops]);
+
+  const laptopsInStock = useMemo(() => {
+    return laptops.filter((l) => {
+      const n = (l.hardware_status?.name ?? l.status ?? "").toLowerCase();
+      return n.includes("stock");
+    }).length;
+  }, [laptops]);
+
+  const ssoPct = useMemo(() => {
+    if (services.length === 0) return 0;
+    const n = services.filter((s) => s.sso_integrated).length;
+    return Math.round((n * 100) / services.length);
+  }, [services]);
+
+  const activeServices = useMemo(
+    () => services.filter((s) => s.is_active).length,
+    [services],
   );
 
   if (loading) {
@@ -298,268 +548,158 @@ export function Dashboard() {
   }
 
   const hasCostData = records.length > 0;
+  const todayLabel = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <PageTransition>
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Dashboard</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Welcome{user?.email ? `, ${user.email}` : ""}.
-      </p>
-
-      <div className="mt-8 flex justify-center">
-        <div className="relative w-full max-w-3xl" ref={searchRef}>
-          <div className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 shadow-sm">
-            <SearchInput
-              value={dashboardSearch}
-              onChange={(value) => {
-                setDashboardSearch(value);
-                setSearchOpen(true);
-              }}
-              onFocus={() => {
-                if (normalizedSearch) {
-                  setSearchOpen(true);
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setSearchOpen(false);
-                }
-              }}
-              placeholder="Search services and hardware..."
-              bare
-              inputClassName="rounded-full py-4 pl-12 pr-5 text-base"
-              iconClassName="left-5 h-5 w-5"
-            />
-          </div>
-          {searchOpen && normalizedSearch && (
-            <div className="animate-scale-in absolute left-0 top-full z-20 mt-3 w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xl">
-              <div className="space-y-4">
-                {serviceMatches.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Services
-                    </p>
-                    <div className="space-y-1">
-                      {serviceMatches.map((service) => (
-                        <button
-                          key={service.id}
-                          type="button"
-                          onClick={() => {
-                            setSearchOpen(false);
-                            setDashboardSearch("");
-                            navigate(`/services/${service.id}`);
-                          }}
-                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <span>
-                            <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {service.name}
-                            </span>
-                            <span className="block text-xs text-gray-500 dark:text-gray-400">
-                              {service.category_rel?.name ?? "—"} • {service.status}
-                            </span>
-                          </span>
-                          <span className="ml-4 text-xs text-gray-400">
-                            Service
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {laptopMatches.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Hardware
-                    </p>
-                    <div className="space-y-1">
-                      {laptopMatches.map((laptop) => (
-                        <button
-                          key={laptop.id}
-                          type="button"
-                          onClick={() => {
-                            setSearchOpen(false);
-                            setDashboardSearch("");
-                            navigate(`/hardware/${laptop.id}`);
-                          }}
-                          className="flex w-full items-start justify-between rounded-xl px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <span>
-                            <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {laptop.model_name}
-                            </span>
-                            <span className="block text-xs text-gray-500 dark:text-gray-400">
-                              {laptop.serial_number} • {laptop.status}
-                            </span>
-                          </span>
-                          <span className="ml-4 text-xs text-gray-400">
-                            Hardware
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {serviceMatches.length === 0 && laptopMatches.length === 0 && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    No matching services or hardware found.
-                  </p>
-                )}
-              </div>
+      <div className="mx-auto max-w-[1280px]">
+        {/* Hero */}
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[12px] text-fg-3">
+              {todayLabel}
             </div>
+            <h1
+              className="text-fg"
+              style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+            >
+              {greetingForNow(user?.email)}
+            </h1>
+            <div className="mt-1 text-[14px] text-fg-3">
+              <span className="text-fg-2 font-medium">{upcoming30}</span>{" "}
+              renewal{upcoming30 === 1 ? "" : "s"} in the next 30 days ·{" "}
+              <span className="text-fg-2 font-medium">{laptopsInStock}</span>{" "}
+              laptop{laptopsInStock === 1 ? "" : "s"} in stock
+            </div>
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div className="mb-4 flex flex-wrap rounded-[10px] border border-border bg-surface shadow-sm">
+          <Kpi
+            first
+            label="Active services"
+            value={activeServices}
+            sub={`of ${services.length}`}
+            onClick={() => navigate("/services")}
+          />
+          <Kpi
+            label="Renewals · 90d"
+            value={upcoming90}
+            sub={`${upcoming30} urgent`}
+            onClick={() => navigate("/calendar")}
+          />
+          <Kpi
+            label="Laptops deployed"
+            value={laptopsInUse}
+            sub={`of ${laptops.length}`}
+            onClick={() => navigate("/hardware")}
+          />
+          {canFinancialView && hasCostData && (
+            <Kpi
+              label={`Spend · FY${dashYear}`}
+              value={formatMoneyCompact(costByYear[dashYear] ?? 0)}
+              delta={Number.isFinite(yoyChange) ? yoyChange : null}
+              sub="vs prior year"
+              onClick={() => navigate("/costs")}
+            />
           )}
+          <Kpi label="SSO coverage" value={`${ssoPct}%`} sub="target 80%" />
+        </div>
+
+        {/* Main grid */}
+        <div className="grid grid-cols-12 gap-4">
+          {canFinancialView && hasCostData && (
+            <WidgetCard
+              title="Annualized spend trend"
+              span={8}
+              right={
+                <div
+                  className="tnum text-fg-3"
+                  style={{ fontSize: 12, letterSpacing: "0.02em" }}
+                >
+                  FY{fiscalYears[0]} – FY{fiscalYears[fiscalYears.length - 1]}
+                </div>
+              }
+            >
+              <SpendTrendChart
+                years={fiscalYears}
+                costByYear={costByYear}
+                activeYear={dashYear}
+                onSelectYear={setDashYear}
+              />
+              <div className="mt-2 flex justify-end">
+                <Link
+                  to="/costs"
+                  className="text-[12px] text-accent hover:text-accent-strong"
+                >
+                  View full report →
+                </Link>
+              </div>
+            </WidgetCard>
+          )}
+
+          <WidgetCard
+            title="Upcoming renewals"
+            span={canFinancialView && hasCostData ? 4 : 6}
+            right={
+              <Link
+                to="/calendar"
+                className="text-[12px] text-fg-3 hover:text-fg-2"
+              >
+                Calendar →
+              </Link>
+            }
+          >
+            <UpcomingRenewals services={services} />
+          </WidgetCard>
+
+          {canFinancialView && hasCostData && (
+            <WidgetCard
+              title={`Spend by category · FY${dashYear}`}
+              span={6}
+              right={
+                <Link to="/costs" className="text-[12px] text-fg-3 hover:text-fg-2">
+                  Drill down →
+                </Link>
+              }
+            >
+              <SpendByCategory records={records} fiscalYear={dashYear} />
+            </WidgetCard>
+          )}
+
+          <WidgetCard
+            title="Hardware snapshot"
+            span={canFinancialView && hasCostData ? 6 : 6}
+            right={
+              <Link to="/hardware" className="text-[12px] text-fg-3 hover:text-fg-2">
+                All hardware →
+              </Link>
+            }
+          >
+            <HardwareSnapshot laptops={laptops} />
+          </WidgetCard>
+
+          <WidgetCard
+            title="Top services by spend"
+            span={12}
+            right={
+              <Link
+                to="/services"
+                className="text-[12px] text-fg-3 hover:text-fg-2"
+              >
+                All services →
+              </Link>
+            }
+          >
+            <TopServicesBySpend services={services} />
+          </WidgetCard>
         </div>
       </div>
-
-      {/* Inventory stats */}
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard
-          label="Total Services"
-          value={services.length}
-          onClick={() => navigate("/services")}
-          stagger={1}
-        />
-        <StatCard
-          label="Total Laptops"
-          value={laptops.length}
-          onClick={() => navigate("/hardware")}
-          stagger={2}
-        />
-        <StatCard
-          label="Assigned Laptops"
-          value={laptops.filter((l) => l.status === "Assigned").length}
-          stagger={3}
-        />
-        <StatCard
-          label="In Stock"
-          value={laptops.filter((l) => l.status === "In Stock").length}
-          stagger={4}
-        />
-      </div>
-
-      {canFinancialView && hasCostData && (
-        <>
-          {/* Year selector */}
-          <div className="mt-8 flex items-center gap-3">
-            <span className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Fiscal year:
-            </span>
-            <div className="inline-flex gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
-              {years.map((y) => (
-                <button
-                  key={y}
-                  onClick={() => setDashYear(y)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium transition-all duration-150 ${
-                    dashYear === y
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Cost KPIs (actual + estimated for current/future years) */}
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatCard
-              label={
-                showProjectedValues
-                  ? "Total spend (actual + estimated)"
-                  : "Total spend (actual)"
-              }
-              value={fmtFull(costByYear[dashYear] ?? 0)}
-            />
-            <StatCard
-              label={
-                showProjectedValues
-                  ? "YoY change (actual + estimated)"
-                  : "YoY change (actual)"
-              }
-              value={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(1)}%`}
-              color={yoyChange < 0 ? "text-emerald-600" : yoyChange > 0 ? "text-red-600" : "text-gray-900 dark:text-gray-100"}
-            />
-            <StatCard
-              label={
-                showProjectedValues
-                  ? `Classification: ${selectedClassificationLabel} (actual + estimated)`
-                  : `Classification: ${selectedClassificationLabel} (actual)`
-              }
-              value={fmtFull(classificationTotal)}
-              color="text-purple-700"
-              subtext="Click to cycle"
-              onClick={() =>
-                setSelectedClassificationIndex((prev) =>
-                  classificationOptions.length === 0
-                    ? 0
-                    : (prev + 1) % classificationOptions.length,
-                )
-              }
-            />
-            <StatCard
-              label={
-                showProjectedValues
-                  ? `Category: ${selectedCategoryLabel} (actual + estimated)`
-                  : `Category: ${selectedCategoryLabel} (actual)`
-              }
-              value={fmtFull(categoryTotal)}
-              color="text-blue-700"
-              subtext="Click to cycle"
-              onClick={() =>
-                setSelectedCategoryIndex((prev) =>
-                  categoryOptions.length === 0 ? 0 : (prev + 1) % categoryOptions.length,
-                )
-              }
-            />
-          </div>
-
-          {records.length > 0 && actualRecords.length === 0 && (
-            <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
-              There are cost records, but none marked as actual. Add actual amounts or open the IT Financial Report to include other record types.
-            </p>
-          )}
-
-          {/* Total spend by year */}
-          <div className="mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Total spend by year (actual; current/future includes estimated)
-            </h3>
-            <BarChart
-              data={years.map((y) => ({
-                label: String(y),
-                value: costByYear[y] ?? 0,
-                color: y === dashYear ? "var(--color-brand-600)" : "var(--color-brand-200)",
-              }))}
-              onBarClick={(i) => {
-                const y = years[i];
-                if (y !== undefined) setDashYear(y);
-              }}
-            />
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 rounded-xl border border-brand-200 bg-brand-50/80 p-5 dark:border-brand-900 dark:bg-brand-950/40 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                IT Financial Report
-              </p>
-              <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
-                Compare actual, estimated, and budget; filter, export, and print.
-              </p>
-            </div>
-            <Link
-              to="/costs"
-              className="inline-flex shrink-0 items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
-            >
-              Open IT Financial Report
-            </Link>
-          </div>
-        </>
-      )}
-    </div>
     </PageTransition>
   );
 }
