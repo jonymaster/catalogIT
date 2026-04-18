@@ -20,7 +20,6 @@ import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
 import { LaptopDetail } from "./pages/LaptopDetail";
 import { ServiceCreate } from "./pages/ServiceCreate";
-import { ServiceEdit } from "./pages/ServiceEdit";
 import { LaptopCreate } from "./pages/LaptopCreate";
 import { LaptopEdit } from "./pages/LaptopEdit";
 import { PersonalSettings } from "./pages/PersonalSettings";
@@ -71,7 +70,6 @@ export default function App() {
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
-                <Route path="/services/:id/edit" element={<ServiceEdit />} />
                 <Route path="/hardware" element={<Hardware />} />
                 <Route path="/hardware/new" element={<LaptopCreate />} />
                 <Route path="/hardware/:id" element={<LaptopDetail />} />
