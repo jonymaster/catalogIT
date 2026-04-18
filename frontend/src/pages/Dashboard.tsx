@@ -202,6 +202,7 @@ export function Dashboard() {
   const searchRef = useRef<HTMLDivElement>(null);
   const dashboardPreferencesHydratedRef = useRef(false);
   const lastSyncedDashboardSignatureRef = useRef<string | null>(null);
+  const dashboardPreferencesRequestIdRef = useRef(0);
 
   useEffect(() => {
     Promise.all([
@@ -275,12 +276,11 @@ export function Dashboard() {
     const sourcePreferences = hasProfilePreferences
       ? profileDashboardPreferences
       : storedDashboardPreferences;
+    const hydratedSignature = JSON.stringify(sourcePreferences);
 
     const timeoutId = window.setTimeout(() => {
       setVisibleWidgetIds(sourcePreferences.visible_widget_ids ?? []);
-      lastSyncedDashboardSignatureRef.current = hasProfilePreferences
-        ? JSON.stringify(profileDashboardPreferences)
-        : null;
+      lastSyncedDashboardSignatureRef.current = hydratedSignature;
       dashboardPreferencesHydratedRef.current = true;
     }, 0);
 
@@ -309,6 +309,8 @@ export function Dashboard() {
     }
 
     const timeoutId = window.setTimeout(() => {
+      const requestId = dashboardPreferencesRequestIdRef.current + 1;
+      dashboardPreferencesRequestIdRef.current = requestId;
       client
         .patch<UserPreferences>("/api/me/preferences", {
           ui_preferences: {
@@ -316,10 +318,16 @@ export function Dashboard() {
           },
         })
         .then((response) => {
+          if (requestId !== dashboardPreferencesRequestIdRef.current) {
+            return;
+          }
           lastSyncedDashboardSignatureRef.current = serialized;
           setPreferences(response.data);
         })
         .catch(() => {
+          if (requestId !== dashboardPreferencesRequestIdRef.current) {
+            return;
+          }
           // Keep the local fallback in place if profile sync fails.
         });
     }, 250);

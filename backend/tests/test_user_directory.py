@@ -73,6 +73,17 @@ class UserDirectorySearchTest(unittest.TestCase):
         self.assertIn("lower(coalesce(users.department", sql)
         self.assertIn("%alice%", sql)
 
+    def test_query_escapes_like_metacharacters(self) -> None:
+        stmt = _apply_directory_search(select(User), r"50%_off")
+        compiled = stmt.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+        sql = str(compiled).lower()
+
+        self.assertIn(r" escape '\\'", sql)
+        self.assertIn(r"50\\%%\\_off", sql)
+
 
 class UserProfileRouteTest(unittest.TestCase):
     def test_profile_includes_owned_services_assigned_services_and_laptops(self) -> None:

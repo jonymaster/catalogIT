@@ -524,6 +524,7 @@ export function Services() {
   const navigate = useNavigate();
   const serviceListPreferencesHydratedRef = useRef(false);
   const lastSyncedServiceListSignatureRef = useRef<string | null>(null);
+  const serviceListPreferencesRequestIdRef = useRef(0);
 
   const profileServiceListPreferences = useMemo(
     () => normalizeServiceListPreferences(preferences?.ui_preferences.service_list),
@@ -549,14 +550,13 @@ export function Services() {
     const sourcePreferences = hasProfilePreferences
       ? profileServiceListPreferences
       : storedServiceListPreferences;
+    const hydratedSignature = JSON.stringify(sourcePreferences);
 
     const timeoutId = window.setTimeout(() => {
       setVisibleKeys([...sourcePreferences.visible_columns]);
       setFilters(cloneServiceFilters(sourcePreferences.filters));
       setSortState({ ...sourcePreferences.sort });
-      lastSyncedServiceListSignatureRef.current = hasProfilePreferences
-        ? JSON.stringify(profileServiceListPreferences)
-        : null;
+      lastSyncedServiceListSignatureRef.current = hydratedSignature;
       serviceListPreferencesHydratedRef.current = true;
     }, 0);
 
@@ -585,6 +585,8 @@ export function Services() {
     }
 
     const timeoutId = window.setTimeout(() => {
+      const requestId = serviceListPreferencesRequestIdRef.current + 1;
+      serviceListPreferencesRequestIdRef.current = requestId;
       client
         .patch<UserPreferences>("/api/me/preferences", {
           ui_preferences: {
@@ -592,10 +594,16 @@ export function Services() {
           },
         })
         .then((response) => {
+          if (requestId !== serviceListPreferencesRequestIdRef.current) {
+            return;
+          }
           lastSyncedServiceListSignatureRef.current = serialized;
           setPreferences(response.data);
         })
         .catch(() => {
+          if (requestId !== serviceListPreferencesRequestIdRef.current) {
+            return;
+          }
           // Keep local fallback state if profile sync fails.
         });
     }, 300);
