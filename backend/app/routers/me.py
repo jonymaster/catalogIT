@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,9 @@ from app.models.user import User
 from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferencesUpdate, UserRead, user_read_from_orm
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+
+_MAX_UI_PREFERENCES_DEPTH = 8
+_MAX_UI_PREFERENCES_JSON_BYTES = 64 * 1024
 
 
 def _normalized_ui_preferences(value: Any) -> dict[str, Any]:
@@ -32,6 +36,37 @@ def _deep_merge_preferences(
             continue
         merged[key] = value
     return merged
+
+
+def _validate_ui_preferences_depth(value: Any, *, depth: int = 0) -> None:
+    if depth > _MAX_UI_PREFERENCES_DEPTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences exceed maximum nesting depth",
+        )
+
+    if isinstance(value, dict):
+        for nested_value in value.values():
+            _validate_ui_preferences_depth(nested_value, depth=depth + 1)
+        return
+
+    if isinstance(value, list):
+        for nested_value in value:
+            _validate_ui_preferences_depth(nested_value, depth=depth + 1)
+
+
+def _validate_ui_preferences_size(value: dict[str, Any]) -> None:
+    serialized = json.dumps(value, separators=(",", ":"), sort_keys=True)
+    if len(serialized.encode("utf-8")) > _MAX_UI_PREFERENCES_JSON_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences exceed maximum size",
+        )
+
+
+def _validate_ui_preferences(value: dict[str, Any]) -> None:
+    _validate_ui_preferences_depth(value)
+    _validate_ui_preferences_size(value)
 
 
 @router.get("/profile", response_model=UserRead)
@@ -151,10 +186,12 @@ async def update_preferences(
             if value is None:
                 user.ui_preferences = {}
             else:
-                user.ui_preferences = _deep_merge_preferences(
+                merged_preferences = _deep_merge_preferences(
                     _normalized_ui_preferences(user.ui_preferences),
                     value,
                 )
+                _validate_ui_preferences(merged_preferences)
+                user.ui_preferences = merged_preferences
             continue
         setattr(user, field, value.strip() or None if isinstance(value, str) else value)
 

@@ -200,6 +200,12 @@ function dimensionColor(dimension: DashboardCostDimension, key: string) {
   return getCategoryColor(`${dimension}:${key || "__none__"}`);
 }
 
+function dimensionVisualizationLabel(dimension: DashboardCostDimension) {
+  return dimension === "team"
+    ? "Team attribution"
+    : DASHBOARD_COST_DIMENSION_LABEL[dimension];
+}
+
 function formatRecordType(recordType: string) {
   return RECORD_TYPE_OPTIONS.find((option) => option.value === recordType)?.label ?? recordType;
 }
@@ -514,6 +520,11 @@ export function CostsReport() {
         })),
     [drilldownRecords],
   );
+
+  const teamAttributionVisible =
+    analysisMode === "dimension"
+      ? primaryDimension === "team" || effectiveSecondaryDimension === "team"
+      : effectiveSecondaryDimension === "team";
 
   function resetFilters() {
     setSource("all");
@@ -1128,17 +1139,25 @@ export function CostsReport() {
             }
             subtext={
               analysisMode === "dimension"
-                ? `Ranking by ${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension].toLowerCase()}`
-                : `Stacked by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension].toLowerCase()}`
+                ? `Ranking by ${dimensionVisualizationLabel(primaryDimension).toLowerCase()}`
+                : `Stacked by ${dimensionVisualizationLabel(effectiveSecondaryDimension).toLowerCase()}`
             }
           />
         </div>
+
+        {teamAttributionVisible && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+            Team attribution is inclusive. Services owned by multiple departments
+            contribute to each matching team bucket, so team totals can exceed the
+            overall spend in scope.
+          </div>
+        )}
 
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               {analysisMode === "dimension"
-                ? `Spend by ${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension]}`
+                ? `Spend by ${dimensionVisualizationLabel(primaryDimension)}`
                 : "Spend by fiscal year"}
             </h2>
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
@@ -1176,8 +1195,8 @@ export function CostsReport() {
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               {analysisMode === "dimension"
-                ? `${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension]} split by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension]}`
-                : `Fiscal year split by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension]}`}
+                ? `${dimensionVisualizationLabel(primaryDimension)} split by ${dimensionVisualizationLabel(effectiveSecondaryDimension)}`
+                : `Fiscal year split by ${dimensionVisualizationLabel(effectiveSecondaryDimension)}`}
             </h2>
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
               Click a stack to drill into a group, or click a segment to isolate a specific slice.

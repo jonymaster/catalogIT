@@ -50,6 +50,8 @@ interface FormData {
   total_seats: string;
 }
 
+type RelatedServiceOption = Pick<Service, "id" | "name" | "is_active">;
+
 type ServiceFieldErrorKey =
   | "name"
   | "owner_ids"
@@ -104,7 +106,7 @@ export function ServiceForm({ initial }: Props) {
   >({});
 
   const [users, setUsers] = useState<User[]>([]);
-  const [serviceOptions, setServiceOptions] = useState<Service[]>([]);
+  const [serviceOptions, setServiceOptions] = useState<RelatedServiceOption[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -135,6 +137,23 @@ export function ServiceForm({ initial }: Props) {
       setServiceClassifications(cl.data);
     });
   }, []);
+
+  const relatedServiceOptions = useMemo(() => {
+    const merged = new Map<string, RelatedServiceOption>();
+
+    serviceOptions.forEach((service) => {
+      merged.set(service.id, service);
+    });
+    initial?.related_services.forEach((service) => {
+      if (!merged.has(service.id)) {
+        merged.set(service.id, service);
+      }
+    });
+
+    return Array.from(merged.values()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+  }, [initial?.related_services, serviceOptions]);
 
   useEffect(() => {
     if (serviceStatuses.length === 0) {
@@ -417,11 +436,12 @@ export function ServiceForm({ initial }: Props) {
                 )
               }
             >
-              {serviceOptions
+              {relatedServiceOptions
                 .filter((service) => service.id !== initial?.id)
                 .map((service) => (
                   <option key={service.id} value={service.id}>
                     {service.name}
+                    {service.is_active ? "" : " (archived)"}
                   </option>
                 ))}
             </select>
