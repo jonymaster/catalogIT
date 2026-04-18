@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from math import ceil
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
@@ -96,7 +97,7 @@ async def list_users_for_directory(
 
 @router.get("/{user_id}/profile", response_model=UserProfileRead)
 async def get_user_profile(
-    user_id: str,
+    user_id: uuid.UUID,
     _current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_audited_db),
 ):

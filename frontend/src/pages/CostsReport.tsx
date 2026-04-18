@@ -20,7 +20,7 @@ import {
   classificationDisplayName,
   costCenterFilterOptions,
   dimensionFilterOptions,
-  dimensionValueForRecord,
+  dimensionValuesForRecord,
   distinctCategoryNames,
   distinctClassifications,
   environmentDisplayName,
@@ -34,6 +34,7 @@ import {
   vendorDisplayName,
   sourceDisplayName,
   buildStackedDimensionData,
+  recordMatchesDimensionKey,
 } from "../utils/dashboardCostAggregates";
 
 type RecordType = "actual" | "estimated" | "budget";
@@ -217,17 +218,18 @@ function timeStackGroups(
     records
       .filter((record) => record.fiscal_year === year)
       .forEach((record) => {
-        const value = dimensionValueForRecord(record, secondaryDimension);
-        const existing = slices.get(value.key);
-        if (existing) {
-          existing.value += record.amount;
-          return;
-        }
-        slices.set(value.key, {
-          id: value.key,
-          name: value.label,
-          value: record.amount,
-          color: dimensionColor(secondaryDimension, value.key),
+        dimensionValuesForRecord(record, secondaryDimension).forEach((value) => {
+          const existing = slices.get(value.key);
+          if (existing) {
+            existing.value += record.amount;
+            return;
+          }
+          slices.set(value.key, {
+            id: value.key,
+            name: value.label,
+            value: record.amount,
+            color: dimensionColor(secondaryDimension, value.key),
+          });
         });
       });
 
@@ -467,15 +469,19 @@ export function CostsReport() {
       }
 
       if (analysisMode === "dimension" && drilldown.primaryKey != null) {
-        const value = dimensionValueForRecord(record, primaryDimension);
-        if (value.key !== drilldown.primaryKey) {
+        if (!recordMatchesDimensionKey(record, primaryDimension, drilldown.primaryKey)) {
           return false;
         }
       }
 
       if (drilldown.secondaryKey != null) {
-        const value = dimensionValueForRecord(record, effectiveSecondaryDimension);
-        if (value.key !== drilldown.secondaryKey) {
+        if (
+          !recordMatchesDimensionKey(
+            record,
+            effectiveSecondaryDimension,
+            drilldown.secondaryKey,
+          )
+        ) {
           return false;
         }
       }
@@ -619,7 +625,9 @@ export function CostsReport() {
       categoryDisplayName(row.category_name ?? ""),
       subcategoryDisplayName(row.subcategory_name ?? ""),
       classificationDisplayName(row.classification ?? "", row.classification_name),
-      teamDisplayName(row.team_name ?? ""),
+      row.team_names.length > 0
+        ? row.team_names.map((team) => teamDisplayName(team)).join(", ")
+        : teamDisplayName(""),
       environmentDisplayName(row.environment_name ?? ""),
       row.cost_center_name ?? (row.source === "hardware" ? "Hardware (assets)" : "(No cost center)"),
       String(row.fiscal_year),
@@ -744,11 +752,16 @@ export function CostsReport() {
         key: "team_name",
         header: "Team",
         render: (row) =>
-          row.team_name?.trim() ? (
-            <QuickFilterButton
-              label={teamDisplayName(row.team_name)}
-              onClick={() => handleQuickFilter("team", row.team_name ?? "")}
-            />
+          row.team_names.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {row.team_names.map((teamName) => (
+                <QuickFilterButton
+                  key={teamName}
+                  label={teamDisplayName(teamName)}
+                  onClick={() => handleQuickFilter("team", teamName)}
+                />
+              ))}
+            </div>
           ) : (
             "—"
           ),

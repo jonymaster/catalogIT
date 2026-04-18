@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -38,6 +38,7 @@ class CostRecordOut(BaseModel):
     subcategory_name: str | None = None
     environment_name: str | None = None
     team_name: str | None = None
+    team_names: list[str] = Field(default_factory=list)
     fiscal_year: int
     amount: float
     record_type: str
@@ -130,6 +131,7 @@ async def get_dashboard(
                     subcategory_name=svc.subcategory,
                     environment_name=svc.environment,
                     team_name=", ".join(team_names) if team_names else None,
+                    team_names=team_names,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,
@@ -161,6 +163,7 @@ async def get_dashboard(
                     subcategory_name=None,
                     environment_name=None,
                     team_name=None,
+                    team_names=[],
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,

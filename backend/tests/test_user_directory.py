@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+from collections.abc import AsyncGenerator
 from types import SimpleNamespace
 import unittest
 import uuid
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 
+from app.dependencies.auth import get_current_user
+from app.dependencies.db import get_audited_db
+from app.routers import user_directory
 from app.routers.user_directory import _apply_directory_search, get_user_profile
 from app.models.user import User
 
@@ -70,6 +76,25 @@ class UserDirectorySearchTest(unittest.TestCase):
 
 
 class UserProfileRouteTest(unittest.TestCase):
+    def test_profile_route_rejects_invalid_uuid_path_param(self) -> None:
+        app = FastAPI()
+        app.include_router(user_directory.router)
+
+        async def override_current_user() -> SimpleNamespace:
+            return SimpleNamespace(id=uuid.uuid4(), role="viewer")
+
+        async def override_db() -> AsyncGenerator[SimpleNamespace, None]:
+            yield SimpleNamespace()
+
+        app.dependency_overrides[get_current_user] = override_current_user
+        app.dependency_overrides[get_audited_db] = override_db
+        client = TestClient(app)
+
+        response = client.get("/api/users/not-a-uuid/profile")
+
+        self.assertEqual(response.status_code, 422)
+        client.close()
+
     def test_profile_includes_owned_services_assigned_services_and_laptops(self) -> None:
         async def run() -> None:
             user_id = uuid.uuid4()
@@ -123,7 +148,7 @@ class UserProfileRouteTest(unittest.TestCase):
             )
 
             profile = await get_user_profile(
-                str(user_id),
+                user_id,
                 _current_user=SimpleNamespace(id=uuid.uuid4(), role="viewer"),
                 db=db,
             )

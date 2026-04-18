@@ -29,6 +29,7 @@ export interface DashboardCostRecord {
   subcategory_name: string | null;
   environment_name: string | null;
   team_name: string | null;
+  team_names: string[];
   fiscal_year: number;
   amount: number;
   record_type: string;
