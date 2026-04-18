@@ -47,7 +47,7 @@ class LaptopUpdate(BaseModel):
     @classmethod
     def validate_optional_text(cls, value: str | None) -> str | None:
         if value is None:
-            return value
+            raise ValueError("field cannot be null")
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("field cannot be blank")

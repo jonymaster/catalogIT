@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,9 @@ from app.models.user import User
 from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferencesUpdate, UserRead, user_read_from_orm
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+
+_ALLOWED_UI_PREFERENCE_KEYS = {"dashboard", "service_list"}
+_MAX_UI_PREFERENCES_BYTES = 32 * 1024
 
 
 def _normalized_ui_preferences(value: Any) -> dict[str, Any]:
@@ -32,6 +36,22 @@ def _deep_merge_preferences(
             continue
         merged[key] = value
     return merged
+
+
+def _validate_ui_preferences(value: dict[str, Any]) -> None:
+    unknown_keys = sorted(key for key in value if key not in _ALLOWED_UI_PREFERENCE_KEYS)
+    if unknown_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown UI preference sections: {', '.join(unknown_keys)}",
+        )
+
+    encoded = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    if len(encoded) > _MAX_UI_PREFERENCES_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences payload is too large",
+        )
 
 
 @router.get("/profile", response_model=UserRead)
@@ -151,10 +171,12 @@ async def update_preferences(
             if value is None:
                 user.ui_preferences = {}
             else:
-                user.ui_preferences = _deep_merge_preferences(
+                merged_preferences = _deep_merge_preferences(
                     _normalized_ui_preferences(user.ui_preferences),
                     value,
                 )
+                _validate_ui_preferences(merged_preferences)
+                user.ui_preferences = merged_preferences
             continue
         setattr(user, field, value.strip() or None if isinstance(value, str) else value)
 

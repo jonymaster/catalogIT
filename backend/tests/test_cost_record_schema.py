@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from app.schemas.cost_record import CostRecordCreate, CostRecordUpdate
 from app.schemas.service import ServiceCreate, ServiceUpdate
-from app.schemas.laptop import LaptopCreate
+from app.schemas.laptop import LaptopCreate, LaptopUpdate
 from app.schemas.laptop_hardware_cost import LaptopHardwareCostPut
 
 
@@ -85,6 +85,13 @@ class ServiceSchemaValidationTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ServiceCreate(name="Payroll", billing_schedule="quarterly")
 
+    def test_service_create_invalid_billing_schedule_message_omits_blank_sentinel(self) -> None:
+        with self.assertRaises(ValidationError) as exc:
+            ServiceCreate(name="Payroll", billing_schedule="quarterly")
+
+        self.assertIn("billing_schedule must be one of:", str(exc.exception))
+        self.assertNotIn("(blank)", str(exc.exception))
+
     def test_service_create_rejects_invalid_renewal_offsets(self) -> None:
         with self.assertRaises(ValidationError):
             ServiceCreate(name="Payroll", renewal_offsets_days=[30, 0])
@@ -102,3 +109,11 @@ class LaptopSchemaValidationTest(unittest.TestCase):
     def test_laptop_create_rejects_blank_model_name(self) -> None:
         with self.assertRaises(ValidationError):
             LaptopCreate(serial_number="SN-100", model_name="   ")
+
+    def test_laptop_update_rejects_null_serial_number(self) -> None:
+        with self.assertRaises(ValidationError):
+            LaptopUpdate(serial_number=None)
+
+    def test_laptop_update_rejects_null_model_name(self) -> None:
+        with self.assertRaises(ValidationError):
+            LaptopUpdate(model_name=None)

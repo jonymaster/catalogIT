@@ -6,9 +6,14 @@ from types import SimpleNamespace
 import unittest
 import uuid
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 
+from app.dependencies.auth import get_current_user
+from app.dependencies.db import get_audited_db
+from app.routers import user_directory
 from app.routers.user_directory import _apply_directory_search, get_user_profile
 from app.models.user import User
 
@@ -123,7 +128,7 @@ class UserProfileRouteTest(unittest.TestCase):
             )
 
             profile = await get_user_profile(
-                str(user_id),
+                user_id,
                 _current_user=SimpleNamespace(id=uuid.uuid4(), role="viewer"),
                 db=db,
             )
@@ -138,6 +143,30 @@ class UserProfileRouteTest(unittest.TestCase):
             self.assertEqual(profile.assigned_laptops[0].hardware_location_name, "HQ")
 
         asyncio.run(run())
+
+
+class UserProfileRouteValidationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        app = FastAPI()
+        app.include_router(user_directory.router)
+
+        async def override_current_user():
+            return SimpleNamespace(id=uuid.uuid4(), role="viewer")
+
+        async def override_db():
+            yield _FakeDb([])
+
+        app.dependency_overrides[get_current_user] = override_current_user
+        app.dependency_overrides[get_audited_db] = override_db
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self.client.close()
+
+    def test_profile_rejects_invalid_uuid_path_param(self) -> None:
+        response = self.client.get("/api/users/not-a-uuid/profile")
+
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":

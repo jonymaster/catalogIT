@@ -152,6 +152,28 @@ class MePreferencesRouterTest(unittest.TestCase):
         self.assertEqual(response.json()["ui_preferences"], {})
         self.assertEqual(self.user.ui_preferences, {})
 
+    def test_patch_preferences_rejects_unknown_preference_sections(self) -> None:
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={"ui_preferences": {"unexpected": {"enabled": True}}},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Unknown UI preference sections: unexpected")
+        self.assertEqual(self.db.flush_calls, 0)
+        self.assertIsNone(self.user.ui_preferences)
+
+    def test_patch_preferences_rejects_oversized_payloads(self) -> None:
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={"ui_preferences": {"dashboard": {"search": "x" * 33000}}},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "UI preferences payload is too large")
+        self.assertEqual(self.db.flush_calls, 0)
+        self.assertIsNone(self.user.ui_preferences)
+
 
 if __name__ == "__main__":
     unittest.main()
