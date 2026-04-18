@@ -38,21 +38,6 @@ def to_cost_record_read(record: CostRecord) -> CostRecordRead:
     recorded_by_name = (
         record.recorded_by.first_name + " " + record.recorded_by.last_name if record.recorded_by else None
     )
-
-
-async def _ensure_payment_method(
-    db: AsyncSession,
-    payment_method_id: uuid.UUID | None,
-) -> uuid.UUID | None:
-    if payment_method_id is None:
-        return None
-    row = await db.get(PaymentMethod, payment_method_id)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Payment method not found",
-        )
-    return row.id
     return CostRecordRead(
         id=record.id,
         service_id=record.service_id,
@@ -68,6 +53,21 @@ async def _ensure_payment_method(
         recorded_by_id=record.recorded_by_id,
         recorded_by_name=recorded_by_name,
     )
+
+
+async def _ensure_payment_method(
+    db: AsyncSession,
+    payment_method_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if payment_method_id is None:
+        return None
+    row = await db.get(PaymentMethod, payment_method_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment method not found",
+        )
+    return row.id
 
 
 @router.get("/", response_model=list[CostRecordRead])
