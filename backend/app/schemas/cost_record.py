@@ -51,11 +51,25 @@ class CostRecordUpdate(BaseModel):
             raise ValueError("purchase_year must be between 1900 and 2100")
         return v
 
+    @field_validator("fiscal_year")
+    @classmethod
+    def validate_fiscal_year(cls, value: int | None) -> int | None:
+        if value is None:
+            raise ValueError("fiscal_year cannot be null")
+        return value
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, value: float | None) -> float | None:
+        if value is None:
+            raise ValueError("amount cannot be null")
+        return value
+
     @field_validator("record_type")
     @classmethod
     def validate_record_type(cls, value: str | None) -> str | None:
         if value is None:
-            return value
+            raise ValueError("record_type cannot be null")
         return CostRecordCreate.validate_record_type(value)
 
 
