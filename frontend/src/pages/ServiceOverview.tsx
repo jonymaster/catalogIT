@@ -1,4 +1,4 @@
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import { Attachments } from "../components/Attachments";
 import { AuditTimeline } from "../components/AuditTimeline";
 import {
@@ -59,11 +59,20 @@ function renderField(
     case "owners":
       return (
         <Field label={SERVICE_FIELD_LABELS.owners}>
-          {service.owners.length > 0
-            ? service.owners
-                .map((o) => `${o.first_name} ${o.last_name}`)
-                .join(", ")
-            : "--"}
+          {service.owners.length > 0 ? (
+            <span className="inline-flex flex-wrap gap-x-1">
+              {service.owners.map((o, i) => (
+                <span key={o.id}>
+                  <Link to={`/users/${o.id}`} className="hlink">
+                    {o.first_name} {o.last_name}
+                  </Link>
+                  {i < service.owners.length - 1 ? "," : ""}
+                </span>
+              ))}
+            </span>
+          ) : (
+            "--"
+          )}
         </Field>
       );
     case "total_seats": {

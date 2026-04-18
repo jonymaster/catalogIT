@@ -102,9 +102,19 @@ export function LaptopDetail() {
               )}
             </Field>
             <Field label="Assigned To">
-              {laptop.assigned_to
-                ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name} (${laptop.assigned_to.email})`
-                : "Unassigned"}
+              {laptop.assigned_to ? (
+                <>
+                  <Link
+                    to={`/users/${laptop.assigned_to.id}`}
+                    className="hlink"
+                  >
+                    {laptop.assigned_to.first_name} {laptop.assigned_to.last_name}
+                  </Link>{" "}
+                  ({laptop.assigned_to.email})
+                </>
+              ) : (
+                "Unassigned"
+              )}
             </Field>
             <Field label="Location">
               {laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—"}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import client from "../api/client";
 import { Badge } from "../components/Badge";
 import { PageTransition } from "../components/PageTransition";
@@ -586,9 +587,12 @@ export function Users() {
                             />
                           </div>
                         ) : (
-                          <span className="whitespace-nowrap">
+                          <Link
+                            to={`/users/${user.id}`}
+                            className="hlink whitespace-nowrap"
+                          >
                             {user.first_name} {user.last_name}
-                          </span>
+                          </Link>
                         )}
                       </td>
                       <td className="max-w-[12rem] px-4 py-3 text-sm text-gray-500 dark:text-gray-400">

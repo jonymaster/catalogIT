@@ -25,6 +25,7 @@ import { LaptopCreate } from "./pages/LaptopCreate";
 import { LaptopEdit } from "./pages/LaptopEdit";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
+import { UserDetail } from "./pages/UserDetail";
 import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
 import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
@@ -81,6 +82,7 @@ export default function App() {
             <Route element={<ProtectedRoute requiredRole="admin" />}>
               <Route element={<Shell />}>
                 <Route path="/users" element={<Users />} />
+                <Route path="/users/:id" element={<UserDetail />} />
                 <Route path="/audit" element={<SettingsAuditLog />} />
                 <Route path="/settings" element={<Settings />}>
                   <Route index element={<Navigate to="oidc" replace />} />
