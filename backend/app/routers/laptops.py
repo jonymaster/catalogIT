@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import require_role
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/api/laptops", tags=["laptops"])
 _writer = require_role("admin", "editor")
 _admin = require_role("admin")
 _ARCHIVED_LAPTOP_EDITABLE_FIELDS = {"notes", "status", "hardware_status_id", "hardware_location_id"}
+_DUPLICATE_SERIAL_NUMBER_DETAIL = "A laptop with this serial number already exists"
 
 
 def _validate_archived_laptop_update_fields(update_data: dict[str, object]) -> None:
@@ -117,8 +119,21 @@ async def _ensure_unique_serial_number(
     if row is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A laptop with this serial number already exists",
+            detail=_DUPLICATE_SERIAL_NUMBER_DETAIL,
         )
+
+
+def _raise_duplicate_serial_number_http_error(exc: IntegrityError) -> None:
+    message = str(exc.orig).lower()
+    if (
+        "uq_laptops_serial_number_lower" in message
+        or "serial_number" in message
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_DUPLICATE_SERIAL_NUMBER_DETAIL,
+        ) from exc
+    raise exc
 
 
 @router.get("/", response_model=list[LaptopRead])
@@ -253,7 +268,10 @@ async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: 
         notes=body.notes,
     )
     db.add(laptop)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        _raise_duplicate_serial_number_http_error(exc)
     await db.refresh(laptop)
     return laptop
 
@@ -323,7 +341,10 @@ async def update_laptop(
     for field, value in update_data.items():
         setattr(laptop, field, value)
 
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        _raise_duplicate_serial_number_http_error(exc)
     await db.refresh(laptop)
     return laptop
 

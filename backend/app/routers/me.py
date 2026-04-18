@@ -31,6 +31,9 @@ def _deep_merge_preferences(
 ) -> dict[str, Any]:
     merged = dict(current)
     for key, value in updates.items():
+        if value is None:
+            merged.pop(key, None)
+            continue
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = _deep_merge_preferences(merged[key], value)
             continue

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -14,6 +14,13 @@ class Laptop(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     serial_number: Mapped[str] = mapped_column(String(255), unique=True)
+    __table_args__ = (
+        Index(
+            "uq_laptops_serial_number_lower",
+            func.lower(serial_number),
+            unique=True,
+        ),
+    )
     model_name: Mapped[str] = mapped_column(String(255))
     cpu: Mapped[str] = mapped_column(String(100), default="")
     ram: Mapped[str] = mapped_column(String(50), default="")

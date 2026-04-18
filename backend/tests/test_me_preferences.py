@@ -174,6 +174,31 @@ class MePreferencesRouterTest(unittest.TestCase):
         self.assertEqual(self.db.flush_calls, 0)
         self.assertIsNone(self.user.ui_preferences)
 
+    def test_patch_preferences_null_section_unsets_existing_section(self) -> None:
+        self.user.ui_preferences = {
+            "dashboard": {"visible_widget_ids": ["inventory_stats"]},
+            "service_list": {"visible_columns": ["name", "status"]},
+        }
+
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={"ui_preferences": {"dashboard": None}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["ui_preferences"],
+            {
+                "service_list": {"visible_columns": ["name", "status"]},
+            },
+        )
+        self.assertEqual(
+            self.user.ui_preferences,
+            {
+                "service_list": {"visible_columns": ["name", "status"]},
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
