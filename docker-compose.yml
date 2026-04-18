@@ -64,6 +64,11 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/index.html:/app/index.html
       - ./frontend/vite.config.ts:/app/vite.config.ts
+    environment:
+      # Dev: hit the API directly (CORS allows the :5173 origin). Using the
+      # Vite proxy is fine from Chrome/curl but has intermittent 502s under
+      # Firefox's connection reuse pattern, so bypass it entirely.
+      VITE_API_BASE_URL: http://localhost:8000
     depends_on:
       - api
 
