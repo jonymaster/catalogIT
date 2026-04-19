@@ -15,7 +15,7 @@
   --fg-2:          #44423e;
   --fg-3:          #737068;
   --fg-4:          #a3a09a;
-  --accent:        #3b5bdb;
+  --accent:        #3b5bda;
   --accent-soft:   #e9edfb;
   --accent-strong: #2f48b0;
   --success:       #1f7a43;
@@ -86,18 +86,18 @@ html.dark {
 
 /* ── Tailwind theme extensions ─────────────────────────────── */
 @theme {
-  /* Brand palette (indigo-based, kept for back-compat with existing code) */
-  --color-brand-50:  #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
-  --color-brand-950: #1e1b4b;
+  /* Brand palette — centered on the Ledger accent #3b5bda */
+  --color-brand-50:  #eef1fc;
+  --color-brand-100: #dbe1f8;
+  --color-brand-200: #b8c4f0;
+  --color-brand-300: #8fa0e6;
+  --color-brand-400: #6a7fde;
+  --color-brand-500: #4b63d6;
+  --color-brand-600: #3b5bda;
+  --color-brand-700: #2f48b0;
+  --color-brand-800: #243887;
+  --color-brand-900: #1b2a66;
+  --color-brand-950: #10173a;
 
   /* Ledger tokens exposed as Tailwind color utilities (bg-surface, text-fg, ...) */
   --color-bg:            var(--bg);
@@ -217,7 +217,7 @@ body {
 
 /*
  * Clickable “record” rows / blocks: on hover, the primary title uses the accent
- * color (light: #3b5bdb via --accent; dark: --accent) with an underline.
+ * color (light: #3b5bda via --accent; dark: --accent) with an underline.
  * !important wins over utility `text-fg` on the same node.
  */
 .interactive-record:hover td.data-record-primary .truncate {

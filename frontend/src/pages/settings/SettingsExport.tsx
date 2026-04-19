@@ -3,6 +3,7 @@ import client from "../../api/client";
 import type { AdminExportJob } from "../../types/models";
 import { useToast } from "../../context/useToast";
 import { PageTransition } from "../../components/PageTransition";
+import { Button } from "../../components/ui/Button";
 
 const POLL_MS = 1500;
 
@@ -136,14 +137,12 @@ export function SettingsExport() {
       </label>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
+        <Button
           disabled={busy}
           onClick={() => void handlePrepare()}
-          className="inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
         >
           {busy ? "Preparing…" : "Prepare download"}
-        </button>
+        </Button>
 
         {phase === "running" || phase === "starting" ? (
           <span className="text-sm text-gray-500 dark:text-gray-400">

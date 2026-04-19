@@ -8,6 +8,7 @@ import {
   type ServiceFieldKey,
 } from "../service/serviceViewLayout";
 import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
+import { Button } from "./ui/Button";
 import type {
   Service,
   Vendor,
@@ -678,13 +679,9 @@ export function ServiceForm({ initial }: Props) {
       ))}
 
       <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={saving}>
           {saving ? "Saving..." : isEdit ? "Update Service" : "Create Service"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => navigate(-1)}

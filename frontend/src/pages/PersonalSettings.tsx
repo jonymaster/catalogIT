@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
+import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import type { User, UserPreferences } from "../types/models";
@@ -256,13 +257,9 @@ export function PersonalSettings() {
                   />
                 </div>
               </div>
-              <button
-                type="submit"
-                disabled={savingProfile}
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
+              <Button type="submit" disabled={savingProfile}>
                 {savingProfile ? "Saving..." : "Save profile"}
-              </button>
+              </Button>
             </form>
           )}
 
@@ -327,13 +324,9 @@ export function PersonalSettings() {
                   className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 />
               </div>
-              <button
-                type="submit"
-                disabled={savingPwd}
-                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
+              <Button type="submit" disabled={savingPwd}>
                 {savingPwd ? "Updating..." : "Change password"}
-              </button>
+              </Button>
             </form>
           )}
 
@@ -451,13 +444,9 @@ export function PersonalSettings() {
         </div>
 
         <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={savingPrefs}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={savingPrefs}>
             {savingPrefs ? "Saving..." : "Save locale and appearance"}
-          </button>
+          </Button>
           <button
             type="button"
             onClick={() =>

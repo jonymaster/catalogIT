@@ -32,7 +32,7 @@ export function BarChart({
   data,
   width = 640,
   height = 300,
-  color = "#6366f1",
+  color = "#4b63d6",
   onBarClick,
   scale = "linearZero",
   showAxisHint = false,

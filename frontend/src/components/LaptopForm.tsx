@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { OsIcon } from "./ui/OsIcon";
+import { Button } from "./ui/Button";
 import { OS_OPTIONS } from "../utils/operatingSystem";
 import type {
   HardwareLocation,
@@ -338,13 +339,9 @@ export function LaptopForm() {
       </div>
 
       <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={saving}>
           {saving ? "Saving..." : "Create Laptop"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => navigate(-1)}
