@@ -20,16 +20,11 @@ import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
 import { LaptopDetail } from "./pages/LaptopDetail";
 import { ServiceCreate } from "./pages/ServiceCreate";
-import { ServiceEdit } from "./pages/ServiceEdit";
 import { LaptopCreate } from "./pages/LaptopCreate";
 import { LaptopEdit } from "./pages/LaptopEdit";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
 import { UserDetail } from "./pages/UserDetail";
-import { UserOverview } from "./pages/UserOverview";
-import { UserOwnedServices } from "./pages/UserOwnedServices";
-import { UserAssignedServices } from "./pages/UserAssignedServices";
-import { UserAssignedAssets } from "./pages/UserAssignedAssets";
 import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
 import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
@@ -75,23 +70,17 @@ export default function App() {
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
-                <Route path="/services/:id/edit" element={<ServiceEdit />} />
                 <Route path="/hardware" element={<Hardware />} />
                 <Route path="/hardware/new" element={<LaptopCreate />} />
                 <Route path="/hardware/:id" element={<LaptopDetail />} />
                 <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
-                <Route path="/users/:id" element={<UserDetail />}>
-                  <Route index element={<UserOverview />} />
-                  <Route path="owned-services" element={<UserOwnedServices />} />
-                  <Route path="assigned-services" element={<UserAssignedServices />} />
-                  <Route path="assigned-assets" element={<UserAssignedAssets />} />
-                </Route>
                 <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
             </Route>
             <Route element={<ProtectedRoute requiredRole="admin" />}>
               <Route element={<Shell />}>
                 <Route path="/users" element={<Users />} />
+                <Route path="/users/:id" element={<UserDetail />} />
                 <Route path="/audit" element={<SettingsAuditLog />} />
                 <Route path="/settings" element={<Settings />}>
                   <Route index element={<Navigate to="oidc" replace />} />

@@ -1,249 +1,600 @@
-import { useOutletContext } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useOutletContext } from "react-router-dom";
+import client from "../api/client";
 import { Attachments } from "../components/Attachments";
-import { AuditTimeline } from "../components/AuditTimeline";
 import {
   BooleanYesNoBadge,
   ClassificationBadge,
   ColoredReferenceBadge,
   CriticalityBadge,
 } from "../components/Badge";
-import { StatusBadge } from "../components/StatusBadge";
+import { AvatarStack, Avatar } from "../components/ui/Avatar";
 import { useAuth } from "../context/useAuth";
 import { formatBillingSchedule } from "../service/serviceBilling";
-import {
-  SERVICE_FIELD_LABELS,
-  SERVICE_VIEW_SECTIONS,
-  type ServiceFieldKey,
-} from "../service/serviceViewLayout";
-import { UserLinkList } from "../components/UserLinks";
-import type { Service, UserPreferences } from "../types/models";
+import type {
+  Category,
+  CostCenter,
+  PaymentMethod,
+  Service,
+  ServiceClassification,
+  User,
+  UserPreferences,
+  Vendor,
+} from "../types/models";
 import { formatDateOnly } from "../utils/formatting";
+import type {
+  ServiceDetailContext,
+  ServiceDraft,
+  ServiceValidationErrors,
+} from "../service/serviceDetailContext";
 
-function Field({
+const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
+const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
+
+interface RefData {
+  users: User[];
+  vendors: Vendor[];
+  categories: Category[];
+  costCenters: CostCenter[];
+  paymentMethods: PaymentMethod[];
+  classifications: ServiceClassification[];
+}
+
+function Row({
   label,
   children,
+  error,
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
+  error?: string;
 }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+      <dt className="text-xs font-medium uppercase tracking-wider text-fg-3">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{children}</dd>
+      <dd className="mt-1 text-sm text-fg">{children}</dd>
+      {error && (
+        <p className="mt-1 flex items-center gap-1 text-xs text-danger">
+          <span
+            aria-hidden
+            className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white"
+          >
+            !
+          </span>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
-function renderField(
-  key: ServiceFieldKey,
-  service: Service,
-  preferences: UserPreferences | null,
-) {
-  switch (key) {
-    case "status": {
-      const label = service.service_status?.name ?? service.status;
-      return (
-        <Field label={SERVICE_FIELD_LABELS.status}>
-          {service.service_status ? (
-            <ColoredReferenceBadge
-              label={service.service_status.name}
-              color={service.service_status.color}
-            />
-          ) : (
-            <StatusBadge status={label} />
-          )}
-        </Field>
-      );
-    }
-    case "owners":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.owners}>
-          <UserLinkList users={service.owners} />
-        </Field>
-      );
-    case "total_seats": {
-      const occupied = service.assignees?.length ?? 0;
-      const cap = service.total_seats;
-      const second = cap != null ? String(cap) : "∞";
-      return (
-        <Field label="Seat usage">
-          {occupied} / {second}
-        </Field>
-      );
-    }
-    case "classification":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.classification}>
-          <ClassificationBadge classification={service.service_classification} />
-        </Field>
-      );
-    case "criticality":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.criticality}>
-          <CriticalityBadge value={service.criticality} />
-        </Field>
-      );
-    case "sso_integrated":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.sso_integrated}>
-          <BooleanYesNoBadge value={service.sso_integrated} />
-        </Field>
-      );
-    case "scim_enabled":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.scim_enabled}>
-          <BooleanYesNoBadge value={service.scim_enabled} />
-        </Field>
-      );
-    case "vendor":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.vendor}>
-          {service.vendor?.name ?? "--"}
-        </Field>
-      );
-    case "spending_category":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.spending_category}>
-          {service.category_rel ? (
+function fieldClass(hasError: boolean): string {
+  return `block w-full rounded-md bg-surface px-2.5 py-1.5 text-sm text-fg placeholder:text-fg-4 transition-shadow focus:outline-none focus:ring-2 focus:ring-accent/30 ${
+    hasError
+      ? "border border-danger shadow-[0_0_0_3px_var(--danger-soft)]"
+      : "border border-border-strong focus:border-accent"
+  }`;
+}
+
+function useRefData(editing: boolean): RefData | null {
+  const [data, setData] = useState<RefData | null>(null);
+  useEffect(() => {
+    if (!editing || data) return;
+    let cancelled = false;
+    Promise.all([
+      client.get<User[]>("/api/users/"),
+      client.get<Vendor[]>("/api/vendors/"),
+      client.get<Category[]>("/api/categories/"),
+      client.get<CostCenter[]>("/api/cost-centers/"),
+      client.get<PaymentMethod[]>("/api/payment-methods/"),
+      client.get<ServiceClassification[]>("/api/service-classifications/"),
+    ]).then(([u, v, c, cc, p, cl]) => {
+      if (cancelled) return;
+      setData({
+        users: u.data,
+        vendors: v.data,
+        categories: c.data,
+        costCenters: cc.data,
+        paymentMethods: p.data,
+        classifications: cl.data,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [editing, data]);
+  return data;
+}
+
+interface LeftColumnProps {
+  service: Service;
+  preferences: UserPreferences | null;
+  editing: boolean;
+  draft: ServiceDraft;
+  setField: ServiceDetailContext["setDraftField"];
+  errors: ServiceValidationErrors;
+  refData: RefData | null;
+}
+
+function LeftColumn({
+  service,
+  preferences,
+  editing,
+  draft,
+  setField,
+  errors,
+  refData,
+}: LeftColumnProps) {
+  return (
+    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+      <h2 className="mb-4 text-base font-semibold text-fg">General</h2>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <Row label="Description">
+            {editing ? (
+              <textarea
+                rows={3}
+                maxLength={255}
+                value={draft.description}
+                onChange={(e) => setField("description", e.target.value)}
+                placeholder="What is this service for, who depends on it, any context…"
+                className={fieldClass(false)}
+              />
+            ) : service.description ? (
+              <p className="leading-relaxed text-fg">{service.description}</p>
+            ) : (
+              <span className="text-fg-4">No description yet.</span>
+            )}
+          </Row>
+        </div>
+
+        <Row label="Spending Category">
+          {editing ? (
+            <select
+              value={draft.category_id}
+              onChange={(e) => setField("category_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : service.category_rel ? (
             <ColoredReferenceBadge
               label={service.category_rel.name}
               color={service.category_rel.color}
             />
           ) : (
-            "--"
+            <span className="text-fg-4">—</span>
           )}
-        </Field>
-      );
-    case "cost_center":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.cost_center}>
-          {service.cost_center?.name ?? "--"}
-        </Field>
-      );
-    case "billing_schedule":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.billing_schedule}>
-          {formatBillingSchedule(service.billing_schedule)}
-        </Field>
-      );
-    case "renewal_reminders": {
-      const custom =
-        service.renewal_offsets_days && service.renewal_offsets_days.length > 0;
-      const detail = custom
-        ? `Custom offsets: ${service.renewal_offsets_days!.join(", ")} days before renewal`
-        : "Using global default reminder schedule from Settings";
-      return (
-        <div className="sm:col-span-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            {SERVICE_FIELD_LABELS.renewal_reminders}
-          </p>
-          <p className="mt-2 text-sm text-gray-900 dark:text-gray-100">
-            Email reminders:{" "}
-            {service.renewal_reminders_enabled ? "Enabled" : "Disabled"}
-          </p>
-          {service.renewal_reminders_enabled && (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{detail}</p>
+        </Row>
+
+        <Row label="Classification">
+          {editing ? (
+            <select
+              value={draft.classification_id}
+              onChange={(e) => setField("classification_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.classifications.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <ClassificationBadge classification={service.service_classification} />
           )}
+        </Row>
+
+        <Row label="Criticality">
+          {editing ? (
+            <select
+              value={draft.criticality}
+              onChange={(e) => setField("criticality", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {CRITICALITY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <CriticalityBadge value={service.criticality} />
+          )}
+        </Row>
+
+        <Row label="Vendor">
+          {editing ? (
+            <select
+              value={draft.vendor_id}
+              onChange={(e) => setField("vendor_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.vendors.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            service.vendor?.name ?? <span className="text-fg-4">—</span>
+          )}
+        </Row>
+
+        <div className="sm:col-span-2">
+          <Row
+            label="Point of contact"
+            error={editing ? errors.point_of_contact : undefined}
+          >
+            {editing ? (
+              <input
+                type="text"
+                value={draft.point_of_contact}
+                onChange={(e) => setField("point_of_contact", e.target.value)}
+                placeholder="e.g. Jane Doe (Vendor Account Manager)"
+                className={fieldClass(false)}
+              />
+            ) : service.point_of_contact?.trim() ? (
+              service.point_of_contact
+            ) : (
+              <span className="text-fg-4">—</span>
+            )}
+          </Row>
         </div>
-      );
-    }
-    case "renewal_date":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.renewal_date}>
-          {formatDateOnly(service.renewal_date, preferences)}
-        </Field>
-      );
-    case "yearly_cost":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.yearly_cost}>
-          {service.yearly_cost != null
-            ? `$${Number(service.yearly_cost).toLocaleString()}`
-            : "--"}
-        </Field>
-      );
-    case "payment_method":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.payment_method}>
-          {service.payment_method ? (
+
+        <Row label="Cost Center">
+          {editing ? (
+            <select
+              value={draft.cost_center_id}
+              onChange={(e) => setField("cost_center_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.costCenters.map((cc) => (
+                <option key={cc.id} value={cc.id}>
+                  {cc.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            service.cost_center?.name ?? <span className="text-fg-4">—</span>
+          )}
+        </Row>
+
+        <Row label="Payment Method">
+          {editing ? (
+            <select
+              value={draft.payment_method_id}
+              onChange={(e) => setField("payment_method_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.paymentMethods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          ) : service.payment_method ? (
             <ColoredReferenceBadge
               label={service.payment_method.name}
               color={service.payment_method.color}
             />
           ) : (
-            "--"
+            <span className="text-fg-4">—</span>
           )}
-        </Field>
-      );
-    case "nonprofit_pricing":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.nonprofit_pricing}>
-          <BooleanYesNoBadge value={service.nonprofit_pricing} />
-        </Field>
-      );
-    case "notes":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.notes}>
-          {service.notes?.trim() ? service.notes : "—"}
-        </Field>
-      );
-    case "point_of_contact":
-      return (
-        <Field label={SERVICE_FIELD_LABELS.point_of_contact}>
-          {service.point_of_contact?.trim() ? service.point_of_contact : "—"}
-        </Field>
-      );
-    default:
-      return null;
-  }
+        </Row>
+
+        <Row label="Billing Schedule">
+          {editing ? (
+            <select
+              value={draft.billing_schedule}
+              onChange={(e) => setField("billing_schedule", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {BILLING_OPTIONS.map((o) => (
+                <option key={o} value={o}>
+                  {formatBillingSchedule(o)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            formatBillingSchedule(service.billing_schedule)
+          )}
+        </Row>
+
+        <Row
+          label="Renewal Date"
+          error={editing ? errors.renewal_date : undefined}
+        >
+          {editing ? (
+            <input
+              type="date"
+              value={draft.renewal_date}
+              onChange={(e) => setField("renewal_date", e.target.value)}
+              className={fieldClass(Boolean(errors.renewal_date))}
+            />
+          ) : (
+            formatDateOnly(service.renewal_date, preferences)
+          )}
+        </Row>
+
+        <Row
+          label="Yearly Cost"
+          error={editing ? errors.yearly_cost : undefined}
+        >
+          {editing ? (
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={draft.yearly_cost}
+              onChange={(e) => setField("yearly_cost", e.target.value)}
+              placeholder="0"
+              className={fieldClass(Boolean(errors.yearly_cost))}
+            />
+          ) : service.yearly_cost != null ? (
+            `$${Number(service.yearly_cost).toLocaleString()}`
+          ) : (
+            <span className="text-fg-4">—</span>
+          )}
+        </Row>
+
+        <Row
+          label="Number of seats"
+          error={editing ? errors.total_seats : undefined}
+        >
+          {editing ? (
+            <input
+              type="number"
+              min={1}
+              value={draft.total_seats}
+              onChange={(e) => setField("total_seats", e.target.value)}
+              placeholder="Unlimited if empty"
+              className={fieldClass(Boolean(errors.total_seats))}
+            />
+          ) : (
+            <>
+              {service.assignees?.length ?? 0} /{" "}
+              {service.total_seats != null ? service.total_seats : "∞"}
+            </>
+          )}
+        </Row>
+      </dl>
+    </section>
+  );
+}
+
+interface RightColumnProps {
+  service: Service;
+  editing: boolean;
+  draft: ServiceDraft;
+  setField: ServiceDetailContext["setDraftField"];
+  refData: RefData | null;
+}
+
+function RightColumn({
+  service,
+  editing,
+  draft,
+  setField,
+  refData,
+}: RightColumnProps) {
+  const selectedOwners =
+    refData?.users.filter((u) => draft.owner_ids.includes(u.id)) ??
+    service.owners;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-3 text-base font-semibold text-fg">Owners</h2>
+        {!editing ? (
+          service.owners.length === 0 ? (
+            <p className="text-sm text-fg-4">No owners assigned.</p>
+          ) : (
+            <div className="space-y-2">
+              <AvatarStack users={service.owners} max={5} size={24} />
+              <ul className="space-y-1.5">
+                {service.owners.map((o) => (
+                  <li key={o.id} className="flex items-center gap-2 text-sm">
+                    <Avatar user={o} size={22} />
+                    <Link to={`/users/${o.id}`} className="hlink text-fg">
+                      {o.first_name} {o.last_name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        ) : (
+          <div className="space-y-2">
+            {selectedOwners.length > 0 && (
+              <AvatarStack users={selectedOwners} max={5} size={22} />
+            )}
+            <select
+              multiple
+              value={draft.owner_ids}
+              onChange={(e) =>
+                setField(
+                  "owner_ids",
+                  Array.from(e.target.selectedOptions, (o) => o.value),
+                )
+              }
+              className={`${fieldClass(false)} h-32`}
+            >
+              {refData?.users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.first_name} {u.last_name} ({u.email})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-fg-3">
+              Hold Ctrl/Cmd to select multiple.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-3 text-base font-semibold text-fg">
+          Access &amp; Provisioning
+        </h2>
+        <dl className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              SSO integrated
+            </dt>
+            <dd>
+              {editing ? (
+                <Toggle
+                  checked={draft.sso_integrated}
+                  onChange={(v) => setField("sso_integrated", v)}
+                />
+              ) : (
+                <BooleanYesNoBadge value={service.sso_integrated} />
+              )}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              SCIM provisioning
+            </dt>
+            <dd>
+              {editing ? (
+                <Toggle
+                  checked={draft.scim_enabled}
+                  onChange={(v) => setField("scim_enabled", v)}
+                />
+              ) : (
+                <BooleanYesNoBadge value={service.scim_enabled} />
+              )}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              Nonprofit pricing
+            </dt>
+            <dd>
+              {editing ? (
+                <Toggle
+                  checked={draft.nonprofit_pricing}
+                  onChange={(v) => setField("nonprofit_pricing", v)}
+                />
+              ) : (
+                <BooleanYesNoBadge value={service.nonprofit_pricing} />
+              )}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors ${
+        checked
+          ? "border-accent bg-accent"
+          : "border-border-strong bg-surface-3"
+      }`}
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-[18px]" : "translate-x-[2px]"
+        }`}
+      />
+    </button>
+  );
 }
 
 export function ServiceOverview() {
-  const { service } = useOutletContext<{ service: Service }>();
+  const ctx = useOutletContext<ServiceDetailContext>();
   const { preferences } = useAuth();
+  const refData = useRefData(ctx.editing);
+  const { service, editing, draft, setDraftField, errors } = ctx;
 
   return (
-    <div className="space-y-8">
-      {SERVICE_VIEW_SECTIONS.map((section) => (
-        <div
-          key={section.id}
-          className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm"
-        >
-          <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
-            {section.title}
-          </h2>
-          <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-            {section.fields.map((key) => (
-              <div
-                key={key}
-                className={
-                  key === "notes" ||
-                  key === "renewal_reminders" ||
-                  key === "point_of_contact"
-                    ? "col-span-full"
-                    : undefined
-                }
-              >
-                {renderField(key, service, preferences)}
-              </div>
-            ))}
-          </dl>
+    <div className="space-y-6">
+      {editing && Object.keys(errors).length > 0 && (
+        <div className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+          Please fix the highlighted fields before saving.
         </div>
-      ))}
+      )}
 
-      <Attachments entityType="service" entityId={service.id} />
-
-      <div>
-        <h2 className="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">
-          Change History
-        </h2>
-        <AuditTimeline
-          tableName="services"
-          recordId={service.id}
-          perPage={10}
-        />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <LeftColumn
+            service={service}
+            preferences={preferences}
+            editing={editing}
+            draft={draft}
+            setField={setDraftField}
+            errors={errors}
+            refData={refData}
+          />
+        </div>
+        <div className="lg:col-span-1">
+          <RightColumn
+            service={service}
+            editing={editing}
+            draft={draft}
+            setField={setDraftField}
+            refData={refData}
+          />
+        </div>
       </div>
+
+      {!editing && (
+        <>
+          <Attachments entityType="service" entityId={service.id} />
+          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
+            {service.notes?.trim() ? (
+              <p className="whitespace-pre-wrap text-sm text-fg">
+                {service.notes}
+              </p>
+            ) : (
+              <p className="text-sm text-fg-4">No notes yet.</p>
+            )}
+          </section>
+        </>
+      )}
+
+      {editing && (
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
+          <textarea
+            rows={4}
+            value={draft.notes}
+            onChange={(e) => setDraftField("notes", e.target.value)}
+            className={fieldClass(false)}
+            placeholder="Internal notes about this service…"
+          />
+        </section>
+      )}
     </div>
   );
 }

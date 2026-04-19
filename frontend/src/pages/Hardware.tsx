@@ -184,7 +184,7 @@ function todayFilenameDate(): string {
 export function Hardware() {
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const [view, setView] = useState<"active" | "archived">("active");
-  const [loading, setLoading] = useState(true);
+  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<HardwareFilters>(() =>
     Object.fromEntries(
@@ -206,12 +206,25 @@ export function Hardware() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     client
       .get<Laptop[]>("/api/laptops/", { params: { archived: view === "archived" } })
-      .then((r) => setLaptops(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!cancelled) {
+          setLaptops(r.data);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadedView(view);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [view]);
+
+  const loading = loadedView !== view;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -361,17 +374,29 @@ export function Hardware() {
   return (
     <PageTransition>
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Hardware</h1>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1
+            className="text-fg"
+            style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+          >
+            Hardware
+          </h1>
+          <div className="mt-1 text-[13px] text-fg-3">
+            {loading
+              ? "Loading…"
+              : `${laptops.length} ${laptops.length === 1 ? "laptop" : "laptops"}`}
+          </div>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
-          <div className="rounded-md border border-gray-300 dark:border-gray-700 p-0.5 flex">
+          <div className="inline-flex rounded-md border border-border bg-surface-2 p-0.5">
             <button
               type="button"
               onClick={() => setView("active")}
-              className={`px-3 py-1.5 text-sm rounded ${
+              className={`rounded px-3 py-1 text-xs font-medium transition-all ${
                 view === "active"
-                  ? "bg-brand-600 text-white"
-                  : "text-gray-600 dark:text-gray-300"
+                  ? "bg-surface text-fg shadow-sm"
+                  : "text-fg-3 hover:text-fg-2"
               }`}
             >
               Active
@@ -379,10 +404,10 @@ export function Hardware() {
             <button
               type="button"
               onClick={() => setView("archived")}
-              className={`px-3 py-1.5 text-sm rounded ${
+              className={`rounded px-3 py-1 text-xs font-medium transition-all ${
                 view === "archived"
-                  ? "bg-brand-600 text-white"
-                  : "text-gray-600 dark:text-gray-300"
+                  ? "bg-surface text-fg shadow-sm"
+                  : "text-fg-3 hover:text-fg-2"
               }`}
             >
               Archived
@@ -393,19 +418,19 @@ export function Hardware() {
               type="button"
               onClick={handleExportCsv}
               disabled={filtered.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ArrowDownTrayIcon className="h-4 w-4" />
-              Export CSV
+              Export
             </button>
           )}
           {canEdit && view === "active" && (
             <Link
               to="/hardware/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-brand-700"
+              className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-strong"
             >
               <PlusIcon className="h-4 w-4" />
-              New Laptop
+              New laptop
             </Link>
           )}
         </div>
