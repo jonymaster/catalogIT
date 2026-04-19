@@ -232,6 +232,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             ),
             "assigned_to_id": str(l.assigned_to_id) if l.assigned_to_id else None,
             "notes": l.notes,
+            "mdm_connected": l.mdm_connected,
             "is_active": l.is_active,
             "archived_at": l.archived_at.isoformat() if l.archived_at else None,
             "created_at": l.created_at.isoformat() if l.created_at else None,

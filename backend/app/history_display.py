@@ -154,6 +154,8 @@ def _friendly_laptop_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | No
         key = str(raw).lower() if isinstance(raw, str) else raw
         if key in _OS_LABELS:
             out["operating_system"] = _OS_LABELS[key]
+    if "mdm_connected" in out and out["mdm_connected"] is not None:
+        out["mdm_connected"] = "Yes" if out["mdm_connected"] else "No"
     if "hardware_status_id" in out:
         if "status" in out:
             del out["hardware_status_id"]

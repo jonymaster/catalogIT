@@ -23,6 +23,7 @@ class LaptopCreate(BaseModel):
     hardware_location_id: uuid.UUID | None = None
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
+    mdm_connected: bool = False
 
 
 class LaptopUpdate(BaseModel):
@@ -37,6 +38,7 @@ class LaptopUpdate(BaseModel):
     hardware_location_id: uuid.UUID | None = None
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
+    mdm_connected: bool | None = None
 
 
 class LaptopRead(BaseModel):
@@ -55,6 +57,7 @@ class LaptopRead(BaseModel):
     assigned_to_id: uuid.UUID | None
     assigned_to: UserRead | None
     notes: str | None
+    mdm_connected: bool
     is_active: bool = True
     archived_at: datetime | None = None
     created_at: datetime

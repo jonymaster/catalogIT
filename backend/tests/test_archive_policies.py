@@ -24,6 +24,7 @@ class ArchiveUpdatePolicyTest(unittest.TestCase):
                 "status": "In Stock",
                 "hardware_status_id": "abc",
                 "hardware_location_id": None,
+                "mdm_connected": True,
             }
         )
 
