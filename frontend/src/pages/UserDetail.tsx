@@ -168,9 +168,17 @@ function neutralChip(label: string) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-[10px] border border-border bg-surface p-3.5">
+function StatCard({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  onClick?: () => void;
+}) {
+  const body = (
+    <>
       <div
         className="text-[11px] uppercase text-fg-3"
         style={{ letterSpacing: "0.04em" }}
@@ -183,8 +191,18 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
       >
         {value}
       </div>
-    </div>
+    </>
   );
+  const interactive =
+    "w-full rounded-[10px] border border-border bg-surface p-3.5 text-left transition-colors hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={interactive}>
+        {body}
+      </button>
+    );
+  }
+  return <div className="rounded-[10px] border border-border bg-surface p-3.5">{body}</div>;
 }
 
 function EmptyState({
@@ -882,12 +900,25 @@ export function UserDetail() {
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <StatCard label="Services assigned" value={assignedServices.length} />
-          <StatCard label="Services owned" value={ownedServices.length} />
-          <StatCard label="Laptops assigned" value={assignedLaptops.length} />
+          <StatCard
+            label="Services assigned"
+            value={assignedServices.length}
+            onClick={() => setTab("assigned")}
+          />
+          <StatCard
+            label="Services owned"
+            value={ownedServices.length}
+            onClick={() => setTab("owned")}
+          />
+          <StatCard
+            label="Laptops assigned"
+            value={assignedLaptops.length}
+            onClick={() => setTab("hardware")}
+          />
           <StatCard
             label="Est. seat cost (annual)"
             value={seatCost > 0 ? formatMoneyCompact(seatCost) : "$0"}
+            onClick={() => setTab("assigned")}
           />
         </div>
 
