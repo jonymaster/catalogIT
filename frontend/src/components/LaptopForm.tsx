@@ -4,17 +4,12 @@ import client from "../api/client";
 import { OsIcon } from "./ui/OsIcon";
 import { OS_OPTIONS } from "../utils/operatingSystem";
 import type {
-  CostRecord,
   HardwareLocation,
   HardwareStatus,
   Laptop,
   OperatingSystem,
   User,
 } from "../types/models";
-
-interface Props {
-  initial?: Laptop;
-}
 
 interface FormData {
   serial_number: string;
@@ -29,40 +24,40 @@ interface FormData {
   assigned_to_id: string;
   notes: string;
   mdm_connected: boolean;
-  /** Shown on create only; stored on the first cost record, not on the laptop row */
   purchase_year: string;
   purchase_cost: string;
 }
 
-function toFormData(l?: Laptop): FormData {
-  return {
-    serial_number: l?.serial_number ?? "",
-    model_name: l?.model_name ?? "",
-    operating_system: l?.operating_system ?? "",
-    cpu: l?.cpu ?? "",
-    ram: l?.ram ?? "",
-    storage_size: l?.storage_size ?? "",
-    status: l?.status ?? "In Stock",
-    hardware_status_id: l?.hardware_status_id ?? "",
-    hardware_location_id: l?.hardware_location_id ?? "",
-    assigned_to_id: l?.assigned_to_id ?? "",
-    notes: l?.notes ?? "",
-    mdm_connected: l?.mdm_connected ?? false,
-    purchase_year: "",
-    purchase_cost: "",
-  };
-}
+const emptyForm: FormData = {
+  serial_number: "",
+  model_name: "",
+  operating_system: "",
+  cpu: "",
+  ram: "",
+  storage_size: "",
+  status: "In Stock",
+  hardware_status_id: "",
+  hardware_location_id: "",
+  assigned_to_id: "",
+  notes: "",
+  mdm_connected: false,
+  purchase_year: "",
+  purchase_cost: "",
+};
 
-export function LaptopForm({ initial }: Props) {
+export function LaptopForm() {
   const navigate = useNavigate();
-  const isEdit = !!initial;
 
-  const [form, setForm] = useState<FormData>(() => toFormData(initial));
+  const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>([]);
-  const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>([]);
+  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>(
+    [],
+  );
+  const [hardwareLocations, setHardwareLocations] = useState<
+    HardwareLocation[]
+  >([]);
 
   useEffect(() => {
     client.get<User[]>("/api/users/").then((r) => setUsers(r.data));
@@ -83,38 +78,13 @@ export function LaptopForm({ initial }: Props) {
     if (hardwareStatuses.length === 0) return;
     setForm((prev) => {
       if (prev.hardware_status_id) return prev;
-      const byName = hardwareStatuses.find(
-        (s) => s.name.toLowerCase() === prev.status.trim().toLowerCase(),
-      );
-      if (byName) {
-        return { ...prev, hardware_status_id: byName.id, status: byName.name };
-      }
-      if (!isEdit) {
-        const inStock = hardwareStatuses.find((s) => s.name === "In Stock");
-        if (inStock) {
-          return { ...prev, hardware_status_id: inStock.id, status: inStock.name };
-        }
+      const inStock = hardwareStatuses.find((s) => s.name === "In Stock");
+      if (inStock) {
+        return { ...prev, hardware_status_id: inStock.id, status: inStock.name };
       }
       return prev;
     });
-  }, [hardwareStatuses, isEdit]);
-
-  useEffect(() => {
-    if (!initial?.id || !initial.is_active) return;
-    client
-      .get<CostRecord | null>(`/api/laptops/${initial.id}/hardware-cost`)
-      .then((r) => {
-        const c = r.data;
-        if (c) {
-          setForm((prev) => ({
-            ...prev,
-            purchase_year: c.purchase_year != null ? String(c.purchase_year) : "",
-            purchase_cost: String(c.amount),
-          }));
-        }
-      })
-      .catch(() => {});
-  }, [initial?.id, initial?.is_active]);
+  }, [hardwareStatuses]);
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -143,32 +113,17 @@ export function LaptopForm({ initial }: Props) {
     };
 
     try {
-      if (isEdit) {
-        await client.put(`/api/laptops/${initial.id}`, payload);
-        if (initial.is_active) {
-          const pyRaw = form.purchase_year.trim();
-          const py = pyRaw ? Number(pyRaw) : null;
-          const costRaw = form.purchase_cost.trim();
-          const costAmt = costRaw ? Number(costRaw) : 0;
-          await client.put(`/api/laptops/${initial.id}/hardware-cost`, {
-            amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-            purchase_year: py != null && Number.isFinite(py) ? py : null,
-          });
-        }
-        navigate(`/hardware/${initial.id}`);
-      } else {
-        const res = await client.post<Laptop>("/api/laptops/", payload);
-        const laptopId = res.data.id;
-        const pyRaw = form.purchase_year.trim();
-        const py = pyRaw ? Number(pyRaw) : null;
-        const costRaw = form.purchase_cost.trim();
-        const costAmt = costRaw ? Number(costRaw) : 0;
-        await client.put(`/api/laptops/${laptopId}/hardware-cost`, {
-          amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-          purchase_year: py != null && Number.isFinite(py) ? py : null,
-        });
-        navigate(`/hardware/${laptopId}`);
-      }
+      const res = await client.post<Laptop>("/api/laptops/", payload);
+      const laptopId = res.data.id;
+      const pyRaw = form.purchase_year.trim();
+      const py = pyRaw ? Number(pyRaw) : null;
+      const costRaw = form.purchase_cost.trim();
+      const costAmt = costRaw ? Number(costRaw) : 0;
+      await client.put(`/api/laptops/${laptopId}/hardware-cost`, {
+        amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
+        purchase_year: py != null && Number.isFinite(py) ? py : null,
+      });
+      navigate(`/hardware/${laptopId}`);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Failed to save laptop";
@@ -343,35 +298,33 @@ export function LaptopForm({ initial }: Props) {
           </div>
         </div>
 
-        {(!isEdit || (initial?.is_active ?? false)) && (
-          <div className={rowGridCls}>
-            <div>
-              <label className={labelCls}>Purchase year</label>
-              <input
-                type="number"
-                min={1900}
-                max={2100}
-                className={inputCls}
-                value={form.purchase_year}
-                onChange={(e) => set("purchase_year", e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-
-            <div>
-              <label className={labelCls}>Cost</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className={inputCls}
-                value={form.purchase_cost}
-                onChange={(e) => set("purchase_cost", e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
+        <div className={rowGridCls}>
+          <div>
+            <label className={labelCls}>Purchase year</label>
+            <input
+              type="number"
+              min={1900}
+              max={2100}
+              className={inputCls}
+              value={form.purchase_year}
+              onChange={(e) => set("purchase_year", e.target.value)}
+              placeholder="Optional"
+            />
           </div>
-        )}
+
+          <div>
+            <label className={labelCls}>Cost</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className={inputCls}
+              value={form.purchase_cost}
+              onChange={(e) => set("purchase_cost", e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
       </div>
 
       <div>
@@ -390,7 +343,7 @@ export function LaptopForm({ initial }: Props) {
           disabled={saving}
           className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
         >
-          {saving ? "Saving..." : isEdit ? "Update Laptop" : "Create Laptop"}
+          {saving ? "Saving..." : "Create Laptop"}
         </button>
         <button
           type="button"
