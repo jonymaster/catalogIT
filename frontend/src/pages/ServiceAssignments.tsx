@@ -6,6 +6,7 @@ import client from "../api/client";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import type { Service, UserDirectoryPage } from "../types/models";
+import { Button } from "../components/ui/Button";
 
 const DIRECTORY_PAGE_SIZE = 25;
 
@@ -467,14 +468,12 @@ export function ServiceAssignments() {
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
+                <Button
                   disabled={saving || !modalDirty}
                   onClick={handleSaveModal}
-                  className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save"}
-                </button>
+                </Button>
               </div>
             </div>
           </div>,

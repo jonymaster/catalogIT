@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../../api/client";
 import { PageTransition } from "../../components/PageTransition";
+import { Button } from "../../components/ui/Button";
 
 /** Source files in the public repo (docs + canned HTML). */
 const REPO_MAIN =
@@ -502,14 +503,9 @@ export function SettingsNotifications() {
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={saving}
-        onClick={() => void save()}
-        className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-      >
+      <Button disabled={saving} onClick={() => void save()}>
         {saving ? "Saving..." : "Save"}
-      </button>
+      </Button>
     </div>
     </PageTransition>
   );

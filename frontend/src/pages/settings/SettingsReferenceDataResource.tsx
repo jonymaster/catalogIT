@@ -13,6 +13,7 @@ import type { Column } from "../../components/DataTable";
 import { DataTable } from "../../components/DataTable";
 import { PageTransition } from "../../components/PageTransition";
 import { SearchInput } from "../../components/SearchInput";
+import { Button } from "../../components/ui/Button";
 import {
   REFERENCE_BADGE_PRESET_CLASSES,
   REFERENCE_BADGE_PRESETS,
@@ -359,13 +360,7 @@ export function SettingsReferenceDataResource() {
           </h3>
           <p className="max-w-2xl text-sm text-gray-600 dark:text-gray-300">{resource.description}</p>
         </div>
-        <button
-          type="button"
-          onClick={openCreateDialog}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
-        >
-          Add {resource.label}
-        </button>
+        <Button onClick={openCreateDialog}>Add {resource.label}</Button>
       </div>
 
       <div className="max-w-sm">
@@ -433,13 +428,9 @@ export function SettingsReferenceDataResource() {
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
-            >
+            <Button type="submit" disabled={saving}>
               {saving ? "Saving..." : editingRecord ? "Save changes" : `Create ${resource.label}`}
-            </button>
+            </Button>
           </div>
         </form>
       </dialog>

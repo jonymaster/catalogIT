@@ -1456,7 +1456,10 @@ export function CostsReport() {
                 data={chartYears.map((y) => ({
                   label: String(y),
                   value: visualCostByYearA[y] ?? 0,
-                  color: y === displayYear ? "#4f46e5" : "#c7d2fe",
+                  color:
+                    y === displayYear
+                      ? "var(--accent)"
+                      : "color-mix(in srgb, var(--accent) 38%, var(--surface-2))",
                 }))}
                 onBarClick={(i) => {
                   const y = chartYears[i];
@@ -1492,7 +1495,10 @@ export function CostsReport() {
                   data={chartYears.map((y) => ({
                     label: String(y),
                     value: visualCostByYearA[y] ?? 0,
-                    color: y === displayYear ? "#4f46e5" : "#c7d2fe",
+                    color:
+                    y === displayYear
+                      ? "var(--accent)"
+                      : "color-mix(in srgb, var(--accent) 38%, var(--surface-2))",
                   }))}
                   onBarClick={(i) => {
                     const y = chartYears[i];
