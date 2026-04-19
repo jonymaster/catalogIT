@@ -368,6 +368,7 @@ async def _seed_laptops(session: AsyncSession) -> None:
             status=str(r.get("status") or "In Stock"),
             assigned_to_id=assigned_to_id,
             notes=r.get("notes"),
+            mdm_connected=bool(r.get("mdm_connected", False)),
         ))
     await session.flush()
     print(f"  laptops: {len(rows)} processed")

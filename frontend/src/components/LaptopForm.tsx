@@ -28,6 +28,7 @@ interface FormData {
   hardware_location_id: string;
   assigned_to_id: string;
   notes: string;
+  mdm_connected: boolean;
   /** Shown on create only; stored on the first cost record, not on the laptop row */
   purchase_year: string;
   purchase_cost: string;
@@ -46,6 +47,7 @@ function toFormData(l?: Laptop): FormData {
     hardware_location_id: l?.hardware_location_id ?? "",
     assigned_to_id: l?.assigned_to_id ?? "",
     notes: l?.notes ?? "",
+    mdm_connected: l?.mdm_connected ?? false,
     purchase_year: "",
     purchase_cost: "",
   };
@@ -137,6 +139,7 @@ export function LaptopForm({ initial }: Props) {
       hardware_location_id: form.hardware_location_id || null,
       assigned_to_id: form.assigned_to_id || null,
       notes: form.notes || null,
+      mdm_connected: form.mdm_connected,
     };
 
     try {
@@ -297,6 +300,18 @@ export function LaptopForm({ initial }: Props) {
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="flex items-end pb-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <input
+              type="checkbox"
+              checked={form.mdm_connected}
+              onChange={(e) => set("mdm_connected", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+            />
+            MDM Connected
+          </label>
         </div>
 
         <div className={rowGridCls}>

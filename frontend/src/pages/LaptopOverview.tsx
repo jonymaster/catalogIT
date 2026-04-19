@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import { ColoredReferenceBadge } from "../components/Badge";
+import { BooleanYesNoBadge, ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { OsIcon } from "../components/ui/OsIcon";
 import { operatingSystemLabel } from "../utils/operatingSystem";
@@ -66,6 +66,9 @@ export function LaptopOverview() {
             </Field>
             <Field label="Location">
               {laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—"}
+            </Field>
+            <Field label="MDM Connected">
+              <BooleanYesNoBadge value={laptop.mdm_connected} />
             </Field>
           </div>
 

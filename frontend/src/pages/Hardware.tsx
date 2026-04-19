@@ -11,7 +11,7 @@ import { ColumnSelector } from "../components/ColumnSelector";
 import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
-import { ColoredReferenceBadge } from "../components/Badge";
+import { BooleanYesNoBadge, ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
@@ -116,10 +116,7 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     getFilterOptions: (laptops) =>
       getUniqueOptions(laptops.map((l) => operatingSystemLabel(l.operating_system))),
     render: (laptop) => (
-      <div className="flex min-w-0 items-center gap-2.5">
-        <OsIcon operatingSystem={laptop.operating_system} />
-        <span className="truncate text-fg">{operatingSystemLabel(laptop.operating_system)}</span>
-      </div>
+      <span className="truncate text-fg">{operatingSystemLabel(laptop.operating_system)}</span>
     ),
   },
   {
@@ -156,6 +153,15 @@ const columnDefinitions: HardwareColumnDefinition[] = [
       ),
     render: (laptop) =>
       laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+  },
+  {
+    key: "mdm_connected",
+    label: "MDM Connected",
+    filterType: "select",
+    getFilterValue: (laptop) => (laptop.mdm_connected ? "Yes" : "No"),
+    getSortValue: (laptop) => laptop.mdm_connected,
+    getFilterOptions: () => ["No", "Yes"],
+    render: (laptop) => <BooleanYesNoBadge value={laptop.mdm_connected} />,
   },
   {
     key: "cpu",

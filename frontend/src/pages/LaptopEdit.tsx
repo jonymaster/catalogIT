@@ -15,6 +15,7 @@ export function LaptopEdit() {
   const [hardwareLocationId, setHardwareLocationId] = useState("");
   const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>([]);
   const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>([]);
+  const [mdmConnected, setMdmConnected] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export function LaptopEdit() {
         setNotes(d.notes ?? "");
         setHardwareStatusId(d.hardware_status_id ?? "");
         setHardwareLocationId(d.hardware_location_id ?? "");
+        setMdmConnected(d.mdm_connected);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -62,11 +64,13 @@ export function LaptopEdit() {
         hardware_status_id: hardwareStatusId || null,
         hardware_location_id: hardwareLocationId || null,
         status: row?.name ?? laptop.status,
+        mdm_connected: mdmConnected,
       });
       setLaptop(response.data);
       setNotes(response.data.notes ?? "");
       setHardwareStatusId(response.data.hardware_status_id ?? "");
       setHardwareLocationId(response.data.hardware_location_id ?? "");
+      setMdmConnected(response.data.mdm_connected);
     } finally {
       setSaving(false);
     }
@@ -82,6 +86,7 @@ export function LaptopEdit() {
     setNotes(response.data.notes ?? "");
     setHardwareStatusId(response.data.hardware_status_id ?? "");
     setHardwareLocationId(response.data.hardware_location_id ?? "");
+    setMdmConnected(response.data.mdm_connected);
   }
 
   if (loading) return <FormSkeleton />;
@@ -132,8 +137,8 @@ export function LaptopEdit() {
         ) : (
           <form onSubmit={saveArchivedMetadata} className="space-y-6">
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Archived hardware supports metadata-only updates: notes, status, and location. Unarchive to
-              change assignment, specs, cost, and other fields.
+              Archived hardware supports metadata-only updates: notes, status, location, and MDM connected.
+              Unarchive to change assignment, specs, cost, and other fields.
             </p>
             <div className={rowGridCls}>
               <div>
@@ -178,6 +183,17 @@ export function LaptopEdit() {
                   ))}
                 </select>
               </div>
+            </div>
+            <div className="flex items-end pb-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                <input
+                  type="checkbox"
+                  checked={mdmConnected}
+                  onChange={(e) => setMdmConnected(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                />
+                MDM Connected
+              </label>
             </div>
             <div>
               <label className={labelCls}>Notes</label>
