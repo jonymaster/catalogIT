@@ -377,9 +377,20 @@ interface GalleryCardProps {
   service: Service;
   preferences: UserPreferences | null;
   onOpen: (service: Service) => void;
+  showDescriptionTooltip: (
+    event: React.SyntheticEvent<HTMLElement>,
+    description: string,
+  ) => void;
+  hideDescriptionTooltip: () => void;
 }
 
-function ServiceGalleryCard({ service, preferences, onOpen }: GalleryCardProps) {
+function ServiceGalleryCard({
+  service,
+  preferences,
+  onOpen,
+  showDescriptionTooltip,
+  hideDescriptionTooltip,
+}: GalleryCardProps) {
   const renewalIso = service.renewal_date;
   const renewalLabel = formatDateOnly(renewalIso, preferences);
   return (
@@ -389,7 +400,20 @@ function ServiceGalleryCard({ service, preferences, onOpen }: GalleryCardProps) 
       className="interactive-record flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-border-strong hover:shadow-md"
     >
       <div className="flex items-start gap-3">
-        <Monogram name={service.name} seed={service.id} size={36} />
+        <span
+          className={`shrink-0 ${service.description ? "cursor-help" : ""}`}
+          onMouseEnter={
+            service.description
+              ? (event) =>
+                  showDescriptionTooltip(event, service.description ?? "")
+              : undefined
+          }
+          onMouseLeave={
+            service.description ? hideDescriptionTooltip : undefined
+          }
+        >
+          <Monogram name={service.name} seed={service.id} size={36} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="record-primary-label truncate text-[14px] font-semibold text-fg">
             {service.name}
@@ -400,11 +424,6 @@ function ServiceGalleryCard({ service, preferences, onOpen }: GalleryCardProps) 
           </div>
         </div>
       </div>
-      {service.description && (
-        <div className="line-clamp-2 text-[12.5px] text-fg-3">
-          {service.description}
-        </div>
-      )}
       <div className="flex flex-wrap items-center gap-1.5">
         {service.service_status ? (
           <ColoredReferenceBadge
@@ -682,22 +701,27 @@ export function Services() {
           column.key === "name"
             ? (service) => (
                 <div className="flex items-center gap-2.5">
-                  <Monogram name={service.name} seed={service.id} size={26} />
+                  <span
+                    className={`shrink-0 ${service.description ? "cursor-help" : ""}`}
+                    onMouseEnter={
+                      service.description
+                        ? (event) =>
+                            showDescriptionTooltip(
+                              event,
+                              service.description ?? "",
+                            )
+                        : undefined
+                    }
+                    onMouseLeave={
+                      service.description ? hideDescriptionTooltip : undefined
+                    }
+                  >
+                    <Monogram name={service.name} seed={service.id} size={26} />
+                  </span>
                   <div className="min-w-0">
                     <div className="truncate text-fg">
                       {service.name}
                     </div>
-                    {service.description && (
-                      <div
-                        className="max-w-[260px] truncate text-[11.5px] text-fg-3"
-                        onMouseEnter={(event) =>
-                          showDescriptionTooltip(event, service.description ?? "")
-                        }
-                        onMouseLeave={hideDescriptionTooltip}
-                      >
-                        {service.description}
-                      </div>
-                    )}
                   </div>
                 </div>
               )
@@ -953,6 +977,8 @@ export function Services() {
                     service={service}
                     preferences={preferences}
                     onOpen={(s) => navigate(`/services/${s.id}`)}
+                    showDescriptionTooltip={showDescriptionTooltip}
+                    hideDescriptionTooltip={hideDescriptionTooltip}
                   />
                 ))}
               </div>
