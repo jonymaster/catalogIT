@@ -39,7 +39,7 @@ import {
 } from "../service/serviceDetailContext";
 import type { Service } from "../types/models";
 
-type ExtraTab = "activity" | "integrations" | null;
+type ExtraTab = "activity" | null;
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -227,6 +227,12 @@ export function ServiceDetail() {
     setExtraTab(tab);
   }
 
+  const displayName = editing ? draft.name : service.name;
+  const serviceNameReadCls =
+    "block min-w-0 w-full max-w-full break-words text-[22px] font-semibold leading-tight text-fg";
+  const serviceNameEditCls =
+    "box-border border-0 bg-transparent px-0 py-0 outline-none transition-colors placeholder:text-fg-4 focus-visible:rounded-sm focus-visible:bg-surface focus-visible:shadow-[inset_0_0_0_1px_theme(colors.gray.400)] focus-visible:ring-2 focus-visible:ring-accent/30 dark:focus-visible:shadow-[inset_0_0_0_1px_theme(colors.gray.600)]";
+
   return (
     <PageTransition>
       <div className="space-y-6">
@@ -235,20 +241,40 @@ export function ServiceDetail() {
             Services
           </Link>
           <ChevronRightIcon className="h-3 w-3" />
-          <span className="text-fg-2">{service.name}</span>
+          <span className="text-fg-2">{displayName}</span>
         </div>
 
         <div className="flex flex-wrap items-start gap-4">
           <div className="shrink-0">
-            <Monogram name={service.name} seed={service.id} size={40} />
+            <Monogram name={displayName} seed={service.id} size={40} />
           </div>
           <div className="min-w-0 flex-1">
-            <h1
-              className="text-[22px] font-semibold text-fg"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {service.name}
-            </h1>
+            {editing ? (
+              <div>
+                <input
+                  id="service-header-name"
+                  type="text"
+                  name="service_name"
+                  autoComplete="off"
+                  aria-label="Service name"
+                  value={draft.name}
+                  onChange={(e) => setDraftField("name", e.target.value)}
+                  className={`${serviceNameReadCls} ${serviceNameEditCls}`}
+                  style={{ letterSpacing: "-0.02em" }}
+                  aria-invalid={!!errors.name}
+                />
+                {errors.name && (
+                  <p className="mt-1 text-xs text-danger">{errors.name}</p>
+                )}
+              </div>
+            ) : (
+              <h1
+                className={serviceNameReadCls}
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                {service.name}
+              </h1>
+            )}
             {service.vendor?.name && (
               <p className="mt-0.5 text-sm text-fg-3">{service.vendor.name}</p>
             )}
@@ -348,18 +374,11 @@ export function ServiceDetail() {
               active={activeExtra === "activity"}
               onClick={() => openExtraTab("activity")}
             />
-            <TabButton
-              label="Integrations"
-              active={activeExtra === "integrations"}
-              onClick={() => openExtraTab("integrations")}
-            />
           </nav>
         </div>
 
         {activeExtra === "activity" ? (
           <ActivityPanel serviceId={service.id} />
-        ) : activeExtra === "integrations" ? (
-          <IntegrationsPanel service={service} />
         ) : (
           <Outlet context={outletContext} />
         )}
@@ -509,49 +528,6 @@ function ActivityPanel({ serviceId }: { serviceId: string }) {
     <Panel title="Activity">
       <p className="mb-4 text-sm text-fg-3">Recent changes to this service.</p>
       <AuditTimeline tableName="services" recordId={serviceId} perPage={20} />
-    </Panel>
-  );
-}
-
-function IntegrationsPanel({ service }: { service: Service }) {
-  const items = [
-    {
-      label: "SSO",
-      enabled: Boolean(service.sso_integrated),
-      description:
-        "Single sign-on via the organization's identity provider.",
-    },
-    {
-      label: "SCIM provisioning",
-      enabled: Boolean(service.scim_enabled),
-      description:
-        "Automated user lifecycle via SCIM. Toggle on the Overview tab in edit mode.",
-    },
-  ];
-  return (
-    <Panel title="Integrations">
-      <ul className="divide-y divide-border">
-        {items.map((item) => (
-          <li
-            key={item.label}
-            className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
-          >
-            <div>
-              <p className="text-sm font-medium text-fg">{item.label}</p>
-              <p className="mt-0.5 text-xs text-fg-3">{item.description}</p>
-            </div>
-            <span
-              className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                item.enabled
-                  ? "bg-success-soft text-success"
-                  : "bg-surface-2 text-fg-3"
-              }`}
-            >
-              {item.enabled ? "Enabled" : "Disabled"}
-            </span>
-          </li>
-        ))}
-      </ul>
     </Panel>
   );
 }

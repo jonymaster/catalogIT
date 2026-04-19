@@ -141,11 +141,21 @@ def _friendly_service_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | N
     return out
 
 
+_OS_LABELS = {"macos": "macOS", "linux": "Linux", "windows": "Windows"}
+
+
 def _friendly_laptop_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | None:
     """Drop duplicate status FK when `status` is present; rename FK keys for timeline display."""
     if not d:
         return d
     out = dict(d)
+    if "operating_system" in out and out["operating_system"] is not None:
+        raw = out["operating_system"]
+        key = str(raw).lower() if isinstance(raw, str) else raw
+        if key in _OS_LABELS:
+            out["operating_system"] = _OS_LABELS[key]
+    if "mdm_connected" in out and out["mdm_connected"] is not None:
+        out["mdm_connected"] = "Yes" if out["mdm_connected"] else "No"
     if "hardware_status_id" in out:
         if "status" in out:
             del out["hardware_status_id"]

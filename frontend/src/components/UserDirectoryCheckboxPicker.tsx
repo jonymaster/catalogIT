@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import client from "../api/client";
 import { SearchInput } from "./SearchInput";
 import { Avatar, AvatarStack } from "./ui/Avatar";
@@ -13,6 +19,11 @@ export interface UserDirectoryCheckboxPickerProps {
   pageSize?: number;
   /** Overview tab uses design tokens; create form uses gray borders. */
   variant?: "overview" | "form";
+  /**
+   * When `1`, only one user can be selected (radio list + Unassigned).
+   * Same search and paging as multi-select.
+   */
+  maxSelections?: number;
 }
 
 export function UserDirectoryCheckboxPicker({
@@ -21,7 +32,10 @@ export function UserDirectoryCheckboxPicker({
   seedUsers = [],
   pageSize = DEFAULT_PAGE_SIZE,
   variant = "form",
+  maxSelections,
 }: UserDirectoryCheckboxPickerProps) {
+  const radioGroupName = useId();
+  const single = maxSelections === 1;
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -85,12 +99,22 @@ export function UserDirectoryCheckboxPicker({
   }, [value, userCache]);
 
   function toggle(id: string) {
+    if (single) {
+      onChange([id]);
+      return;
+    }
     if (value.includes(id)) {
       onChange(value.filter((x) => x !== id));
     } else {
-      onChange([...value, id]);
+      const next = [...value, id];
+      if (maxSelections != null && next.length > maxSelections) {
+        return;
+      }
+      onChange(next);
     }
   }
+
+  const selectedId = single ? (value[0] ?? "") : "";
 
   const total = directoryPage?.total ?? 0;
   const totalPages = directoryPage?.total_pages ?? 1;
@@ -140,6 +164,8 @@ export function UserDirectoryCheckboxPicker({
       : "divide-gray-200 dark:divide-gray-700";
   const checkboxCls =
     "h-4 w-4 shrink-0 rounded border-gray-300 dark:border-gray-600 accent-brand-600";
+  const radioCls =
+    "h-4 w-4 shrink-0 border-gray-300 dark:border-gray-600 accent-brand-600";
   const pageBtnCls =
     variant === "overview"
       ? "rounded border border-border px-2 py-0.5 text-fg hover:bg-surface-2 disabled:opacity-40 dark:border-gray-600"
@@ -156,6 +182,62 @@ export function UserDirectoryCheckboxPicker({
       <div className={listShell}>
         {loading && !directoryPage ? (
           <p className={`px-3 py-4 text-sm ${mutedText}`}>Loading users…</p>
+        ) : single && directoryPage ? (
+          <ul className={`divide-y ${listDivide}`}>
+            <li key="__unassigned__">
+              <label
+                className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 ${rowHover} ${rowText}`}
+              >
+                <input
+                  type="radio"
+                  name={radioGroupName}
+                  checked={value.length === 0}
+                  onChange={() => onChange([])}
+                  disabled={loading}
+                  className={radioCls}
+                />
+                <span className="text-sm font-medium">Unassigned</span>
+              </label>
+            </li>
+            {directoryPage.items.map((u) => {
+              const checked = selectedId === u.id;
+              return (
+                <li key={u.id}>
+                  <label
+                    className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 ${rowHover} ${rowText}`}
+                  >
+                    <input
+                      type="radio"
+                      name={radioGroupName}
+                      checked={checked}
+                      onChange={() => toggle(u.id)}
+                      disabled={loading}
+                      className={radioCls}
+                    />
+                    <Avatar user={u} size={22} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">
+                        {u.first_name} {u.last_name}
+                      </span>
+                      <span className={`block truncate text-xs ${mutedText}`}>
+                        {u.email}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+            {directoryPage.items.length === 0 && searchQuery.trim() !== "" && (
+              <li className={`px-3 py-3 text-sm ${mutedText}`}>
+                No users match your search.
+              </li>
+            )}
+            {directoryPage.items.length === 0 && searchQuery.trim() === "" && (
+              <li className={`px-3 py-3 text-sm ${mutedText}`}>
+                No other users in the directory.
+              </li>
+            )}
+          </ul>
         ) : directoryPage && directoryPage.items.length === 0 ? (
           <p className={`px-3 py-4 text-sm ${mutedText}`}>
             {searchQuery.trim()

@@ -224,6 +224,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "cpu": l.cpu,
             "ram": l.ram,
             "storage_size": l.storage_size,
+            "operating_system": l.operating_system,
             "status": l.status,
             "hardware_status_id": str(l.hardware_status_id) if l.hardware_status_id else None,
             "hardware_location_id": (
@@ -231,6 +232,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             ),
             "assigned_to_id": str(l.assigned_to_id) if l.assigned_to_id else None,
             "notes": l.notes,
+            "mdm_connected": l.mdm_connected,
             "is_active": l.is_active,
             "archived_at": l.archived_at.isoformat() if l.archived_at else None,
             "created_at": l.created_at.isoformat() if l.created_at else None,

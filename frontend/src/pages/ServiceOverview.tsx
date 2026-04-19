@@ -7,7 +7,7 @@ import {
   ColoredReferenceBadge,
   CriticalityBadge,
 } from "../components/Badge";
-import { AvatarStack, Avatar } from "../components/ui/Avatar";
+import { Avatar } from "../components/ui/Avatar";
 import { useAuth } from "../context/useAuth";
 import { formatBillingSchedule } from "../service/serviceBilling";
 import type {
@@ -393,19 +393,16 @@ function RightColumn({
           service.owners.length === 0 ? (
             <p className="text-sm text-fg-4">No owners assigned.</p>
           ) : (
-            <div className="space-y-2">
-              <AvatarStack users={service.owners} max={5} size={24} />
-              <ul className="space-y-1.5">
-                {service.owners.map((o) => (
-                  <li key={o.id} className="flex items-center gap-2 text-sm">
-                    <Avatar user={o} size={22} />
-                    <Link to={`/users/${o.id}`} className="hlink text-fg">
-                      {o.first_name} {o.last_name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ul className="space-y-1.5">
+              {service.owners.map((o) => (
+                <li key={o.id} className="flex items-center gap-2 text-sm">
+                  <Avatar user={o} size={22} />
+                  <Link to={`/users/${o.id}`} className="hlink text-fg">
+                    {o.first_name} {o.last_name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )
         ) : (
           <UserDirectoryCheckboxPicker

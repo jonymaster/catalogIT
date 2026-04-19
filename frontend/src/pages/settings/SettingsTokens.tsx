@@ -4,6 +4,7 @@ import { useAuth } from "../../context/useAuth";
 import { useToast } from "../../context/useToast";
 import { formatDateTime } from "../../utils/formatting";
 import { PageTransition } from "../../components/PageTransition";
+import { Button } from "../../components/ui/Button";
 
 interface ApiToken {
   id: string;
@@ -110,13 +111,9 @@ export function SettingsTokens() {
             className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
           />
         </div>
-        <button
-          type="submit"
-          disabled={creating || !name.trim()}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={creating || !name.trim()}>
           {creating ? "Generating..." : "Generate token"}
-        </button>
+        </Button>
       </form>
 
       {/* One-time token reveal modal */}
@@ -146,13 +143,7 @@ export function SettingsTokens() {
             </button>
           </div>
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
-            >
-              Done
-            </button>
+            <Button onClick={handleCloseModal}>Done</Button>
           </div>
         </div>
       </dialog>

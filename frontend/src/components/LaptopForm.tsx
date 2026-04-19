@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
-import type { CostRecord, HardwareLocation, HardwareStatus, Laptop, User } from "../types/models";
-
-interface Props {
-  initial?: Laptop;
-}
+import { OsIcon } from "./ui/OsIcon";
+import { Button } from "./ui/Button";
+import { OS_OPTIONS } from "../utils/operatingSystem";
+import type {
+  HardwareLocation,
+  HardwareStatus,
+  Laptop,
+  OperatingSystem,
+  User,
+} from "../types/models";
 
 interface FormData {
   serial_number: string;
   model_name: string;
+  operating_system: string;
   cpu: string;
   ram: string;
   storage_size: string;
@@ -18,38 +24,41 @@ interface FormData {
   hardware_location_id: string;
   assigned_to_id: string;
   notes: string;
-  /** Shown on create only; stored on the first cost record, not on the laptop row */
+  mdm_connected: boolean;
   purchase_year: string;
   purchase_cost: string;
 }
 
-function toFormData(l?: Laptop): FormData {
-  return {
-    serial_number: l?.serial_number ?? "",
-    model_name: l?.model_name ?? "",
-    cpu: l?.cpu ?? "",
-    ram: l?.ram ?? "",
-    storage_size: l?.storage_size ?? "",
-    status: l?.status ?? "In Stock",
-    hardware_status_id: l?.hardware_status_id ?? "",
-    hardware_location_id: l?.hardware_location_id ?? "",
-    assigned_to_id: l?.assigned_to_id ?? "",
-    notes: l?.notes ?? "",
-    purchase_year: "",
-    purchase_cost: "",
-  };
-}
+const emptyForm: FormData = {
+  serial_number: "",
+  model_name: "",
+  operating_system: "",
+  cpu: "",
+  ram: "",
+  storage_size: "",
+  status: "In Stock",
+  hardware_status_id: "",
+  hardware_location_id: "",
+  assigned_to_id: "",
+  notes: "",
+  mdm_connected: false,
+  purchase_year: "",
+  purchase_cost: "",
+};
 
-export function LaptopForm({ initial }: Props) {
+export function LaptopForm() {
   const navigate = useNavigate();
-  const isEdit = !!initial;
 
-  const [form, setForm] = useState<FormData>(() => toFormData(initial));
+  const [form, setForm] = useState<FormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>([]);
-  const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>([]);
+  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>(
+    [],
+  );
+  const [hardwareLocations, setHardwareLocations] = useState<
+    HardwareLocation[]
+  >([]);
 
   useEffect(() => {
     client.get<User[]>("/api/users/").then((r) => setUsers(r.data));
@@ -70,38 +79,13 @@ export function LaptopForm({ initial }: Props) {
     if (hardwareStatuses.length === 0) return;
     setForm((prev) => {
       if (prev.hardware_status_id) return prev;
-      const byName = hardwareStatuses.find(
-        (s) => s.name.toLowerCase() === prev.status.trim().toLowerCase(),
-      );
-      if (byName) {
-        return { ...prev, hardware_status_id: byName.id, status: byName.name };
-      }
-      if (!isEdit) {
-        const inStock = hardwareStatuses.find((s) => s.name === "In Stock");
-        if (inStock) {
-          return { ...prev, hardware_status_id: inStock.id, status: inStock.name };
-        }
+      const inStock = hardwareStatuses.find((s) => s.name === "In Stock");
+      if (inStock) {
+        return { ...prev, hardware_status_id: inStock.id, status: inStock.name };
       }
       return prev;
     });
-  }, [hardwareStatuses, isEdit]);
-
-  useEffect(() => {
-    if (!initial?.id || !initial.is_active) return;
-    client
-      .get<CostRecord | null>(`/api/laptops/${initial.id}/hardware-cost`)
-      .then((r) => {
-        const c = r.data;
-        if (c) {
-          setForm((prev) => ({
-            ...prev,
-            purchase_year: c.purchase_year != null ? String(c.purchase_year) : "",
-            purchase_cost: String(c.amount),
-          }));
-        }
-      })
-      .catch(() => {});
-  }, [initial?.id, initial?.is_active]);
+  }, [hardwareStatuses]);
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -115,6 +99,9 @@ export function LaptopForm({ initial }: Props) {
     const payload = {
       serial_number: form.serial_number,
       model_name: form.model_name,
+      operating_system: form.operating_system
+        ? (form.operating_system as OperatingSystem)
+        : null,
       cpu: form.cpu,
       ram: form.ram,
       storage_size: form.storage_size,
@@ -123,35 +110,21 @@ export function LaptopForm({ initial }: Props) {
       hardware_location_id: form.hardware_location_id || null,
       assigned_to_id: form.assigned_to_id || null,
       notes: form.notes || null,
+      mdm_connected: form.mdm_connected,
     };
 
     try {
-      if (isEdit) {
-        await client.put(`/api/laptops/${initial.id}`, payload);
-        if (initial.is_active) {
-          const pyRaw = form.purchase_year.trim();
-          const py = pyRaw ? Number(pyRaw) : null;
-          const costRaw = form.purchase_cost.trim();
-          const costAmt = costRaw ? Number(costRaw) : 0;
-          await client.put(`/api/laptops/${initial.id}/hardware-cost`, {
-            amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-            purchase_year: py != null && Number.isFinite(py) ? py : null,
-          });
-        }
-        navigate(`/hardware/${initial.id}`);
-      } else {
-        const res = await client.post<Laptop>("/api/laptops/", payload);
-        const laptopId = res.data.id;
-        const pyRaw = form.purchase_year.trim();
-        const py = pyRaw ? Number(pyRaw) : null;
-        const costRaw = form.purchase_cost.trim();
-        const costAmt = costRaw ? Number(costRaw) : 0;
-        await client.put(`/api/laptops/${laptopId}/hardware-cost`, {
-          amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-          purchase_year: py != null && Number.isFinite(py) ? py : null,
-        });
-        navigate(`/hardware/${laptopId}`);
-      }
+      const res = await client.post<Laptop>("/api/laptops/", payload);
+      const laptopId = res.data.id;
+      const pyRaw = form.purchase_year.trim();
+      const py = pyRaw ? Number(pyRaw) : null;
+      const costRaw = form.purchase_cost.trim();
+      const costAmt = costRaw ? Number(costRaw) : 0;
+      await client.put(`/api/laptops/${laptopId}/hardware-cost`, {
+        amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
+        purchase_year: py != null && Number.isFinite(py) ? py : null,
+      });
+      navigate(`/hardware/${laptopId}`);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Failed to save laptop";
@@ -175,7 +148,7 @@ export function LaptopForm({ initial }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className={labelCls}>Serial Number *</label>
           <input
@@ -194,6 +167,31 @@ export function LaptopForm({ initial }: Props) {
             value={form.model_name}
             onChange={(e) => set("model_name", e.target.value)}
           />
+        </div>
+        <div>
+          <label className={labelCls}>Operating system</label>
+          <div className="flex items-center gap-2">
+            <OsIcon
+              operatingSystem={
+                form.operating_system
+                  ? (form.operating_system as OperatingSystem)
+                  : null
+              }
+              className="h-7 w-7 shrink-0"
+            />
+            <select
+              className={`${inputCls} min-w-0 flex-1`}
+              value={form.operating_system}
+              onChange={(e) => set("operating_system", e.target.value)}
+            >
+              <option value="">— Unknown —</option>
+              {OS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -260,6 +258,18 @@ export function LaptopForm({ initial }: Props) {
           </div>
         </div>
 
+        <div className="flex items-end pb-2">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <input
+              type="checkbox"
+              checked={form.mdm_connected}
+              onChange={(e) => set("mdm_connected", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+            />
+            MDM Connected
+          </label>
+        </div>
+
         <div className={rowGridCls}>
           <div>
             <label className={labelCls}>CPU</label>
@@ -289,35 +299,33 @@ export function LaptopForm({ initial }: Props) {
           </div>
         </div>
 
-        {(!isEdit || (initial?.is_active ?? false)) && (
-          <div className={rowGridCls}>
-            <div>
-              <label className={labelCls}>Purchase year</label>
-              <input
-                type="number"
-                min={1900}
-                max={2100}
-                className={inputCls}
-                value={form.purchase_year}
-                onChange={(e) => set("purchase_year", e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-
-            <div>
-              <label className={labelCls}>Cost</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                className={inputCls}
-                value={form.purchase_cost}
-                onChange={(e) => set("purchase_cost", e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
+        <div className={rowGridCls}>
+          <div>
+            <label className={labelCls}>Purchase year</label>
+            <input
+              type="number"
+              min={1900}
+              max={2100}
+              className={inputCls}
+              value={form.purchase_year}
+              onChange={(e) => set("purchase_year", e.target.value)}
+              placeholder="Optional"
+            />
           </div>
-        )}
+
+          <div>
+            <label className={labelCls}>Cost</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className={inputCls}
+              value={form.purchase_cost}
+              onChange={(e) => set("purchase_cost", e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
       </div>
 
       <div>
@@ -331,13 +339,9 @@ export function LaptopForm({ initial }: Props) {
       </div>
 
       <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : isEdit ? "Update Laptop" : "Create Laptop"}
-        </button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving..." : "Create Laptop"}
+        </Button>
         <button
           type="button"
           onClick={() => navigate(-1)}

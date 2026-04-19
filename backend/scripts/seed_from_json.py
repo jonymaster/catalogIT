@@ -353,6 +353,10 @@ async def _seed_laptops(session: AsyncSession) -> None:
                 u = ur.scalar_one_or_none()
                 if u:
                     assigned_to_id = u.id
+        os_raw = r.get("operating_system")
+        operating_system = str(os_raw).strip().lower() if os_raw not in (None, "") else None
+        if operating_system not in (None, "macos", "linux", "windows"):
+            operating_system = None
         session.add(Laptop(
             id=_laptop_id(serial),
             serial_number=serial,
@@ -360,9 +364,11 @@ async def _seed_laptops(session: AsyncSession) -> None:
             cpu=str(r.get("cpu") or ""),
             ram=str(r.get("ram") or ""),
             storage_size=str(r.get("storage_size") or ""),
+            operating_system=operating_system,
             status=str(r.get("status") or "In Stock"),
             assigned_to_id=assigned_to_id,
             notes=r.get("notes"),
+            mdm_connected=bool(r.get("mdm_connected", False)),
         ))
     await session.flush()
     print(f"  laptops: {len(rows)} processed")

@@ -45,6 +45,7 @@ export function BrandMark({ align = "left", className = "", collapsed = false }:
         width={collapsed ? 32 : undefined}
         height={collapsed ? 32 : 40}
         decoding="async"
+        fetchPriority="high"
       />
     </Link>
   );

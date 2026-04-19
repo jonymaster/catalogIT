@@ -110,9 +110,11 @@ function PaletteBody({ onClose }: PaletteProps) {
             .catch(() => ({ data: { items: [] as User[] } }))
         : Promise.resolve({ data: { items: [] as User[] } }),
     ]).then(([sRes, lRes, uRes]) => {
-      setServices(sRes.data);
-      setLaptops(lRes.data);
-      setUsers(uRes.data.items);
+      const rawUsers = uRes.data as User[] | { items: User[] };
+      const userList = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items ?? []);
+      setServices(Array.isArray(sRes.data) ? sRes.data : []);
+      setLaptops(Array.isArray(lRes.data) ? lRes.data : []);
+      setUsers(userList);
       setLoaded(true);
     });
   }, [isAdmin]);
@@ -144,7 +146,7 @@ function PaletteBody({ onClose }: PaletteProps) {
     const l: LaptopItem[] = laptops.slice(0, 80).map((lp) => ({
       kind: "laptop",
       id: lp.id,
-      label: `${lp.model_name} · ${lp.serial_number.slice(-6)}`,
+      label: `${lp.model_name} · ${(lp.serial_number ?? "").slice(-6)}`,
       hint: lp.assigned_to
         ? `${lp.assigned_to.first_name} ${lp.assigned_to.last_name}`
         : "Unassigned",
@@ -168,10 +170,11 @@ function PaletteBody({ onClose }: PaletteProps) {
     const q = query.trim().toLowerCase();
     if (!q) return all.slice(0, 14);
     return all
-      .filter(
-        (it) =>
-          it.label.toLowerCase().includes(q) || it.hint.toLowerCase().includes(q),
-      )
+      .filter((it) => {
+        const label = String(it.label ?? "");
+        const hint = String(it.hint ?? "");
+        return label.toLowerCase().includes(q) || hint.toLowerCase().includes(q);
+      })
       .slice(0, 18);
   }, [query, all]);
 

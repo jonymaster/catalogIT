@@ -181,6 +181,8 @@ export interface Service {
   updated_at: string;
 }
 
+export type OperatingSystem = "macos" | "linux" | "windows";
+
 export interface Laptop {
   id: string;
   serial_number: string;
@@ -188,6 +190,7 @@ export interface Laptop {
   cpu: string;
   ram: string;
   storage_size: string;
+  operating_system: OperatingSystem | null;
   status: string;
   hardware_status_id: string | null;
   hardware_location_id: string | null;
@@ -196,6 +199,7 @@ export interface Laptop {
   assigned_to_id: string | null;
   assigned_to: User | null;
   notes: string | null;
+  mdm_connected: boolean;
   is_active: boolean;
   archived_at: string | null;
   created_at: string;

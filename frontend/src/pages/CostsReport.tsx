@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./CostsReport.print.css";
 import client from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
+import type { ChartYScaleMode } from "../components/charts/chartAxis";
 import { PageTransition } from "../components/PageTransition";
 import { StackedBar } from "../components/charts/StackedBar";
 import { MultiSelectFacet } from "../components/ui/MultiSelectFacet";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Money } from "../components/ui/Money";
+import type { Column } from "../components/DataTable";
+import { DataTable } from "../components/DataTable";
 import { Monogram } from "../components/ui/Monogram";
+import { OsIcon } from "../components/ui/OsIcon";
 import { formatMoneyCompact } from "../components/ui/money-format";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import {
@@ -19,6 +23,14 @@ import {
   type DashboardCostRecord,
 } from "../types/dashboardCost";
 import type { Service } from "../types/models";
+
+type LineItemRow = DashboardCostRecord & { id: string };
+
+function lineItemDetailPath(r: DashboardCostRecord): string | null {
+  if (r.source === "service" && r.service_id) return `/services/${r.service_id}/costs`;
+  if (r.source === "hardware" && r.laptop_id) return `/hardware/${r.laptop_id}`;
+  return null;
+}
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import {
   buildStackedYearData,
@@ -300,6 +312,7 @@ function StatCell({
 }
 
 export function CostsReport() {
+  const navigate = useNavigate();
   const { records: allRecords, fiscalYears: apiYears, loading, error } =
     useDashboardCostData();
 
@@ -311,6 +324,8 @@ export function CostsReport() {
   const [costCenters, setCostCenters] = useState<string[]>([]);
   const [fiscalYearsFilter, setFiscalYearsFilter] = useState<number[]>([]);
   const [focusYear, setFocusYear] = useState<number | null>(null);
+  const [yearBarChartScale, setYearBarChartScale] =
+    useState<ChartYScaleMode>("linearFocused");
   const [printGeneratedAt, setPrintGeneratedAt] = useState("");
   const [combineActualEstimatedCfYears, setCombineActualEstimatedCfYears] =
     useState(true);
@@ -728,16 +743,19 @@ export function CostsReport() {
     return rows;
   }, [sortedDetail, focusYear, selectedBucket, vendorByServiceId]);
 
-  function displayRecordTypeLabel(recordType: string, fiscalYear: number): string {
-    if (
-      combineActualEstimatedCfYears &&
-      isCurrentOrFutureFiscalYear(fiscalYear, currentYear) &&
-      (recordType === "actual" || recordType === "estimated")
-    ) {
-      return COMBINED_RECORD_TYPE_LABEL;
-    }
-    return RECORD_TYPE_LABELS[recordType] ?? recordType;
-  }
+  const displayRecordTypeLabel = useCallback(
+    (recordType: string, fiscalYear: number): string => {
+      if (
+        combineActualEstimatedCfYears &&
+        isCurrentOrFutureFiscalYear(fiscalYear, currentYear) &&
+        (recordType === "actual" || recordType === "estimated")
+      ) {
+        return COMBINED_RECORD_TYPE_LABEL;
+      }
+      return RECORD_TYPE_LABELS[recordType] ?? recordType;
+    },
+    [combineActualEstimatedCfYears, currentYear],
+  );
 
   function handleDownloadCsv() {
     const headers = [
@@ -940,6 +958,7 @@ export function CostsReport() {
         fiscalYear: number;
         amount: number;
         isService: boolean;
+        operating_system: DashboardCostRecord["operating_system"];
       }
     >();
     drillRecords.forEach((r) => {
@@ -956,6 +975,8 @@ export function CostsReport() {
           fiscalYear: r.fiscal_year,
           amount: r.amount,
           isService: r.source === "service" && !!r.service_id,
+          operating_system:
+            r.source === "hardware" ? r.operating_system : null,
         });
       }
     });
@@ -969,6 +990,109 @@ export function CostsReport() {
     { value: "cost_center", label: "Cost center" },
     { value: "month", label: "Month" },
   ];
+
+  const lineItemTableRows = useMemo<LineItemRow[]>(
+    () =>
+      displayedDetail.map((r, idx) => ({
+        ...r,
+        id: `line-${idx}-${r.source}-${r.service_id ?? "s"}-${r.laptop_id ?? "l"}-${r.fiscal_year}-${r.record_type}-${r.amount}`,
+      })),
+    [displayedDetail],
+  );
+
+  const lineItemColumns = useMemo<Column<LineItemRow>[]>(
+    () => [
+      {
+        key: "source",
+        header: "Source",
+        render: (r) => (
+          <span className="text-gray-700 dark:text-gray-300">{r.source}</span>
+        ),
+      },
+      {
+        key: "name",
+        header: "Name",
+        render: (r) => (
+          <div className="flex min-w-0 max-w-[220px] items-center gap-2.5">
+            {r.source === "service" ? (
+              <Monogram name={r.service_name} seed={r.service_id ?? r.service_name} size={26} />
+            ) : (
+              <OsIcon operatingSystem={r.operating_system} />
+            )}
+            <span className="truncate text-fg">{r.service_name}</span>
+          </div>
+        ),
+      },
+      {
+        key: "category",
+        header: "Category",
+        render: (r) => (
+          <span className="text-gray-600 dark:text-gray-400">
+            {categoryDisplayName(r.category_name ?? "")}
+          </span>
+        ),
+      },
+      {
+        key: "classification",
+        header: "Class.",
+        render: (r) => (
+          <span
+            className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400"
+            title={r.classification ?? ""}
+          >
+            <span
+              className="inline-block h-2 w-2 shrink-0 rounded-full"
+              style={{
+                background: classificationBarColor(r.classification),
+              }}
+            />
+            {classificationLabel(r.classification ?? "")}
+          </span>
+        ),
+      },
+      {
+        key: "cost_center",
+        header: "Cost ctr.",
+        render: (r) => (
+          <span className="text-gray-600 dark:text-gray-400">
+            {r.cost_center_name ?? "—"}
+          </span>
+        ),
+      },
+      {
+        key: "fiscal_year",
+        header: "Year",
+        align: "right",
+        render: (r) => (
+          <span className="font-mono text-base tabular-nums text-gray-700 dark:text-gray-300">
+            {r.fiscal_year}
+          </span>
+        ),
+      },
+      {
+        key: "amount",
+        header: "Amount",
+        align: "right",
+        render: (r) => (
+          <span className="font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            {fmtFull(r.amount)}
+          </span>
+        ),
+      },
+      {
+        key: "record_type",
+        header: "Type",
+        render: (r) => (
+          <span className="text-gray-600 dark:text-gray-400">
+            {r.record_type === "actual_estimated_combined"
+              ? COMBINED_RECORD_TYPE_LABEL
+              : RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
 
   if (loading) {
     return (
@@ -1305,14 +1429,37 @@ export function CostsReport() {
 
           {isOnlyActual ? (
             <div className="print-chart-card mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-              <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Total spend by year (actual)
-              </h2>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 gap-y-2">
+                <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Total spend by year (actual)
+                </h2>
+                <div className="flex flex-wrap items-center gap-2 print:hidden">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Year column axis
+                  </span>
+                  <SegmentedControl<ChartYScaleMode>
+                    value={yearBarChartScale}
+                    onChange={setYearBarChartScale}
+                    size="sm"
+                    activeTone="brand"
+                    options={[
+                      { value: "linearZero", label: "Full" },
+                      { value: "linearFocused", label: "Focus" },
+                      { value: "log", label: "Log" },
+                    ]}
+                  />
+                </div>
+              </div>
               <BarChart
+                scale={yearBarChartScale}
+                showAxisHint
                 data={chartYears.map((y) => ({
                   label: String(y),
                   value: visualCostByYearA[y] ?? 0,
-                  color: y === displayYear ? "#4f46e5" : "#c7d2fe",
+                  color:
+                    y === displayYear
+                      ? "var(--accent)"
+                      : "color-mix(in srgb, var(--accent) 38%, var(--surface-2))",
                 }))}
                 onBarClick={(i) => {
                   const y = chartYears[i];
@@ -1322,15 +1469,36 @@ export function CostsReport() {
             </div>
           ) : (
             <div className="mt-6 grid gap-4 lg:grid-cols-2 print:grid-cols-1">
+              <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-2 print:hidden">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Year column axis
+                </span>
+                <SegmentedControl<ChartYScaleMode>
+                  value={yearBarChartScale}
+                  onChange={setYearBarChartScale}
+                  size="sm"
+                  activeTone="brand"
+                  options={[
+                    { value: "linearZero", label: "Full" },
+                    { value: "linearFocused", label: "Focus" },
+                    { value: "log", label: "Log" },
+                  ]}
+                />
+              </div>
               <div className="print-chart-card min-h-[280px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
                 <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {RECORD_TYPE_LABELS[comparisonTypes[0]]} — total by year
                 </h2>
                 <BarChart
+                  scale={yearBarChartScale}
+                  showAxisHint
                   data={chartYears.map((y) => ({
                     label: String(y),
                     value: visualCostByYearA[y] ?? 0,
-                    color: y === displayYear ? "#4f46e5" : "#c7d2fe",
+                    color:
+                    y === displayYear
+                      ? "var(--accent)"
+                      : "color-mix(in srgb, var(--accent) 38%, var(--surface-2))",
                   }))}
                   onBarClick={(i) => {
                     const y = chartYears[i];
@@ -1344,6 +1512,8 @@ export function CostsReport() {
                     {RECORD_TYPE_LABELS[comparisonTypes[1]]} — total by year
                   </h2>
                   <BarChart
+                    scale={yearBarChartScale}
+                    showAxisHint
                     data={chartYears.map((y) => ({
                       label: String(y),
                       value: visualCostByYearB[y] ?? 0,
@@ -1388,6 +1558,8 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataA}
+                scale={yearBarChartScale}
+                showAxisHint
                 onYearClick={(y) => {
                   setFocusYear(y);
                   setSelectedBucket(null);
@@ -1426,6 +1598,8 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataB}
+                scale={yearBarChartScale}
+                showAxisHint
                 onYearClick={(y) => {
                   setFocusYear(y);
                   setSelectedBucket(null);
@@ -1513,11 +1687,18 @@ export function CostsReport() {
                             >
                               <td className="px-3 py-2">
                                 <div className="flex items-center gap-2">
-                                  <Monogram
-                                    name={service?.name ?? row.name}
-                                    seed={row.id}
-                                    size={22}
-                                  />
+                                  {row.isService ? (
+                                    <Monogram
+                                      name={service?.name ?? row.name}
+                                      seed={row.id}
+                                      size={22}
+                                    />
+                                  ) : (
+                                    <OsIcon
+                                      operatingSystem={row.operating_system}
+                                      className="h-[22px] w-[22px] shrink-0"
+                                    />
+                                  )}
                                   {linkTo ? (
                                     <Link
                                       to={linkTo}
@@ -1660,96 +1841,20 @@ export function CostsReport() {
               )}
             </h2>
             <div className="costs-report-print-table-wrap max-h-[520px] overflow-auto print:max-h-none print:overflow-visible">
-              <table className="costs-report-data-table min-w-full divide-y divide-gray-200 text-base dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-950">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Source
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Category
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Class.
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Cost ctr.
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Year
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Type
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                  {displayedDetail.map((r, idx) => {
-                    const linkTo =
-                      r.source === "service" && r.service_id
-                        ? `/services/${r.service_id}`
-                        : r.source === "hardware" && r.laptop_id
-                        ? `/hardware/${r.laptop_id}`
-                        : null;
-                    return (
-                    <tr key={`${r.service_name}-${r.fiscal_year}-${idx}`}>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
-                        {r.source}
-                      </td>
-                      <td className="print-name-cell max-w-[220px] truncate px-4 py-3 text-gray-900 dark:text-gray-100">
-                        {linkTo ? (
-                          <Link
-                            to={linkTo}
-                            className="font-medium hover:text-accent hover:underline"
-                          >
-                            {r.service_name}
-                          </Link>
-                        ) : (
-                          r.service_name
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {categoryDisplayName(r.category_name ?? "")}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        <span
-                          className="inline-flex items-center gap-1"
-                          title={r.classification ?? ""}
-                        >
-                          <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{
-                              background: classificationBarColor(r.classification),
-                            }}
-                          />
-                          {classificationLabel(r.classification ?? "")}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {r.cost_center_name ?? (r.source === "hardware" ? "—" : "—")}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-base text-gray-700 tabular-nums dark:text-gray-300">
-                        {r.fiscal_year}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                        {fmtFull(r.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {r.record_type === "actual_estimated_combined"
-                          ? COMBINED_RECORD_TYPE_LABEL
-                          : RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable<LineItemRow>
+                columns={lineItemColumns}
+                data={lineItemTableRows}
+                striped
+                primaryColumnKey="name"
+                className="rounded-none border-0 bg-transparent shadow-none dark:bg-transparent"
+                tableClassName="costs-report-data-table text-base"
+                primaryCellClassName="print-name-cell max-w-[220px]"
+                onRowClick={(r) => {
+                  const path = lineItemDetailPath(r);
+                  if (path) navigate(path);
+                }}
+                rowInteractive={(r) => lineItemDetailPath(r) != null}
+              />
             </div>
           </div>
         </>

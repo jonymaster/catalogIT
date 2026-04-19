@@ -3,17 +3,21 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import {
-  ArrowRightStartOnRectangleIcon,
   ChevronRightIcon,
   ComputerDesktopIcon,
+  PencilSquareIcon,
   ServerStackIcon,
+  XMarkIcon,
 } from "../components/Icons";
-import { ColoredReferenceBadge } from "../components/Badge";
+import { Badge, ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { DetailPageSkeleton } from "../components/Skeleton";
 import { Days } from "../components/ui/Days";
 import { Monogram } from "../components/ui/Monogram";
 import { formatMoneyCompact, formatMoneyFull } from "../components/ui/money-format";
+import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
+import { PERMISSION_FINANCIAL_VIEW } from "../constants/permissions";
 import type { Laptop, Service, User } from "../types/models";
 
 const TABS = [
@@ -24,6 +28,43 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+const ROLES = ["admin", "editor", "viewer"] as const;
+
+type UserDraft = {
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  email: string;
+  department: string;
+  role: string;
+  is_active: boolean;
+  receive_renewal_notifications: boolean;
+  financial_view: boolean;
+};
+
+function toDraft(user: User): UserDraft {
+  return {
+    first_name: user.first_name,
+    last_name: user.last_name,
+    display_name: user.display_name ?? "",
+    email: user.email,
+    department: user.department ?? "",
+    role: user.role,
+    is_active: user.is_active,
+    receive_renewal_notifications: user.receive_renewal_notifications ?? true,
+    financial_view: user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false,
+  };
+}
+
+function formatApiError(err: unknown): string {
+  const ax = err as {
+    response?: { data?: { detail?: string | { message?: string } } };
+  };
+  const d = ax.response?.data?.detail;
+  if (typeof d === "string") return d;
+  if (d && typeof d === "object" && typeof d.message === "string") return d.message;
+  return "Request failed.";
+}
 
 function hueFromString(s: string): number {
   let h = 0;
@@ -169,6 +210,200 @@ function EmptyState({
   );
 }
 
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wider text-fg-3">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm text-fg">{children}</dd>
+    </div>
+  );
+}
+
+const fieldClass =
+  "block w-full rounded-md border border-border-strong bg-surface px-2.5 py-1.5 text-sm text-fg placeholder:text-fg-4 transition-shadow focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
+
+function GeneralPanel({
+  user,
+  editing,
+  draft,
+  setDraft,
+}: {
+  user: User;
+  editing: boolean;
+  draft: UserDraft;
+  setDraft: React.Dispatch<React.SetStateAction<UserDraft | null>>;
+}) {
+  const isLocal = user.provisioning_source === "local";
+  const setField = <K extends keyof UserDraft>(key: K, value: UserDraft[K]) => {
+    setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+  const financialValue = draft.role === "admin" ? false : draft.financial_view;
+
+  return (
+    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+      <h2 className="mb-4 text-base font-semibold text-fg">General</h2>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        {editing && isLocal && (
+          <>
+            <Row label="First name">
+              <input
+                value={draft.first_name}
+                onChange={(e) => setField("first_name", e.target.value)}
+                className={fieldClass}
+              />
+            </Row>
+            <Row label="Last name">
+              <input
+                value={draft.last_name}
+                onChange={(e) => setField("last_name", e.target.value)}
+                className={fieldClass}
+              />
+            </Row>
+            <Row label="Display name">
+              <input
+                value={draft.display_name}
+                onChange={(e) => setField("display_name", e.target.value)}
+                className={fieldClass}
+              />
+            </Row>
+            <Row label="Email">
+              <input
+                type="email"
+                value={draft.email}
+                onChange={(e) => setField("email", e.target.value)}
+                className={fieldClass}
+              />
+            </Row>
+          </>
+        )}
+
+        <Row label="Department">
+          {editing && isLocal ? (
+            <input
+              value={draft.department}
+              onChange={(e) => setField("department", e.target.value)}
+              className={fieldClass}
+              placeholder="—"
+            />
+          ) : user.department?.trim() ? (
+            <span>{user.department}</span>
+          ) : (
+            <span className="text-fg-4">—</span>
+          )}
+        </Row>
+
+        <Row label="Role">
+          {editing ? (
+            <select
+              value={draft.role}
+              onChange={(e) =>
+                setField("role", e.target.value as UserDraft["role"])
+              }
+              className={fieldClass}
+            >
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="capitalize">{user.role}</span>
+          )}
+        </Row>
+
+        <Row label="Financial view permissions">
+          {draft.role === "admin" && !editing ? (
+            <span className="text-fg-4">
+              Granted implicitly to admins
+            </span>
+          ) : editing ? (
+            draft.role === "admin" ? (
+              <span className="text-fg-4">
+                Granted implicitly to admins
+              </span>
+            ) : (
+              <label className="inline-flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={financialValue}
+                  onChange={(e) => setField("financial_view", e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <span className="text-sm text-fg-2">
+                  Granted (IT Financial Report and dashboard cost data)
+                </span>
+              </label>
+            )
+          ) : (
+            <Badge
+              color={
+                user.permissions?.includes(PERMISSION_FINANCIAL_VIEW)
+                  ? "blue"
+                  : "gray"
+              }
+            >
+              {user.permissions?.includes(PERMISSION_FINANCIAL_VIEW)
+                ? "Granted"
+                : "Not granted"}
+            </Badge>
+          )}
+        </Row>
+
+        <Row label="Renewal emails">
+          {editing ? (
+            <label className="inline-flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={draft.receive_renewal_notifications}
+                onChange={(e) =>
+                  setField("receive_renewal_notifications", e.target.checked)
+                }
+                className="h-4 w-4 rounded border-border"
+              />
+              <span className="text-sm text-fg-2">
+                Receive service renewal notifications
+              </span>
+            </label>
+          ) : (
+            <Badge
+              color={user.receive_renewal_notifications ?? true ? "green" : "gray"}
+            >
+              {user.receive_renewal_notifications ?? true ? "On" : "Off"}
+            </Badge>
+          )}
+        </Row>
+
+        <Row label="Status">
+          {editing ? (
+            <label className="inline-flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={draft.is_active}
+                onChange={(e) => setField("is_active", e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <span className="text-sm text-fg-2">Active</span>
+            </label>
+          ) : (
+            <Badge color={user.is_active ? "green" : "red"}>
+              {user.is_active ? "Active" : "Inactive"}
+            </Badge>
+          )}
+        </Row>
+      </dl>
+    </section>
+  );
+}
+
 function ServicesTable({
   services,
   variant,
@@ -210,12 +445,12 @@ function ServicesTable({
               <tr
                 key={s.id}
                 onClick={() => navigate(`/services/${s.id}`)}
-                className="cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
+                className="interactive-record cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
               >
-                <td className="px-3 py-2.5">
+                <td className="data-record-primary px-3 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <Monogram name={s.name} seed={s.id} size={26} />
-                    <span className="font-medium">{s.name}</span>
+                    <span className="record-primary-label truncate font-medium">{s.name}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2.5 text-fg-3">{s.vendor?.name ?? "—"}</td>
@@ -308,12 +543,12 @@ function HardwareTable({
               <tr
                 key={l.id}
                 onClick={() => navigate(`/hardware/${l.id}`)}
-                className="cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
+                className="interactive-record cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
               >
-                <td className="px-3 py-2.5">
-                  <span className="inline-flex items-center gap-2">
-                    <ComputerDesktopIcon className="h-4 w-4 text-fg-3" />
-                    <span className="font-medium">{l.model_name}</span>
+                <td className="data-record-primary px-3 py-2.5">
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <ComputerDesktopIcon className="h-4 w-4 shrink-0 text-fg-3" />
+                    <span className="record-primary-label truncate font-medium">{l.model_name}</span>
                   </span>
                 </td>
                 <td
@@ -421,12 +656,19 @@ function ActivityTimeline({ user, services }: { user: User; services: Service[] 
 
 export function UserDetail() {
   const { id } = useParams<{ id: string }>();
+  const { canEdit } = useAuth();
+  const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<TabId>("assigned");
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<UserDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -444,6 +686,7 @@ export function UserDetail() {
           return;
         }
         setUser(match);
+        setDraft(toDraft(match));
         setServices(servicesRes.data);
         setLaptops(laptopsRes.data);
       })
@@ -484,13 +727,61 @@ export function UserDetail() {
   }, [assignedServices]);
 
   if (!id || notFound) return <Navigate to="/users" replace />;
-  if (loading || !user) return <DetailPageSkeleton />;
+  if (loading || !user || !draft) return <DetailPageSkeleton />;
 
   const name = displayName(user);
   const hue = hueFromString(user.email || user.id);
+  const isLocal = user.provisioning_source === "local";
 
   function notImplemented() {
     alert("Not implemented yet");
+  }
+
+  function startEditing() {
+    if (!user) return;
+    setDraft(toDraft(user));
+    setSaveError(null);
+    setEditing(true);
+  }
+
+  function cancelEditing() {
+    if (user) setDraft(toDraft(user));
+    setSaveError(null);
+    setEditing(false);
+  }
+
+  async function handleSave() {
+    if (!user || !draft) return;
+    const patch: Record<string, unknown> = {
+      role: draft.role,
+      is_active: draft.is_active,
+      receive_renewal_notifications: draft.receive_renewal_notifications,
+    };
+    if (isLocal) {
+      patch.email = draft.email.trim();
+      patch.first_name = draft.first_name.trim();
+      patch.last_name = draft.last_name.trim();
+      patch.display_name = draft.display_name.trim() || null;
+      patch.department = draft.department.trim() || null;
+    }
+    if (draft.role !== "admin") {
+      patch.permissions = draft.financial_view ? [PERMISSION_FINANCIAL_VIEW] : [];
+    } else {
+      patch.permissions = [];
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await client.patch<User>(`/api/settings/users/${user.id}`, patch);
+      setUser(res.data);
+      setDraft(toDraft(res.data));
+      setEditing(false);
+      showToast({ type: "success", text: "User updated." });
+    } catch (err: unknown) {
+      setSaveError(formatApiError(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -539,27 +830,55 @@ export function UserDetail() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={notImplemented}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2"
-            >
-              <ArrowRightStartOnRectangleIcon className="h-4 w-4" />
-              Open in HR
-            </button>
-            <button
-              type="button"
-              onClick={notImplemented}
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors"
-              style={{
-                color: "var(--danger)",
-                background: "var(--danger-soft)",
-              }}
-            >
-              <ArchiveBoxIcon className="h-4 w-4" />
-              Offboard
-            </button>
+            {canEdit && !editing && (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg-2 shadow-sm transition-colors hover:bg-surface-2"
+              >
+                <PencilSquareIcon className="h-4 w-4" />
+                Edit
+              </button>
+            )}
+            {canEdit && editing && (
+              <>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={cancelEditing}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-surface-2 disabled:opacity-50"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    void handleSave();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent-strong disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </>
+            )}
           </div>
+        </div>
+
+        {saveError && editing && (
+          <div className="mb-4 rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+            {saveError}
+          </div>
+        )}
+
+        <div className="mb-5">
+          <GeneralPanel
+            user={user}
+            editing={editing}
+            draft={draft}
+            setDraft={setDraft}
+          />
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -654,21 +973,3 @@ export function UserDetail() {
   );
 }
 
-function ArchiveBoxIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.75}
-      stroke="currentColor"
-      className={className}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"
-      />
-    </svg>
-  );
-}
