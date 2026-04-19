@@ -445,12 +445,12 @@ function ServicesTable({
               <tr
                 key={s.id}
                 onClick={() => navigate(`/services/${s.id}`)}
-                className="cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
+                className="interactive-record cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
               >
-                <td className="px-3 py-2.5">
+                <td className="data-record-primary px-3 py-2.5">
                   <div className="flex items-center gap-2.5">
                     <Monogram name={s.name} seed={s.id} size={26} />
-                    <span className="font-medium">{s.name}</span>
+                    <span className="record-primary-label truncate font-medium">{s.name}</span>
                   </div>
                 </td>
                 <td className="px-3 py-2.5 text-fg-3">{s.vendor?.name ?? "—"}</td>
@@ -543,12 +543,12 @@ function HardwareTable({
               <tr
                 key={l.id}
                 onClick={() => navigate(`/hardware/${l.id}`)}
-                className="cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
+                className="interactive-record cursor-pointer border-b border-border text-[13.5px] text-fg transition-colors last:border-0 hover:bg-surface-2/60"
               >
-                <td className="px-3 py-2.5">
-                  <span className="inline-flex items-center gap-2">
-                    <ComputerDesktopIcon className="h-4 w-4 text-fg-3" />
-                    <span className="font-medium">{l.model_name}</span>
+                <td className="data-record-primary px-3 py-2.5">
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <ComputerDesktopIcon className="h-4 w-4 shrink-0 text-fg-3" />
+                    <span className="record-primary-label truncate font-medium">{l.model_name}</span>
                   </span>
                 </td>
                 <td

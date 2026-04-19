@@ -591,7 +591,7 @@ function UpcomingRenewals({ services }: { services: Service[] }) {
             key={s.id}
             type="button"
             onClick={() => navigate(`/services/${s.id}`)}
-            className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
+            className="interactive-record flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-2"
           >
             <div
               className="flex w-9 shrink-0 flex-col items-center justify-center rounded-md py-0.5 text-[10px] font-medium"
@@ -604,7 +604,7 @@ function UpcomingRenewals({ services }: { services: Service[] }) {
             </div>
             <div className="min-w-0 flex-1">
               <div
-                className="truncate text-[13px] font-medium text-fg"
+                className="record-primary-label truncate text-[13px] font-medium text-fg"
                 title={s.name}
               >
                 {s.name}

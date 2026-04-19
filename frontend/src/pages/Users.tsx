@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { Badge } from "../components/Badge";
 import { PageTransition } from "../components/PageTransition";
 import { SearchInput } from "../components/SearchInput";
+import type { Column } from "../components/DataTable";
+import { DataTable } from "../components/DataTable";
+import { Monogram } from "../components/ui/Monogram";
 import { useToast } from "../context/useToast";
 import { PERMISSION_FINANCIAL_VIEW } from "../constants/permissions";
 import type { ProvisioningSource, User } from "../types/models";
@@ -26,7 +29,18 @@ function sourceBadge(src: ProvisioningSource) {
   return <Badge color="purple">OIDC</Badge>;
 }
 
+function userMonogramName(u: User): string {
+  const dn = u.display_name?.trim();
+  if (dn) return dn;
+  return `${u.first_name} ${u.last_name}`.trim() || u.email;
+}
+
+function userListFullName(u: User): string {
+  return `${u.first_name} ${u.last_name}`.trim();
+}
+
 export function Users() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -61,10 +75,87 @@ export function Users() {
       (u) =>
         u.first_name.toLowerCase().includes(q) ||
         u.last_name.toLowerCase().includes(q) ||
+        (u.display_name ?? "").toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         (u.department ?? "").toLowerCase().includes(q),
     );
   }, [users, search]);
+
+  const columns = useMemo<Column<User>[]>(
+    () => [
+      {
+        key: "name",
+        header: "Name",
+        render: (user) => (
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Monogram name={userMonogramName(user)} seed={user.id} size={26} />
+            <span className="min-w-0 truncate text-fg">{userListFullName(user)}</span>
+          </div>
+        ),
+      },
+      {
+        key: "email",
+        header: "Email",
+        render: (user) => (
+          <span className="whitespace-nowrap text-gray-500 dark:text-gray-400">{user.email}</span>
+        ),
+      },
+      {
+        key: "department",
+        header: "Department",
+        render: (user) => (
+          <span className="text-gray-500 dark:text-gray-400">{user.department || "—"}</span>
+        ),
+      },
+      {
+        key: "source",
+        header: "Source",
+        render: (user) => sourceBadge(user.provisioning_source),
+      },
+      {
+        key: "role",
+        header: "Role",
+        render: (user) => (
+          <span className="text-sm text-gray-700 dark:text-gray-200">{user.role}</span>
+        ),
+      },
+      {
+        key: "financial_view",
+        header: "Financial view",
+        render: (user) => {
+          const financialView =
+            user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false;
+          if (user.role === "admin") {
+            return <span className="text-xs text-gray-400">—</span>;
+          }
+          return (
+            <Badge color={financialView ? "blue" : "gray"}>
+              {financialView ? "Yes" : "No"}
+            </Badge>
+          );
+        },
+      },
+      {
+        key: "status",
+        header: "Status",
+        render: (user) => (
+          <Badge color={user.is_active ? "green" : "red"}>
+            {user.is_active ? "Active" : "Inactive"}
+          </Badge>
+        ),
+      },
+      {
+        key: "renewal_emails",
+        header: "Renewal emails",
+        render: (user) => (
+          <Badge color={user.receive_renewal_notifications ?? true ? "green" : "gray"}>
+            {user.receive_renewal_notifications ?? true ? "On" : "Off"}
+          </Badge>
+        ),
+      },
+    ],
+    [],
+  );
 
   async function submitCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -293,97 +384,13 @@ export function Users() {
               placeholder="Search users..."
             />
           </div>
-          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-950">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Email
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Department
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Source
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Role
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Financial view
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Renewal emails
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                {filtered.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
-                    >
-                      No users found.
-                    </td>
-                  </tr>
-                )}
-                {filtered.map((user) => {
-                  const financialView =
-                    user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false;
-                  return (
-                    <tr key={user.id}>
-                      <td className="max-w-[14rem] px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-                        <Link
-                          to={`/users/${user.id}`}
-                          className="hlink whitespace-nowrap"
-                        >
-                          {user.first_name} {user.last_name}
-                        </Link>
-                      </td>
-                      <td className="max-w-[12rem] px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                        <span className="whitespace-nowrap">{user.email}</span>
-                      </td>
-                      <td className="max-w-[10rem] px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                        {user.department || "--"}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">{sourceBadge(user.provisioning_source)}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className="text-sm text-gray-700 dark:text-gray-200">{user.role}</span>
-                      </td>
-                      <td className="max-w-[10rem] px-4 py-3">
-                        {user.role === "admin" ? (
-                          <span className="text-xs text-gray-400">—</span>
-                        ) : (
-                          <Badge color={financialView ? "blue" : "gray"}>
-                            {financialView ? "Yes" : "No"}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <Badge color={user.is_active ? "green" : "red"}>
-                          {user.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <Badge
-                          color={user.receive_renewal_notifications ?? true ? "green" : "gray"}
-                        >
-                          {user.receive_renewal_notifications ?? true ? "On" : "Off"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={filtered}
+            striped
+            primaryColumnKey="name"
+            onRowClick={(u) => navigate(`/users/${u.id}`)}
+          />
         </>
       )}
     </div>

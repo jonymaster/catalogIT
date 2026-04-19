@@ -215,6 +215,25 @@ body {
 }
 .hlink:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
+/*
+ * Clickable “record” rows / blocks: on hover, the primary title uses the accent
+ * color (light: #3b5bdb via --accent; dark: --accent) with an underline.
+ * !important wins over utility `text-fg` on the same node.
+ */
+.interactive-record:hover td.data-record-primary .truncate {
+  color: var(--accent) !important;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+  transition: color 120ms ease;
+}
+
+.interactive-record:hover .record-primary-label {
+  color: var(--accent) !important;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+  transition: color 120ms ease;
+}
+
 /* Scrollbars */
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: transparent; }

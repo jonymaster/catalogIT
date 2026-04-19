@@ -24,6 +24,10 @@ class LaptopFriendlyAuditDictTest(unittest.TestCase):
         self.assertEqual(out["status"], "Assigned")
         self.assertNotIn("hardware_status_id", out)
 
+    def test_labels_operating_system(self) -> None:
+        out = _friendly_laptop_value_dict({"operating_system": "macos"})
+        self.assertEqual(out["operating_system"], "macOS")
+
 
 class LaptopAssigneeLabelTest(unittest.TestCase):
     def test_prefers_first_last(self) -> None:

@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
-import type { CostRecord, HardwareLocation, HardwareStatus, Laptop, User } from "../types/models";
+import { OsIcon } from "./ui/OsIcon";
+import { OS_OPTIONS } from "../utils/operatingSystem";
+import type {
+  CostRecord,
+  HardwareLocation,
+  HardwareStatus,
+  Laptop,
+  OperatingSystem,
+  User,
+} from "../types/models";
 
 interface Props {
   initial?: Laptop;
@@ -10,6 +19,7 @@ interface Props {
 interface FormData {
   serial_number: string;
   model_name: string;
+  operating_system: string;
   cpu: string;
   ram: string;
   storage_size: string;
@@ -27,6 +37,7 @@ function toFormData(l?: Laptop): FormData {
   return {
     serial_number: l?.serial_number ?? "",
     model_name: l?.model_name ?? "",
+    operating_system: l?.operating_system ?? "",
     cpu: l?.cpu ?? "",
     ram: l?.ram ?? "",
     storage_size: l?.storage_size ?? "",
@@ -115,6 +126,9 @@ export function LaptopForm({ initial }: Props) {
     const payload = {
       serial_number: form.serial_number,
       model_name: form.model_name,
+      operating_system: form.operating_system
+        ? (form.operating_system as OperatingSystem)
+        : null,
       cpu: form.cpu,
       ram: form.ram,
       storage_size: form.storage_size,
@@ -175,7 +189,7 @@ export function LaptopForm({ initial }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className={labelCls}>Serial Number *</label>
           <input
@@ -194,6 +208,31 @@ export function LaptopForm({ initial }: Props) {
             value={form.model_name}
             onChange={(e) => set("model_name", e.target.value)}
           />
+        </div>
+        <div>
+          <label className={labelCls}>Operating system</label>
+          <div className="flex items-center gap-2">
+            <OsIcon
+              operatingSystem={
+                form.operating_system
+                  ? (form.operating_system as OperatingSystem)
+                  : null
+              }
+              className="h-7 w-7 shrink-0"
+            />
+            <select
+              className={`${inputCls} min-w-0 flex-1`}
+              value={form.operating_system}
+              onChange={(e) => set("operating_system", e.target.value)}
+            >
+              <option value="">— Unknown —</option>
+              {OS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
