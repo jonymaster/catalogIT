@@ -57,23 +57,29 @@ export function ServiceDetail() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [extraTab, setExtraTab] = useState<ExtraTab>(null);
 
-  // Track the id we've already fetched so the effect stays idempotent
-  // even when the id changes across route updates.
-  const fetchedIdRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!id || fetchedIdRef.current === id) return;
-    fetchedIdRef.current = id;
+    if (!id) {
+      setService(null);
+      setDraft(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    setLoading(true);
     client
       .get<Service>(`/api/services/${id}`)
       .then((r) => {
         if (cancelled) return;
         setService(r.data);
         setDraft(toDraft(r.data));
-        setLoading(false);
       })
       .catch(() => {
+        if (cancelled) return;
+        setService(null);
+        setDraft(null);
+      })
+      .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
