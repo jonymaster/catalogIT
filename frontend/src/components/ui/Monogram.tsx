@@ -12,12 +12,24 @@ function hueFromString(s: string): number {
   return h % 360;
 }
 
+function firstLetter(word: string): string | undefined {
+  const m = word.match(/\p{L}/u);
+  return m ? m[0] : undefined;
+}
+
 function derive(name: string): string {
-  const words = name.trim().split(/\s+/);
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const words = trimmed.split(/\s+/);
   if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase();
+    const a = firstLetter(words[0]);
+    const b = firstLetter(words[1]);
+    if (a && b) return (a + b).toUpperCase();
   }
-  return name.slice(0, 2).toUpperCase();
+  const letters = trimmed.match(/\p{L}/gu) ?? [];
+  if (letters.length >= 2) return (letters[0] + letters[1]).toUpperCase();
+  if (letters.length === 1) return letters[0].toUpperCase();
+  return "?";
 }
 
 /**
