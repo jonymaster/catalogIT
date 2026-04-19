@@ -1,6 +1,7 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useSidebar } from "../context/SidebarContext";
+import { BrandMark } from "./BrandMark";
 import {
   HomeIcon,
   ServerStackIcon,
@@ -27,30 +28,6 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
-}
-
-function BrandMonogram({ collapsed }: { collapsed: boolean }) {
-  return (
-    <Link
-      to="/"
-      className="flex items-center gap-2 transition-opacity hover:opacity-90"
-    >
-      <span
-        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-fg text-bg font-bold"
-        style={{ fontSize: 13, letterSpacing: "-0.04em" }}
-      >
-        C
-      </span>
-      {!collapsed && (
-        <span
-          className="text-[14.5px] font-semibold text-fg"
-          style={{ letterSpacing: "-0.01em" }}
-        >
-          CatalogIT
-        </span>
-      )}
-    </Link>
-  );
 }
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
@@ -158,7 +135,7 @@ export function Sidebar() {
           justifyContent: collapsed ? "center" : "flex-start",
         }}
       >
-        <BrandMonogram collapsed={collapsed} />
+        <BrandMark collapsed={collapsed} className="gap-0 [&_img]:max-h-9" />
       </div>
 
       {/* Navigation */}
