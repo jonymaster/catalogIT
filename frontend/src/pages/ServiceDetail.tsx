@@ -39,7 +39,7 @@ import {
 } from "../service/serviceDetailContext";
 import type { Service } from "../types/models";
 
-type ExtraTab = "activity" | "integrations" | null;
+type ExtraTab = "activity" | null;
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -348,18 +348,11 @@ export function ServiceDetail() {
               active={activeExtra === "activity"}
               onClick={() => openExtraTab("activity")}
             />
-            <TabButton
-              label="Integrations"
-              active={activeExtra === "integrations"}
-              onClick={() => openExtraTab("integrations")}
-            />
           </nav>
         </div>
 
         {activeExtra === "activity" ? (
           <ActivityPanel serviceId={service.id} />
-        ) : activeExtra === "integrations" ? (
-          <IntegrationsPanel service={service} />
         ) : (
           <Outlet context={outletContext} />
         )}
