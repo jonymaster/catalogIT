@@ -11,6 +11,11 @@ import type {
   PaginatedGlobalAudit,
 } from "../types/models";
 import { BarChart } from "../components/charts/BarChart";
+import {
+  buildChartAxis,
+  formatChartTickMoney,
+  type ChartYScaleMode,
+} from "../components/charts/chartAxis";
 import { DashboardSkeleton } from "../components/Skeleton";
 import { BarRow } from "../components/ui/BarRow";
 import { Avatar } from "../components/ui/Avatar";
@@ -56,6 +61,10 @@ interface WidgetCtx {
   ssoCount: number;
   activeServices: number;
   isAdmin: boolean;
+  spendChartScale: ChartYScaleMode;
+  setSpendChartScale: (m: ChartYScaleMode) => void;
+  /** Where to show the shared axis mode control when only one spend chart is visible. */
+  spendAxisTogglePlacement: "trend" | "byYear" | "none";
 }
 
 interface WidgetDef {
@@ -289,20 +298,26 @@ function KpiStrip({ ctx }: { ctx: WidgetCtx }) {
   );
 }
 
+const SPEND_TREND_TICK_FRACS = [0, 0.25, 0.5, 0.75, 1] as const;
+
 function SpendTrendChart({
   years,
   costByYear,
   activeYear,
   onSelectYear,
+  scale,
+  showAxisHint,
 }: {
   years: number[];
   costByYear: Record<number, number>;
   activeYear: number;
   onSelectYear: (y: number) => void;
+  scale: ChartYScaleMode;
+  showAxisHint?: boolean;
 }) {
   const w = 640;
   const h = 180;
-  const padL = 40;
+  const padL = 52;
   const padR = 10;
   const padT = 10;
   const padB = 26;
@@ -310,11 +325,15 @@ function SpendTrendChart({
   const ih = h - padT - padB;
 
   const values = years.map((y) => costByYear[y] ?? 0);
-  const max = Math.max(...values, 1);
+  const axis = buildChartAxis(values, scale);
+
+  if (years.length === 0) {
+    return null;
+  }
 
   const pts = years.map((y, i) => ({
     x: years.length === 1 ? padL + iw / 2 : padL + (i / (years.length - 1)) * iw,
-    y: padT + ih - ((costByYear[y] ?? 0) / max) * ih,
+    y: padT + ih - axis.valueToHeightFraction(costByYear[y] ?? 0) * ih,
     year: y,
     value: costByYear[y] ?? 0,
   }));
@@ -324,64 +343,141 @@ function SpendTrendChart({
     ` L${pts[pts.length - 1].x},${padT + ih} L${pts[0].x},${padT + ih} Z`;
 
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      style={{ width: "100%", height: "auto" }}
-      preserveAspectRatio="none"
-    >
-      {[0.25, 0.5, 0.75, 1].map((f) => (
-        <line
-          key={f}
-          x1={padL}
-          x2={w - padR}
-          y1={padT + ih * (1 - f)}
-          y2={padT + ih * (1 - f)}
-          stroke="var(--border)"
-          strokeWidth={1}
+    <div className="w-full">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        style={{ width: "100%", height: "auto" }}
+        preserveAspectRatio="none"
+      >
+        {SPEND_TREND_TICK_FRACS.map((f) => {
+          const y = padT + ih * (1 - f);
+          return (
+            <g key={f}>
+              <line
+                x1={padL}
+                x2={w - padR}
+                y1={y}
+                y2={y}
+                stroke="var(--border)"
+                strokeWidth={1}
+              />
+              <text
+                x={padL - 8}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="11"
+                fontWeight="500"
+                className="fill-gray-500 dark:fill-gray-400"
+                style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}
+              >
+                {formatChartTickMoney(axis.tickValue(f))}
+              </text>
+            </g>
+          );
+        })}
+        <path d={areaPath} fill="var(--accent)" opacity={0.1} />
+        <path
+          d={linePath}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={1.75}
+          strokeLinejoin="round"
         />
-      ))}
-      <path d={areaPath} fill="var(--accent)" opacity={0.1} />
-      <path
-        d={linePath}
-        fill="none"
-        stroke="var(--accent)"
-        strokeWidth={1.75}
-        strokeLinejoin="round"
-      />
-      {pts.map((p) => (
-        <g key={p.year} style={{ cursor: "pointer" }} onClick={() => onSelectYear(p.year)}>
-          <circle
-            cx={p.x}
-            cy={p.y}
-            r={p.year === activeYear ? 4 : 2.5}
-            fill="var(--accent)"
-          />
-          <text
-            x={p.x}
-            y={h - 8}
-            fontSize={10.5}
-            textAnchor="middle"
-            fill={p.year === activeYear ? "var(--fg)" : "var(--fg-3)"}
-            fontFamily="'IBM Plex Mono', ui-monospace, monospace"
-            fontWeight={p.year === activeYear ? 600 : 400}
+        {pts.map((p) => (
+          <g
+            key={p.year}
+            style={{ cursor: "pointer" }}
+            onClick={() => onSelectYear(p.year)}
           >
-            {p.year}
-          </text>
-        </g>
-      ))}
-    </svg>
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={p.year === activeYear ? 4 : 2.5}
+              fill="var(--accent)"
+            />
+            <text
+              x={p.x}
+              y={h - 8}
+              fontSize={10.5}
+              textAnchor="middle"
+              fill={p.year === activeYear ? "var(--fg)" : "var(--fg-3)"}
+              fontFamily="'IBM Plex Mono', ui-monospace, monospace"
+              fontWeight={p.year === activeYear ? 600 : 400}
+            >
+              {p.year}
+            </text>
+          </g>
+        ))}
+      </svg>
+      {showAxisHint && axis.axisHint ? (
+        <div className="mt-1 text-center text-[11px] text-gray-500 dark:text-gray-400">
+          {axis.axisHint}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SpendChartScaleToggle({
+  value,
+  onChange,
+}: {
+  value: ChartYScaleMode;
+  onChange: (m: ChartYScaleMode) => void;
+}) {
+  const opts: { id: ChartYScaleMode; label: string }[] = [
+    { id: "linearZero", label: "Full" },
+    { id: "linearFocused", label: "Focus" },
+    { id: "log", label: "Log" },
+  ];
+  return (
+    <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5">
+      <span className="text-[11px] text-fg-4">Axis</span>
+      <div className="inline-flex rounded-md border border-border bg-surface-2/50 p-0.5">
+        {opts.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => onChange(o.id)}
+            className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              value === o.id
+                ? "bg-accent text-white shadow-sm"
+                : "text-fg-3 hover:text-fg-2"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
 function SpendTrendWidget({ ctx }: { ctx: WidgetCtx }) {
-  const { fiscalYears, costByYear, dashYear, setDashYear } = ctx;
+  const {
+    fiscalYears,
+    costByYear,
+    dashYear,
+    setDashYear,
+    spendChartScale,
+    setSpendChartScale,
+    spendAxisTogglePlacement,
+  } = ctx;
   return (
     <>
+      {fiscalYears.length > 0 && spendAxisTogglePlacement === "trend" ? (
+        <SpendChartScaleToggle
+          value={spendChartScale}
+          onChange={setSpendChartScale}
+        />
+      ) : null}
       <SpendTrendChart
         years={fiscalYears}
         costByYear={costByYear}
         activeYear={dashYear}
         onSelectYear={setDashYear}
+        scale={spendChartScale}
+        showAxisHint
       />
       <div className="mt-2 flex justify-end">
         <Link
@@ -396,7 +492,16 @@ function SpendTrendWidget({ ctx }: { ctx: WidgetCtx }) {
 }
 
 function SpendByYearWidget({ ctx }: { ctx: WidgetCtx }) {
-  const { fiscalYears, costByYear, dashYear, setDashYear, hasCostData } = ctx;
+  const {
+    fiscalYears,
+    costByYear,
+    dashYear,
+    setDashYear,
+    hasCostData,
+    spendChartScale,
+    setSpendChartScale,
+    spendAxisTogglePlacement,
+  } = ctx;
   if (!hasCostData || fiscalYears.length === 0) {
     return (
       <div className="py-8 text-center text-sm text-fg-3">
@@ -406,8 +511,16 @@ function SpendByYearWidget({ ctx }: { ctx: WidgetCtx }) {
   }
   return (
     <>
+      {spendAxisTogglePlacement === "byYear" ? (
+        <SpendChartScaleToggle
+          value={spendChartScale}
+          onChange={setSpendChartScale}
+        />
+      ) : null}
       <BarChart
         height={260}
+        scale={spendChartScale}
+        showAxisHint
         data={fiscalYears.map((y) => ({
           label: String(y),
           value: costByYear[y] ?? 0,
@@ -1148,6 +1261,9 @@ export function Dashboard() {
   const [laptops, setLaptops] = useState<Laptop[]>([]);
   const { records, fiscalYears, loading: costLoading } = useDashboardCostData();
   const [dashYearOverride, setDashYearOverride] = useState<number | null>(null);
+  const [spendChartScale, setSpendChartScale] = useState<ChartYScaleMode>(
+    "linearFocused",
+  );
   const [editMode, setEditMode] = useState(false);
   const [widgetIds, setWidgetIds] = useLocalStorage<WidgetId[]>(
     WIDGET_STORAGE_KEY,
@@ -1366,6 +1482,15 @@ export function Dashboard() {
     day: "numeric",
   });
 
+  const spendAxisTogglePlacement: "trend" | "byYear" | "none" =
+    !canFinancialView
+      ? "none"
+      : orderedIds.includes("spend-trend")
+        ? "trend"
+        : orderedIds.includes("spend-by-year")
+          ? "byYear"
+          : "none";
+
   const ctx: WidgetCtx = {
     services,
     laptops,
@@ -1384,6 +1509,9 @@ export function Dashboard() {
     ssoCount,
     activeServices,
     isAdmin,
+    spendChartScale,
+    setSpendChartScale,
+    spendAxisTogglePlacement,
   };
 
   const rightForWidget = (id: WidgetId): React.ReactNode => {
