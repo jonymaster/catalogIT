@@ -126,6 +126,19 @@ export function Sidebar() {
         transition: "width 220ms cubic-bezier(.2,.8,.2,1)",
       }}
     >
+      <button
+        type="button"
+        onClick={toggle}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-expanded={!collapsed}
+        className="absolute right-0 top-1/2 z-50 flex h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-border bg-surface text-fg-3 shadow-sm transition-[color,background-color,box-shadow] duration-150 hover:bg-surface-2 hover:text-fg-2"
+      >
+        {collapsed ? (
+          <ChevronRightIcon className="h-4 w-4" />
+        ) : (
+          <ChevronLeftIcon className="h-4 w-4" />
+        )}
+      </button>
       {/* Brand */}
       <div
         className="flex items-center border-b border-border"
@@ -186,28 +199,9 @@ export function Sidebar() {
                     {isAdmin ? "Admin" : "Member"} · CatalogIT
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={toggle}
-                  title="Collapse sidebar"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-                >
-                  <ChevronLeftIcon className="h-4 w-4" />
-                </button>
               </>
             )}
           </div>
-        )}
-
-        {collapsed && (
-          <button
-            type="button"
-            onClick={toggle}
-            title="Expand sidebar"
-            className="mb-1 inline-flex h-8 w-full items-center justify-center rounded-md text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
         )}
 
         {!collapsed && (
