@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from math import ceil
 import uuid
 
@@ -30,18 +31,22 @@ _writer = require_role("admin", "editor")
 _MAX_DIRECTORY_PAGE = 50
 
 
+def _escape_like_term(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _apply_directory_search(stmt, q: str | None):
     needle = (q or "").strip().lower()
     if not needle:
         return stmt
-    like = f"%{needle}%"
+    like = f"%{_escape_like_term(needle)}%"
     return stmt.where(
         or_(
-            func.lower(User.email).like(like),
-            func.lower(User.first_name).like(like),
-            func.lower(User.last_name).like(like),
-            func.lower(func.coalesce(User.display_name, "")).like(like),
-            func.lower(func.coalesce(User.department, "")).like(like),
+            func.lower(User.email).like(like, escape="\\"),
+            func.lower(User.first_name).like(like, escape="\\"),
+            func.lower(User.last_name).like(like, escape="\\"),
+            func.lower(func.coalesce(User.display_name, "")).like(like, escape="\\"),
+            func.lower(func.coalesce(User.department, "")).like(like, escape="\\"),
         )
     )
 

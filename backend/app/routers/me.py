@@ -17,6 +17,7 @@ from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferenc
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 
+_ALLOWED_UI_PREFERENCE_KEYS = {"dashboard", "service_list"}
 _MAX_UI_PREFERENCES_DEPTH = 8
 _MAX_UI_PREFERENCES_JSON_BYTES = 64 * 1024
 
@@ -31,6 +32,9 @@ def _deep_merge_preferences(
 ) -> dict[str, Any]:
     merged = dict(current)
     for key, value in updates.items():
+        if value is None:
+            merged.pop(key, None)
+            continue
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = _deep_merge_preferences(merged[key], value)
             continue
@@ -65,6 +69,14 @@ def _validate_ui_preferences_size(value: dict[str, Any]) -> None:
 
 
 def _validate_ui_preferences(value: dict[str, Any]) -> None:
+    unknown_keys = sorted(
+        key for key in value if key not in _ALLOWED_UI_PREFERENCE_KEYS
+    )
+    if unknown_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown UI preference sections: {', '.join(unknown_keys)}",
+        )
     _validate_ui_preferences_depth(value)
     _validate_ui_preferences_size(value)
 

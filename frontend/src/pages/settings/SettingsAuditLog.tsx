@@ -140,8 +140,13 @@ export function SettingsAuditLog() {
     <PageTransition>
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Audit logs</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <h1
+          className="text-fg"
+          style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+        >
+          Audit log
+        </h1>
+        <p className="mt-1 text-[13px] text-fg-3">
           Sign-ins, data changes, notifications, integration tests, and application errors for
           this deployment. Events older than the retention window (90 days by default) are removed when
           the server runs the scheduled audit-retention job.

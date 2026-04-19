@@ -1,7 +1,6 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { useSidebar } from "../context/sidebar-context";
-import { BrandMark } from "./BrandMark";
+import { useSidebar } from "../context/SidebarContext";
 import {
   HomeIcon,
   ServerStackIcon,
@@ -25,70 +24,81 @@ interface NavItem {
   end?: boolean;
 }
 
-const mainNav: NavItem[] = [
-  { name: "Dashboard", to: "/", icon: HomeIcon, end: true },
-];
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
 
-const inventoryNav: NavItem[] = [
-  { name: "Services", to: "/services", icon: ServerStackIcon },
-  { name: "Hardware", to: "/hardware", icon: ComputerDesktopIcon },
-];
-
-const planningNav: NavItem[] = [
-  { name: "Renewal Calendar", to: "/calendar", icon: CalendarDaysIcon },
-];
-
-const adminNav: NavItem[] = [
-  { name: "Users", to: "/users", icon: UsersIcon },
-  { name: "Settings", to: "/settings", icon: Cog6ToothIcon },
-  { name: "Audit logs", to: "/audit", icon: ClipboardDocumentListIcon },
-];
+function BrandMonogram({ collapsed }: { collapsed: boolean }) {
+  return (
+    <Link
+      to="/"
+      className="flex items-center gap-2 transition-opacity hover:opacity-90"
+    >
+      <span
+        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-fg text-bg font-bold"
+        style={{ fontSize: 13, letterSpacing: "-0.04em" }}
+      >
+        C
+      </span>
+      {!collapsed && (
+        <span
+          className="text-[14.5px] font-semibold text-fg"
+          style={{ letterSpacing: "-0.01em" }}
+        >
+          CatalogIT
+        </span>
+      )}
+    </Link>
+  );
+}
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   return (
     <NavLink
       to={item.to}
       end={item.end}
+      title={collapsed ? item.name : undefined}
       className={({ isActive }) =>
-        `group relative flex items-center rounded-lg text-sm font-medium transition-all duration-150 ${
-          collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2"
-        } ${
+        [
+          "group relative flex items-center rounded-md text-[13.5px] font-medium transition-colors duration-150 whitespace-nowrap",
+          collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-1.5",
           isActive
-            ? "bg-sidebar-bg-active text-sidebar-text-active"
-            : "text-sidebar-text hover:bg-sidebar-bg-hover hover:text-sidebar-text-active"
-        }`
+            ? "bg-surface-3 text-fg"
+            : "text-fg-3 hover:bg-surface-2 hover:text-fg-2",
+        ].join(" ")
       }
     >
       {({ isActive }) => (
         <>
           {isActive && (
-            <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-accent" />
+            <span
+              className="absolute top-1/2 -translate-y-1/2 rounded-full bg-accent"
+              style={{
+                width: 3,
+                height: 16,
+                left: collapsed ? 4 : -6,
+              }}
+            />
           )}
-          <item.icon className="h-5 w-5 shrink-0" />
+          <item.icon className="h-[17px] w-[17px] shrink-0" />
           {!collapsed && <span className="truncate">{item.name}</span>}
-          {collapsed && (
-            <span className="pointer-events-none absolute left-full z-40 ml-3 whitespace-nowrap rounded-md border border-sidebar-border bg-sidebar-bg-active px-2.5 py-1.5 text-xs font-medium text-sidebar-text-active opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-              {item.name}
-            </span>
-          )}
         </>
       )}
     </NavLink>
   );
 }
 
-function NavSection({ items, collapsed }: { items: NavItem[]; collapsed: boolean }) {
+function SectionHeader({ label, collapsed }: { label: string; collapsed: boolean }) {
+  if (collapsed) return null;
   return (
-    <div className="space-y-0.5">
-      {items.map((item) => (
-        <SidebarLink key={item.to} item={item} collapsed={collapsed} />
-      ))}
+    <div
+      className="px-2.5 pb-1 pt-2 text-[10.5px] font-semibold uppercase text-fg-4"
+      style={{ letterSpacing: "0.1em" }}
+    >
+      {label}
     </div>
   );
-}
-
-function Divider() {
-  return <div className="my-3 h-px bg-sidebar-border" />;
 }
 
 export function Sidebar() {
@@ -97,106 +107,157 @@ export function Sidebar() {
   const isAdmin = user?.role === "admin";
   const initial = user?.email?.charAt(0).toUpperCase() ?? "?";
 
+  const sections: NavSection[] = [
+    {
+      label: "",
+      items: [{ name: "Dashboard", to: "/", icon: HomeIcon, end: true }],
+    },
+    {
+      label: "Inventory",
+      items: [
+        { name: "Services", to: "/services", icon: ServerStackIcon },
+        { name: "Hardware", to: "/hardware", icon: ComputerDesktopIcon },
+      ],
+    },
+    {
+      label: "Planning",
+      items: [
+        { name: "Renewals", to: "/calendar", icon: CalendarDaysIcon },
+        ...(canFinancialView
+          ? [{ name: "Cost Report", to: "/costs", icon: BanknotesIcon }]
+          : []),
+      ],
+    },
+  ];
+
+  if (isAdmin) {
+    sections.push({
+      label: "Admin",
+      items: [
+        { name: "People", to: "/users", icon: UsersIcon },
+        { name: "Settings", to: "/settings", icon: Cog6ToothIcon },
+        { name: "Audit log", to: "/audit", icon: ClipboardDocumentListIcon },
+      ],
+    });
+  }
+
   return (
     <aside
-      className="fixed left-0 top-0 z-30 flex h-screen flex-col bg-sidebar-bg"
+      className="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-surface"
       style={{
         width: collapsed ? "var(--sidebar-collapsed)" : "var(--sidebar-expanded)",
-        transition: "width 250ms var(--ease-out-expo)",
+        transition: "width 220ms cubic-bezier(.2,.8,.2,1)",
       }}
     >
       {/* Brand */}
-      <div className={`flex items-center border-b border-sidebar-border ${collapsed ? "justify-center px-3 py-4" : "px-5 py-4"}`}>
-        <BrandMark collapsed={collapsed} />
+      <div
+        className="flex items-center border-b border-border"
+        style={{
+          padding: collapsed ? "14px 10px" : "14px 14px",
+          minHeight: 52,
+          justifyContent: collapsed ? "center" : "flex-start",
+        }}
+      >
+        <BrandMonogram collapsed={collapsed} />
       </div>
 
       {/* Navigation */}
-      <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 ${collapsed ? "px-2" : "px-3"}`}>
-        <NavSection items={mainNav} collapsed={collapsed} />
-        <Divider />
-        <NavSection items={inventoryNav} collapsed={collapsed} />
-        <Divider />
-        <NavSection items={planningNav} collapsed={collapsed} />
-
-        {canFinancialView && (
-          <>
-            <Divider />
-            <NavSection
-              items={[{ name: "Costs", to: "/costs", icon: BanknotesIcon }]}
-              collapsed={collapsed}
-            />
-          </>
-        )}
-
-        {isAdmin && (
-          <>
-            <Divider />
-            {!collapsed && (
-              <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-sidebar-text/50">
-                Admin
-              </p>
-            )}
-            <NavSection items={adminNav} collapsed={collapsed} />
-          </>
-        )}
+      <nav
+        className="flex-1 overflow-y-auto overflow-x-hidden"
+        style={{ padding: collapsed ? "10px 6px" : "10px 10px" }}
+      >
+        {sections.map((sec, idx) => (
+          <div key={sec.label || idx} className="mb-3.5">
+            {sec.label && <SectionHeader label={sec.label} collapsed={collapsed} />}
+            <div className="space-y-0.5">
+              {sec.items.map((item) => (
+                <SidebarLink key={item.to} item={item} collapsed={collapsed} />
+              ))}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      {/* Collapse toggle: circular, vertically centered on the sidebar */}
-      <button
-        type="button"
-        onClick={toggle}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-expanded={!collapsed}
-        className="absolute right-0 top-1/2 z-40 flex h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-bg text-sidebar-text shadow-md transition-colors hover:bg-sidebar-bg-hover hover:text-sidebar-text-active"
-      >
-        {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronLeftIcon className="h-4 w-4" />}
-      </button>
-
       {/* Footer */}
-      <div className={`border-t border-sidebar-border ${collapsed ? "px-2 py-3" : "px-3 py-3"}`}>
+      <div
+        className="border-t border-border"
+        style={{ padding: collapsed ? "10px 6px" : "10px" }}
+      >
         {user && (
-          <div className={`mb-2 ${collapsed ? "flex justify-center" : ""}`}>
+          <div className={`mb-2 flex items-center gap-2 ${collapsed ? "justify-center" : ""}`}>
             {collapsed ? (
               <NavLink
                 to="/me/settings"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent/20 text-xs font-semibold text-sidebar-accent transition-colors hover:bg-sidebar-accent/30"
                 title={user.email}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-semibold text-fg-2 transition-colors hover:bg-surface-3"
               >
                 {initial}
               </NavLink>
             ) : (
               <>
-                <div className="mb-2 flex items-center gap-2.5">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent/20 text-xs font-semibold text-sidebar-accent">
-                    {initial}
-                  </span>
-                  <span className="truncate text-sm text-sidebar-text">{user.email}</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-semibold text-fg-2">
+                  {initial}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div
+                    className="truncate text-[12.5px] font-medium text-fg"
+                    title={user.email}
+                  >
+                    {user.email}
+                  </div>
+                  <div className="text-[11px] text-fg-3">
+                    {isAdmin ? "Admin" : "Member"} · CatalogIT
+                  </div>
                 </div>
-                <NavLink
-                  to="/me/settings"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ${
-                      isActive
-                        ? "bg-sidebar-bg-active text-sidebar-text-active"
-                        : "text-sidebar-text hover:bg-sidebar-bg-hover hover:text-sidebar-text-active"
-                    }`
-                  }
+                <button
+                  type="button"
+                  onClick={toggle}
+                  title="Collapse sidebar"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-3 hover:bg-surface-2 hover:text-fg-2"
                 >
-                  <UserCircleIcon className="h-5 w-5 shrink-0" />
-                  <span>Personal Settings</span>
-                </NavLink>
+                  <ChevronLeftIcon className="h-4 w-4" />
+                </button>
               </>
             )}
           </div>
         )}
+
+        {collapsed && (
+          <button
+            type="button"
+            onClick={toggle}
+            title="Expand sidebar"
+            className="mb-1 inline-flex h-8 w-full items-center justify-center rounded-md text-fg-3 hover:bg-surface-2 hover:text-fg-2"
+          >
+            <ChevronRightIcon className="h-4 w-4" />
+          </button>
+        )}
+
+        {!collapsed && (
+          <NavLink
+            to="/me/settings"
+            className={({ isActive }) =>
+              `mb-0.5 flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
+                isActive
+                  ? "bg-surface-3 text-fg"
+                  : "text-fg-3 hover:bg-surface-2 hover:text-fg-2"
+              }`
+            }
+          >
+            <UserCircleIcon className="h-[17px] w-[17px] shrink-0" />
+            <span>Personal settings</span>
+          </NavLink>
+        )}
+
         <button
           onClick={logout}
-          className={`flex w-full items-center rounded-lg text-sm font-medium text-sidebar-text transition-all duration-150 hover:bg-sidebar-bg-hover hover:text-sidebar-text-active ${
-            collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2"
-          }`}
           title="Log out"
+          className={[
+            "flex w-full items-center rounded-md text-[13px] font-medium text-fg-3 hover:bg-surface-2 hover:text-fg-2 transition-colors",
+            collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-1.5",
+          ].join(" ")}
         >
-          <ArrowRightStartOnRectangleIcon className="h-5 w-5 shrink-0" />
+          <ArrowRightStartOnRectangleIcon className="h-[17px] w-[17px] shrink-0" />
           {!collapsed && <span>Log out</span>}
         </button>
       </div>

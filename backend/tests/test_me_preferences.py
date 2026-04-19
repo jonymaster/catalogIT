@@ -162,7 +162,7 @@ class MePreferencesRouterTest(unittest.TestCase):
 
         response = self.client.patch(
             "/api/me/preferences",
-            json={"ui_preferences": nested},
+            json={"ui_preferences": {"dashboard": nested}},
         )
 
         self.assertEqual(response.status_code, 400)
@@ -188,6 +188,45 @@ class MePreferencesRouterTest(unittest.TestCase):
             "UI preferences exceed maximum size",
         )
         self.assertEqual(self.db.flush_calls, 0)
+
+    def test_patch_preferences_rejects_unknown_preference_sections(self) -> None:
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={"ui_preferences": {"unexpected": {"enabled": True}}},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Unknown UI preference sections: unexpected",
+        )
+        self.assertEqual(self.db.flush_calls, 0)
+        self.assertIsNone(self.user.ui_preferences)
+
+    def test_patch_preferences_null_section_unsets_existing_section(self) -> None:
+        self.user.ui_preferences = {
+            "dashboard": {"visible_widget_ids": ["inventory_stats"]},
+            "service_list": {"visible_columns": ["name", "status"]},
+        }
+
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={"ui_preferences": {"dashboard": None}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["ui_preferences"],
+            {
+                "service_list": {"visible_columns": ["name", "status"]},
+            },
+        )
+        self.assertEqual(
+            self.user.ui_preferences,
+            {
+                "service_list": {"visible_columns": ["name", "status"]},
+            },
+        )
 
 
 if __name__ == "__main__":

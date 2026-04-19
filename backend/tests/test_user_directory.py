@@ -74,6 +74,17 @@ class UserDirectorySearchTest(unittest.TestCase):
         self.assertIn("lower(coalesce(users.department", sql)
         self.assertIn("%alice%", sql)
 
+    def test_query_escapes_like_metacharacters(self) -> None:
+        stmt = _apply_directory_search(select(User), r"50%_off")
+        compiled = stmt.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+        sql = str(compiled).lower()
+
+        self.assertIn(r" escape '\\'", sql)
+        self.assertIn(r"50\\%%\\_off", sql)
+
 
 class UserProfileRouteTest(unittest.TestCase):
     def test_profile_route_rejects_invalid_uuid_path_param(self) -> None:
@@ -163,6 +174,30 @@ class UserProfileRouteTest(unittest.TestCase):
             self.assertEqual(profile.assigned_laptops[0].hardware_location_name, "HQ")
 
         asyncio.run(run())
+
+
+class UserProfileRouteValidationTest(unittest.TestCase):
+    def setUp(self) -> None:
+        app = FastAPI()
+        app.include_router(user_directory.router)
+
+        async def override_current_user():
+            return SimpleNamespace(id=uuid.uuid4(), role="viewer")
+
+        async def override_db():
+            yield _FakeDb([])
+
+        app.dependency_overrides[get_current_user] = override_current_user
+        app.dependency_overrides[get_audited_db] = override_db
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        self.client.close()
+
+    def test_profile_rejects_invalid_uuid_path_param(self) -> None:
+        response = self.client.get("/api/users/not-a-uuid/profile")
+
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":

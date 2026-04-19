@@ -17,6 +17,10 @@ ALLOWED_BILLING_SCHEDULES = {"", "monthly", "annually", "na", "on_demand"}
 ALLOWED_CRITICALITY_VALUES = {"Critical", "High", "Medium", "Low"}
 
 
+def _format_allowed_choices(allowed: set[str]) -> str:
+    return ", ".join(sorted(value for value in allowed if value))
+
+
 def _normalize_name(value: str) -> str:
     cleaned = value.strip()
     if not cleaned:
@@ -34,7 +38,7 @@ def _normalize_optional_choice(
         return None
     cleaned = value.strip()
     if cleaned not in allowed:
-        raise ValueError(f"{label} must be one of: {', '.join(sorted(v or '(blank)' for v in allowed))}")
+        raise ValueError(f"{label} must be one of: {_format_allowed_choices(allowed)}")
     return cleaned
 
 
