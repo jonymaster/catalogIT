@@ -24,7 +24,7 @@ import { LaptopOverview } from "./pages/LaptopOverview";
 import { LaptopAttachments } from "./pages/LaptopAttachments";
 import { ServiceCreate } from "./pages/ServiceCreate";
 import { LaptopCreate } from "./pages/LaptopCreate";
-import { LaptopEdit } from "./pages/LaptopEdit";
+import { LaptopEditRedirect } from "./pages/LaptopEditRedirect";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
 import { UserDetail } from "./pages/UserDetail";
@@ -80,7 +80,7 @@ export default function App() {
                   <Route index element={<LaptopOverview />} />
                   <Route path="attachments" element={<LaptopAttachments />} />
                 </Route>
-                <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
+                <Route path="/hardware/:id/edit" element={<LaptopEditRedirect />} />
                 <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
             </Route>
