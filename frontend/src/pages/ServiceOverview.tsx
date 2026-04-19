@@ -17,10 +17,10 @@ import type {
   PaymentMethod,
   Service,
   ServiceClassification,
-  User,
   UserPreferences,
   Vendor,
 } from "../types/models";
+import { UserDirectoryCheckboxPicker } from "../components/UserDirectoryCheckboxPicker";
 import { formatDateOnly } from "../utils/formatting";
 import type {
   ServiceDetailContext,
@@ -32,7 +32,6 @@ const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
 
 interface RefData {
-  users: User[];
   vendors: Vendor[];
   categories: Category[];
   costCenters: CostCenter[];
@@ -84,16 +83,14 @@ function useRefData(editing: boolean): RefData | null {
     if (!editing || data) return;
     let cancelled = false;
     Promise.all([
-      client.get<User[]>("/api/users/"),
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
       client.get<ServiceClassification[]>("/api/service-classifications/"),
-    ]).then(([u, v, c, cc, p, cl]) => {
+    ]).then(([v, c, cc, p, cl]) => {
       if (cancelled) return;
       setData({
-        users: u.data,
         vendors: v.data,
         categories: c.data,
         costCenters: cc.data,
@@ -381,7 +378,6 @@ interface RightColumnProps {
   editing: boolean;
   draft: ServiceDraft;
   setField: ServiceDetailContext["setDraftField"];
-  refData: RefData | null;
 }
 
 function RightColumn({
@@ -389,12 +385,7 @@ function RightColumn({
   editing,
   draft,
   setField,
-  refData,
 }: RightColumnProps) {
-  const selectedOwners =
-    refData?.users.filter((u) => draft.owner_ids.includes(u.id)) ??
-    service.owners;
-
   return (
     <div className="flex flex-col gap-5">
       <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
@@ -418,31 +409,12 @@ function RightColumn({
             </div>
           )
         ) : (
-          <div className="space-y-2">
-            {selectedOwners.length > 0 && (
-              <AvatarStack users={selectedOwners} max={5} size={22} />
-            )}
-            <select
-              multiple
-              value={draft.owner_ids}
-              onChange={(e) =>
-                setField(
-                  "owner_ids",
-                  Array.from(e.target.selectedOptions, (o) => o.value),
-                )
-              }
-              className={`${fieldClass(false)} h-32`}
-            >
-              {refData?.users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.first_name} {u.last_name} ({u.email})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-fg-3">
-              Hold Ctrl/Cmd to select multiple.
-            </p>
-          </div>
+          <UserDirectoryCheckboxPicker
+            variant="overview"
+            value={draft.owner_ids}
+            onChange={(ids) => setField("owner_ids", ids)}
+            seedUsers={service.owners}
+          />
         )}
       </section>
 
@@ -562,7 +534,6 @@ export function ServiceOverview() {
             editing={editing}
             draft={draft}
             setField={setDraftField}
-            refData={refData}
           />
         </div>
       </div>
