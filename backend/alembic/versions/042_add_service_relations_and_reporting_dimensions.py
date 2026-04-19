@@ -23,8 +23,8 @@ def upgrade() -> None:
     op.add_column("services", sa.Column("environment", sa.String(length=100), nullable=True))
     op.create_table(
         "service_related_services",
-        sa.Column("service_id", sa.String(length=36), nullable=False),
-        sa.Column("related_service_id", sa.String(length=36), nullable=False),
+        sa.Column("service_id", sa.Uuid(), nullable=False),
+        sa.Column("related_service_id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["related_service_id"], ["services.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["service_id"], ["services.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("service_id", "related_service_id"),
