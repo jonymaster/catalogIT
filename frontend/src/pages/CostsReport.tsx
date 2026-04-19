@@ -159,20 +159,32 @@ function InteractiveBarRow({
   pctOfTotal,
   selected,
   onClick,
-}: InteractiveBarRowProps) {
+  clickable = true,
+}: InteractiveBarRowProps & { clickable?: boolean }) {
   const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`grid w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors ${
+      disabled={!clickable}
+      title={clickable ? `Drill into ${label}` : label}
+      className={`group grid w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors ${
+        clickable ? "cursor-pointer" : "cursor-default"
+      } ${
         selected
           ? "bg-accent-soft ring-1 ring-accent"
-          : "hover:bg-surface-2"
+          : clickable
+          ? "hover:bg-accent-soft/60 hover:ring-1 hover:ring-accent/40"
+          : ""
       }`}
-      style={{ gridTemplateColumns: "180px 1fr 80px 44px" }}
+      style={{ gridTemplateColumns: "180px 1fr 80px 44px 14px" }}
     >
-      <div className="truncate text-[13px] font-medium text-fg" title={label}>
+      <div
+        className={`truncate text-[13px] font-medium text-fg ${
+          clickable ? "group-hover:text-accent group-hover:underline" : ""
+        }`}
+        title={label}
+      >
         {label}
       </div>
       <div className="h-2.5 overflow-hidden rounded bg-surface-2">
@@ -190,6 +202,16 @@ function InteractiveBarRow({
       </div>
       <div className="tnum text-right text-[11.5px] text-fg-3">
         {pctOfTotal.toFixed(1)}%
+      </div>
+      <div
+        className={`text-[12px] text-fg-3 ${
+          clickable
+            ? "opacity-40 group-hover:opacity-100 group-hover:text-accent"
+            : "opacity-0"
+        }`}
+        aria-hidden
+      >
+        ›
       </div>
     </button>
   );
@@ -508,9 +530,6 @@ export function CostsReport() {
     return chartYears[chartYears.length - 1];
   }, [chartYears, focusYear]);
 
-  useEffect(() => {
-    setSelectedBucket(null);
-  }, [displayYear]);
 
   const costByYearA = useMemo(
     () => totalByYear(visualRecordsTypeA, chartYears),
@@ -629,6 +648,19 @@ export function CostsReport() {
     [visualRecordsTypeB, chartYears, categoryNamesForStackB],
   );
 
+  function handleStackedCategoryClick(year: number, categoryId: string) {
+    setFocusYear(year);
+    setBreakdownDim("category");
+    setSelectedBucket({
+      dimension: "category",
+      key: categoryId,
+      label: categoryDisplayName(categoryId),
+    });
+  }
+
+  const selectedCategoryIdForStack =
+    selectedBucket?.dimension === "category" ? selectedBucket.key : null;
+
   const sortedDetail = useMemo(() => {
     if (!combineActualEstimatedCfYears) {
       return [...filteredRecords].sort((a, b) => {
@@ -677,6 +709,24 @@ export function CostsReport() {
     recordsForSelectedVisuals,
     currentYear,
   ]);
+
+  const displayedDetail = useMemo(() => {
+    let rows = sortedDetail;
+    if (focusYear !== null) {
+      rows = rows.filter((r) => r.fiscal_year === focusYear);
+    }
+    if (selectedBucket) {
+      rows = rows.filter((r) => {
+        const { key } = bucketKeyForRecord(
+          r,
+          selectedBucket.dimension,
+          vendorByServiceId,
+        );
+        return key === selectedBucket.key;
+      });
+    }
+    return rows;
+  }, [sortedDetail, focusYear, selectedBucket, vendorByServiceId]);
 
   function displayRecordTypeLabel(recordType: string, fiscalYear: number): string {
     if (
@@ -1338,7 +1388,13 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataA}
-                onYearClick={(y) => setFocusYear(y)}
+                onYearClick={(y) => {
+                  setFocusYear(y);
+                  setSelectedBucket(null);
+                }}
+                onCategoryClick={handleStackedCategoryClick}
+                selectedYear={displayYear}
+                selectedCategoryId={selectedCategoryIdForStack}
               />
             </div>
           )}
@@ -1370,7 +1426,13 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataB}
-                onYearClick={(y) => setFocusYear(y)}
+                onYearClick={(y) => {
+                  setFocusYear(y);
+                  setSelectedBucket(null);
+                }}
+                onCategoryClick={handleStackedCategoryClick}
+                selectedYear={displayYear}
+                selectedCategoryId={selectedCategoryIdForStack}
               />
             </div>
           )}
@@ -1539,6 +1601,7 @@ export function CostsReport() {
                             bucketTotal > 0 ? (b.value / bucketTotal) * 100 : 0
                           }
                           selected={false}
+                          clickable={breakdownDim !== "month"}
                           onClick={() =>
                             breakdownDim === "month"
                               ? undefined
@@ -1563,8 +1626,38 @@ export function CostsReport() {
           </section>
 
           <div className="print-table-section mt-8 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 print:break-inside-avoid">
-            <h2 className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
-              Line items ({sortedDetail.length})
+            <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
+              <span>Line items ({displayedDetail.length})</span>
+              {(focusYear !== null || selectedBucket) && (
+                <span className="flex flex-wrap items-center gap-2 text-[11px] normal-case tracking-normal text-fg-3">
+                  {focusYear !== null && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5">
+                      FY {focusYear}
+                      <button
+                        type="button"
+                        onClick={() => setFocusYear(null)}
+                        className="text-fg-3 hover:text-fg"
+                        aria-label="Clear year filter"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {selectedBucket && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5">
+                      {selectedBucket.label}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBucket(null)}
+                        className="text-fg-3 hover:text-fg"
+                        aria-label="Clear category filter"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                </span>
+              )}
             </h2>
             <div className="costs-report-print-table-wrap max-h-[520px] overflow-auto print:max-h-none print:overflow-visible">
               <table className="costs-report-data-table min-w-full divide-y divide-gray-200 text-base dark:divide-gray-700">
@@ -1597,13 +1690,29 @@ export function CostsReport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                  {sortedDetail.map((r, idx) => (
+                  {displayedDetail.map((r, idx) => {
+                    const linkTo =
+                      r.source === "service" && r.service_id
+                        ? `/services/${r.service_id}`
+                        : r.source === "hardware" && r.laptop_id
+                        ? `/hardware/${r.laptop_id}`
+                        : null;
+                    return (
                     <tr key={`${r.service_name}-${r.fiscal_year}-${idx}`}>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
                         {r.source}
                       </td>
                       <td className="print-name-cell max-w-[220px] truncate px-4 py-3 text-gray-900 dark:text-gray-100">
-                        {r.service_name}
+                        {linkTo ? (
+                          <Link
+                            to={linkTo}
+                            className="font-medium hover:text-accent hover:underline"
+                          >
+                            {r.service_name}
+                          </Link>
+                        ) : (
+                          r.service_name
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
                         {categoryDisplayName(r.category_name ?? "")}
@@ -1637,7 +1746,8 @@ export function CostsReport() {
                           : RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
