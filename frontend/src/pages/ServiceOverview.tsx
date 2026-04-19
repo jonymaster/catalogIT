@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import client from "../api/client";
-import { Attachments } from "../components/Attachments";
 import {
   BooleanYesNoBadge,
   ClassificationBadge,
@@ -539,19 +538,16 @@ export function ServiceOverview() {
       </div>
 
       {!editing && (
-        <>
-          <Attachments entityType="service" entityId={service.id} />
-          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
-            {service.notes?.trim() ? (
-              <p className="whitespace-pre-wrap text-sm text-fg">
-                {service.notes}
-              </p>
-            ) : (
-              <p className="text-sm text-fg-4">No notes yet.</p>
-            )}
-          </section>
-        </>
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
+          {service.notes?.trim() ? (
+            <p className="whitespace-pre-wrap text-sm text-fg">
+              {service.notes}
+            </p>
+          ) : (
+            <p className="text-sm text-fg-4">No notes yet.</p>
+          )}
+        </section>
       )}
 
       {editing && (

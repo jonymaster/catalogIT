@@ -336,6 +336,13 @@ export function ServiceDetail() {
               active={location.pathname.endsWith("/costs")}
               onClick={() => openRoutedTab(`/services/${id}/costs`)}
             />
+            <TabLink
+              to="attachments"
+              end={false}
+              label="Attachments"
+              active={location.pathname.endsWith("/attachments")}
+              onClick={() => openRoutedTab(`/services/${id}/attachments`)}
+            />
             <TabButton
               label="Activity"
               active={activeExtra === "activity"}
