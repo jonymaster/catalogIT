@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
@@ -10,6 +10,7 @@ import type {
   GlobalAuditEventRow,
   PaginatedGlobalAudit,
 } from "../types/models";
+import { BarChart } from "../components/charts/BarChart";
 import { DashboardSkeleton } from "../components/Skeleton";
 import { BarRow } from "../components/ui/BarRow";
 import { Avatar } from "../components/ui/Avatar";
@@ -27,6 +28,7 @@ const WIDGET_STORAGE_KEY = "catalogit:dashboard:widgets";
 type WidgetId =
   | "kpis"
   | "spend-trend"
+  | "spend-by-year"
   | "renewal-risk"
   | "top-vendors"
   | "by-category"
@@ -51,6 +53,7 @@ interface WidgetCtx {
   upcoming90: number;
   laptopsInUse: number;
   ssoPct: number;
+  ssoCount: number;
   activeServices: number;
   isAdmin: boolean;
 }
@@ -70,6 +73,60 @@ function greetingForNow(email?: string | null): string {
   const name = email?.split("@")[0]?.split(".")[0];
   const pretty = name ? name.charAt(0).toUpperCase() + name.slice(1) : null;
   return pretty ? `${prefix}, ${pretty}.` : `${prefix}.`;
+}
+
+function useFlipReorder(
+  ids: string[],
+  getElement: (id: string) => HTMLElement | null | undefined,
+  skipId: string | null,
+) {
+  const prevRects = useRef<Map<string, DOMRect>>(new Map());
+
+  useLayoutEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    const newRects = new Map<string, DOMRect>();
+    const animations: Array<{ el: HTMLElement; dx: number; dy: number }> = [];
+
+    ids.forEach((id) => {
+      const el = getElement(id);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      newRects.set(id, rect);
+      if (id === skipId) return;
+      const prev = prevRects.current.get(id);
+      if (!prev) return;
+      const dx = prev.left - rect.left;
+      const dy = prev.top - rect.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      animations.push({ el, dx, dy });
+    });
+
+    prevRects.current = newRects;
+    if (prefersReducedMotion || animations.length === 0) return;
+
+    animations.forEach(({ el, dx, dy }) => {
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+
+    const raf = requestAnimationFrame(() => {
+      animations.forEach(({ el }) => {
+        el.style.transition = "transform 240ms cubic-bezier(.2,.8,.2,1)";
+        el.style.transform = "";
+        const cleanup = () => {
+          el.style.transition = "";
+          el.style.transform = "";
+          el.removeEventListener("transitionend", cleanup);
+        };
+        el.addEventListener("transitionend", cleanup);
+      });
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [ids, getElement, skipId]);
 }
 
 function useLocalStorage<T>(
@@ -110,6 +167,7 @@ function Kpi({
   sub,
   first,
   onClick,
+  invertDeltaColors,
 }: {
   label: string;
   value: string | number;
@@ -117,7 +175,22 @@ function Kpi({
   sub?: string;
   first?: boolean;
   onClick?: () => void;
+  /** When true, positive delta is bad (red) and negative is good (green) — e.g. spend vs prior year. */
+  invertDeltaColors?: boolean;
 }) {
+  const deltaLineColor =
+    delta == null || delta === 0
+      ? "var(--fg-3)"
+      : invertDeltaColors
+        ? delta > 0
+          ? "var(--danger)"
+          : "var(--success)"
+        : delta > 0
+          ? "var(--success)"
+          : "var(--danger)";
+  const valueColor =
+    invertDeltaColors && delta != null && delta !== 0 ? deltaLineColor : undefined;
+
   return (
     <div
       onClick={onClick}
@@ -132,25 +205,20 @@ function Kpi({
         {label}
       </div>
       <div
-        className="tnum text-fg"
-        style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}
+        className={`tnum ${valueColor ? "" : "text-fg"}`}
+        style={{
+          fontSize: 26,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          ...(valueColor ? { color: valueColor } : {}),
+        }}
       >
         {value}
       </div>
       {(delta != null || sub) && (
         <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px]">
           {delta != null && (
-            <span
-              className="font-medium"
-              style={{
-                color:
-                  delta > 0
-                    ? "var(--success)"
-                    : delta < 0
-                      ? "var(--danger)"
-                      : "var(--fg-3)",
-              }}
-            >
+            <span className="font-medium" style={{ color: deltaLineColor }}>
               {delta > 0 ? "▲" : delta < 0 ? "▼" : "·"} {Math.abs(delta).toFixed(1)}%
             </span>
           )}
@@ -176,6 +244,7 @@ function KpiStrip({ ctx }: { ctx: WidgetCtx }) {
     dashYear,
     yoyChange,
     ssoPct,
+    ssoCount,
   } = ctx;
   return (
     <div className="flex flex-wrap">
@@ -203,11 +272,19 @@ function KpiStrip({ ctx }: { ctx: WidgetCtx }) {
           label={`Spend · FY${dashYear}`}
           value={formatMoneyCompact(costByYear[dashYear] ?? 0)}
           delta={Number.isFinite(yoyChange) ? yoyChange : null}
+          invertDeltaColors
           sub="vs prior year"
           onClick={() => navigate("/costs")}
         />
       )}
-      <Kpi label="SSO coverage" value={`${ssoPct}%`} sub="target 80%" />
+      {activeServices > 0 && (
+        <Kpi
+          label="SSO coverage"
+          value={`${ssoPct}%`}
+          sub={`${ssoCount} out of ${activeServices}`}
+        />
+      )}
+ 
     </div>
   );
 }
@@ -305,6 +382,44 @@ function SpendTrendWidget({ ctx }: { ctx: WidgetCtx }) {
         costByYear={costByYear}
         activeYear={dashYear}
         onSelectYear={setDashYear}
+      />
+      <div className="mt-2 flex justify-end">
+        <Link
+          to="/costs"
+          className="text-[12px] text-accent hover:text-accent-strong"
+        >
+          View full report →
+        </Link>
+      </div>
+    </>
+  );
+}
+
+function SpendByYearWidget({ ctx }: { ctx: WidgetCtx }) {
+  const { fiscalYears, costByYear, dashYear, setDashYear, hasCostData } = ctx;
+  if (!hasCostData || fiscalYears.length === 0) {
+    return (
+      <div className="py-8 text-center text-sm text-fg-3">
+        No cost data yet. Add cost records in the Cost Report to see spend by year.
+      </div>
+    );
+  }
+  return (
+    <>
+      <BarChart
+        height={260}
+        data={fiscalYears.map((y) => ({
+          label: String(y),
+          value: costByYear[y] ?? 0,
+          color:
+            y === dashYear
+              ? "var(--accent)"
+              : "color-mix(in srgb, var(--accent) 38%, var(--surface-2))",
+        }))}
+        onBarClick={(i) => {
+          const y = fiscalYears[i];
+          if (y !== undefined) setDashYear(y);
+        }}
       />
       <div className="mt-2 flex justify-end">
         <Link
@@ -810,14 +925,21 @@ const WIDGETS: WidgetDef[] = [
   {
     id: "spend-trend",
     title: "Annualized spend trend",
-    span: 8,
+    span: 6,
     requiresFinancial: true,
     render: (ctx) => <SpendTrendWidget ctx={ctx} />,
   },
   {
+    id: "spend-by-year",
+    title: "Spend by year (actual)",
+    span: 6,
+    requiresFinancial: true,
+    render: (ctx) => <SpendByYearWidget ctx={ctx} />,
+  },
+  {
     id: "renewal-risk",
     title: "Renewal risk (90 days)",
-    span: 4,
+    span: 6,
     render: (ctx) => <RenewalRisk services={ctx.services} />,
   },
   {
@@ -870,6 +992,7 @@ const WIDGETS: WidgetDef[] = [
 const DEFAULT_WIDGETS: WidgetId[] = [
   "kpis",
   "spend-trend",
+  "spend-by-year",
   "upcoming",
   "by-category",
   "hardware",
@@ -881,8 +1004,11 @@ function WidgetShell({
   editMode,
   onRemove,
   dragging,
+  dropTarget,
   onDragStart,
   onDragEnd,
+  onDragEnter,
+  onDragLeave,
   onDragOver,
   onDrop,
   children,
@@ -892,8 +1018,11 @@ function WidgetShell({
   editMode: boolean;
   onRemove: () => void;
   dragging: boolean;
+  dropTarget: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  onDragEnter: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: () => void;
   children: React.ReactNode;
@@ -901,14 +1030,21 @@ function WidgetShell({
 }) {
   return (
     <div
+      data-widget-id={def.id}
       draggable={editMode && def.id !== "kpis"}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className={`rounded-[10px] border border-border bg-surface p-4 shadow-sm animate-fade-in ${
+      className={`rounded-[10px] border border-border bg-surface p-4 shadow-sm animate-fade-in transition-[opacity,box-shadow] ${
         editMode ? "ring-1 ring-accent/20" : ""
-      } ${dragging ? "opacity-40" : ""}`}
+      } ${dragging ? "opacity-40" : ""} ${
+        dropTarget
+          ? "z-[1] ring-2 ring-dashed ring-accent bg-accent-soft/50"
+          : ""
+      }`}
       style={{
         gridColumn: `span ${def.span} / span ${def.span}`,
         cursor: editMode && def.id !== "kpis" ? "grab" : undefined,
@@ -1018,6 +1154,23 @@ export function Dashboard() {
     DEFAULT_WIDGETS,
   );
   const [draggingId, setDraggingId] = useState<WidgetId | null>(null);
+  const [dragOverId, setDragOverId] = useState<WidgetId | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const getWidgetEl = useCallback(
+    (id: string) =>
+      gridRef.current?.querySelector<HTMLElement>(
+        `[data-widget-id="${id}"]`,
+      ) ?? null,
+    [],
+  );
+  const widgetIdsRef = useRef(widgetIds);
+  const orderSnapshotRef = useRef<WidgetId[] | null>(null);
+  const didDropRef = useRef(false);
+  const lastDragOverWidgetRef = useRef<WidgetId | null>(null);
+
+  useEffect(() => {
+    widgetIdsRef.current = widgetIds;
+  }, [widgetIds]);
 
   useEffect(() => {
     Promise.all([
@@ -1110,16 +1263,20 @@ export function Dashboard() {
     }).length;
   }, [laptops]);
 
-  const ssoPct = useMemo(() => {
-    if (services.length === 0) return 0;
-    const n = services.filter((s) => s.sso_integrated).length;
-    return Math.round((n * 100) / services.length);
-  }, [services]);
-
   const activeServices = useMemo(
     () => services.filter((s) => s.is_active).length,
     [services],
   );
+
+  const ssoCount = useMemo(
+    () => services.filter((s) => s.is_active && s.sso_integrated).length,
+    [services],
+  );
+
+  const ssoPct = useMemo(() => {
+    if (activeServices === 0) return 0;
+    return Math.round((ssoCount * 100) / activeServices);
+  }, [ssoCount, activeServices]);
 
   const hasCostData = records.length > 0;
 
@@ -1154,6 +1311,8 @@ export function Dashboard() {
     () => registry.filter((w) => w.id !== "kpis" && !orderedIds.includes(w.id)),
     [registry, orderedIds],
   );
+
+  useFlipReorder(orderedIds, getWidgetEl, draggingId);
 
   const addWidget = useCallback(
     (id: WidgetId) => {
@@ -1222,6 +1381,7 @@ export function Dashboard() {
     upcoming90,
     laptopsInUse,
     ssoPct,
+    ssoCount,
     activeServices,
     isAdmin,
   };
@@ -1237,6 +1397,12 @@ export function Dashboard() {
             FY{fiscalYears[0]} – FY{fiscalYears[fiscalYears.length - 1]}
           </div>
         ) : null;
+      case "spend-by-year":
+        return (
+          <Link to="/costs" className="text-[12px] text-fg-3 hover:text-fg-2">
+            Cost report →
+          </Link>
+        );
       case "upcoming":
         return (
           <Link to="/calendar" className="text-[12px] text-fg-3 hover:text-fg-2">
@@ -1321,7 +1487,14 @@ export function Dashboard() {
             )}
             <button
               type="button"
-              onClick={() => setEditMode((v) => !v)}
+              onClick={() => {
+                if (editMode) {
+                  setDraggingId(null);
+                  setDragOverId(null);
+                  lastDragOverWidgetRef.current = null;
+                }
+                setEditMode((v) => !v);
+              }}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
                 editMode
                   ? "bg-accent text-white hover:bg-accent-strong"
@@ -1353,12 +1526,18 @@ export function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-12 gap-4">
+          <div ref={gridRef} className="grid grid-cols-12 gap-4">
             {visibleDefs.map((def) => {
               const dragging = draggingId === def.id;
+              const dropTarget =
+                editMode &&
+                !!draggingId &&
+                dragOverId === def.id &&
+                draggingId !== def.id;
               return def.id === "kpis" ? (
                 <div
                   key={def.id}
+                  data-widget-id={def.id}
                   className="rounded-[10px] border border-border bg-surface shadow-sm animate-fade-in"
                   style={{ gridColumn: `span ${def.span} / span ${def.span}` }}
                 >
@@ -1371,23 +1550,75 @@ export function Dashboard() {
                   editMode={editMode}
                   onRemove={() => removeWidget(def.id)}
                   dragging={dragging}
+                  dropTarget={dropTarget}
                   onDragStart={(e) => {
                     setDraggingId(def.id);
+                    orderSnapshotRef.current = [...widgetIdsRef.current];
+                    didDropRef.current = false;
+                    lastDragOverWidgetRef.current = null;
                     e.dataTransfer.effectAllowed = "move";
                     e.dataTransfer.setData("text/plain", def.id);
                   }}
-                  onDragEnd={() => setDraggingId(null)}
-                  onDragOver={(e) => {
-                    if (editMode && draggingId && draggingId !== def.id) {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
+                  onDragEnd={() => {
+                    if (!didDropRef.current && orderSnapshotRef.current) {
+                      setWidgetIds(orderSnapshotRef.current);
                     }
+                    didDropRef.current = false;
+                    orderSnapshotRef.current = null;
+                    lastDragOverWidgetRef.current = null;
+                    setDraggingId(null);
+                    setDragOverId(null);
+                  }}
+                  onDragEnter={(e) => {
+                    if (!editMode || !draggingId) return;
+                    e.preventDefault();
+                  }}
+                  onDragLeave={(e) => {
+                    if (!editMode || !draggingId) return;
+                    const related = e.relatedTarget as Node | null;
+                    if (related && e.currentTarget.contains(related)) return;
+                    setDragOverId((prev) => (prev === def.id ? null : prev));
+                  }}
+                  onDragOver={(e) => {
+                    if (!editMode || !draggingId) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (draggingId === def.id) return;
+
+                    const order = widgetIdsRef.current;
+                    const fromIdx = order.indexOf(draggingId);
+                    const toIdx = order.indexOf(def.id);
+                    if (fromIdx === -1 || toIdx === -1) return;
+
+                    const targetRect = e.currentTarget.getBoundingClientRect();
+                    const draggingEl = gridRef.current?.querySelector<HTMLElement>(
+                      `[data-widget-id="${draggingId}"]`,
+                    );
+                    const draggingRect = draggingEl?.getBoundingClientRect();
+                    const sameRow =
+                      !!draggingRect &&
+                      Math.abs(draggingRect.top - targetRect.top) <
+                        targetRect.height / 2;
+                    const forward = toIdx > fromIdx;
+                    const crossed = sameRow
+                      ? forward
+                        ? e.clientX > (targetRect.left + targetRect.right) / 2
+                        : e.clientX < (targetRect.left + targetRect.right) / 2
+                      : forward
+                        ? e.clientY > (targetRect.top + targetRect.bottom) / 2
+                        : e.clientY < (targetRect.top + targetRect.bottom) / 2;
+                    if (!crossed) return;
+
+                    if (lastDragOverWidgetRef.current === def.id) return;
+                    lastDragOverWidgetRef.current = def.id;
+                    setDragOverId(def.id);
+                    moveWidget(draggingId, def.id);
                   }}
                   onDrop={() => {
-                    if (draggingId && draggingId !== def.id) {
-                      moveWidget(draggingId, def.id);
-                    }
+                    didDropRef.current = true;
                     setDraggingId(null);
+                    setDragOverId(null);
+                    lastDragOverWidgetRef.current = null;
                   }}
                   right={rightForWidget(def.id)}
                 >
