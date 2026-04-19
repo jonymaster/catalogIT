@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import client from "../api/client";
@@ -10,6 +10,7 @@ import type { Service } from "../types/models";
 vi.mock("../api/client", () => ({
   default: {
     get: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
@@ -21,6 +22,22 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+function makeEditorAuthValue(): AuthContextValue {
+  return {
+    token: "token",
+    user: { sub: "user-1", email: "editor@example.com", role: "editor" },
+    preferences: null,
+    preferencesLoading: false,
+    canEdit: true,
+    canFinancialView: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    setToken: vi.fn(),
+    refreshPreferences: vi.fn().mockResolvedValue(undefined),
+    setPreferences: vi.fn(),
+  };
 }
 
 function makeAuthValue(): AuthContextValue {
@@ -79,10 +96,10 @@ function makeService(): Service {
   };
 }
 
-function renderServiceDetail() {
+function renderServiceDetail(auth: AuthContextValue = makeAuthValue()) {
   return render(
     <StrictMode>
-      <AuthContext.Provider value={makeAuthValue()}>
+      <AuthContext.Provider value={auth}>
         <MemoryRouter initialEntries={["/services/service-1"]}>
           <Routes>
             <Route path="/services/:id" element={<ServiceDetail />} />
@@ -96,6 +113,7 @@ function renderServiceDetail() {
 describe("ServiceDetail", () => {
   beforeEach(() => {
     vi.mocked(client.get).mockReset();
+    vi.mocked(client.put).mockReset();
   });
 
   it("renders the service after the request resolves in StrictMode", async () => {
@@ -111,5 +129,34 @@ describe("ServiceDetail", () => {
         screen.getByRole("heading", { name: "Slack" }),
       ).toBeInTheDocument();
     });
+  });
+
+  it("saves the service name from the header input when editing", async () => {
+    vi.mocked(client.get).mockResolvedValue({ data: makeService() });
+    vi.mocked(client.put).mockResolvedValue({
+      data: { ...makeService(), name: "Renamed" },
+    });
+
+    renderServiceDetail(makeEditorAuthValue());
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Slack" }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    const nameInput = screen.getByRole("textbox", { name: "Service name" });
+    fireEvent.change(nameInput, { target: { value: "Renamed" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(vi.mocked(client.put)).toHaveBeenCalled();
+    });
+    const putCall = vi.mocked(client.put).mock.calls[0];
+    expect(putCall[0]).toBe("/api/services/service-1");
+    expect(putCall[1]).toMatchObject({ name: "Renamed" });
   });
 });
