@@ -386,12 +386,12 @@ function ServiceGalleryCard({ service, preferences, onOpen }: GalleryCardProps) 
     <button
       type="button"
       onClick={() => onOpen(service)}
-      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-border-strong hover:shadow-md"
+      className="interactive-record flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-border-strong hover:shadow-md"
     >
       <div className="flex items-start gap-3">
         <Monogram name={service.name} seed={service.id} size={36} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold text-fg">
+          <div className="record-primary-label truncate text-[14px] font-semibold text-fg">
             {service.name}
           </div>
           <div className="truncate text-[12px] text-fg-3">
@@ -684,7 +684,7 @@ export function Services() {
                 <div className="flex items-center gap-2.5">
                   <Monogram name={service.name} seed={service.id} size={26} />
                   <div className="min-w-0">
-                    <div className="truncate font-medium text-fg">
+                    <div className="truncate text-fg">
                       {service.name}
                     </div>
                     {service.description && (

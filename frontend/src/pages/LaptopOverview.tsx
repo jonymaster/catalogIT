@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
+import { OsIcon } from "../components/ui/OsIcon";
+import { operatingSystemLabel } from "../utils/operatingSystem";
 import type { Laptop } from "../types/models";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -31,6 +33,12 @@ export function LaptopOverview() {
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
         <dl className="space-y-6">
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
+            <Field label="Operating system">
+              <span className="inline-flex items-center gap-2">
+                <OsIcon operatingSystem={laptop.operating_system} className="h-5 w-5 shrink-0" />
+                <span>{operatingSystemLabel(laptop.operating_system)}</span>
+              </span>
+            </Field>
             <Field label="Status">
               {laptop.hardware_status ? (
                 <ColoredReferenceBadge

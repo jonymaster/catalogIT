@@ -206,6 +206,7 @@ async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: 
         cpu=body.cpu,
         ram=body.ram,
         storage_size=body.storage_size,
+        operating_system=body.operating_system,
         status=hw_status.name if hw_status else body.status,
         hardware_status_id=hw_status.id if hw_status else None,
         hardware_location_id=hw_location.id if hw_location else None,

@@ -18,6 +18,10 @@ class Laptop(Base):
     cpu: Mapped[str] = mapped_column(String(100), default="")
     ram: Mapped[str] = mapped_column(String(50), default="")
     storage_size: Mapped[str] = mapped_column(String(50), default="")
+    operating_system: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(String(50))
     hardware_status_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("hardware_statuses.id", ondelete="SET NULL"), nullable=True

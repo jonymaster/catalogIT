@@ -1,3 +1,5 @@
+import type { OperatingSystem } from "./models";
+
 export type DashboardCostSource = "service" | "hardware";
 
 /** Mirrors GET /api/dashboard/ cost_records rows. */
@@ -9,6 +11,8 @@ export interface DashboardCostRecord {
   classification: string | null;
   category_name: string | null;
   cost_center_name: string | null;
+  /** Hardware rows only; null for services or unknown OS. */
+  operating_system: OperatingSystem | null;
   fiscal_year: number;
   amount: number;
   record_type: string;

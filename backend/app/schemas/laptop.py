@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.enums.operating_system import OperatingSystem
 from app.schemas.hardware_location import HardwareLocationRead
 from app.schemas.hardware_status import HardwareStatusRead
 from app.schemas.user import UserRead
@@ -16,6 +17,7 @@ class LaptopCreate(BaseModel):
     cpu: str = ""
     ram: str = ""
     storage_size: str = ""
+    operating_system: OperatingSystem | None = None
     status: str = "In Stock"
     hardware_status_id: uuid.UUID | None = None
     hardware_location_id: uuid.UUID | None = None
@@ -29,6 +31,7 @@ class LaptopUpdate(BaseModel):
     cpu: str | None = None
     ram: str | None = None
     storage_size: str | None = None
+    operating_system: OperatingSystem | None = None
     status: str | None = None
     hardware_status_id: uuid.UUID | None = None
     hardware_location_id: uuid.UUID | None = None
@@ -43,6 +46,7 @@ class LaptopRead(BaseModel):
     cpu: str
     ram: str
     storage_size: str
+    operating_system: OperatingSystem | None = None
     status: str
     hardware_status_id: uuid.UUID | None = None
     hardware_location_id: uuid.UUID | None = None

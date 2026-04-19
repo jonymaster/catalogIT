@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
@@ -15,6 +15,8 @@ import { ColoredReferenceBadge } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
+import { OsIcon } from "../components/ui/OsIcon";
+import { operatingSystemLabel } from "../utils/operatingSystem";
 import type { Laptop } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 
@@ -28,7 +30,7 @@ interface HardwareColumnDefinition {
   getFilterValue: (laptop: Laptop) => string;
   getSortValue: (laptop: Laptop) => string | number | boolean | null;
   getFilterOptions?: (laptops: Laptop[]) => string[];
-  render?: (laptop: Laptop) => React.ReactNode;
+  render?: (laptop: Laptop) => ReactNode;
 }
 
 type HardwareFilters = Record<string, string | string[]>;
@@ -90,6 +92,12 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     filterPlaceholder: "Filter by serial number...",
     getFilterValue: (laptop) => laptop.serial_number,
     getSortValue: (laptop) => laptop.serial_number,
+    render: (laptop) => (
+      <div className="flex min-w-0 items-center gap-2.5">
+        <OsIcon operatingSystem={laptop.operating_system} />
+        <span className="truncate text-fg">{laptop.serial_number}</span>
+      </div>
+    ),
   },
   {
     key: "model_name",
@@ -98,6 +106,21 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     filterPlaceholder: "Filter by model...",
     getFilterValue: (laptop) => laptop.model_name,
     getSortValue: (laptop) => laptop.model_name,
+  },
+  {
+    key: "operating_system",
+    label: "OS",
+    filterType: "select",
+    getFilterValue: (laptop) => operatingSystemLabel(laptop.operating_system),
+    getSortValue: (laptop) => laptop.operating_system ?? "",
+    getFilterOptions: (laptops) =>
+      getUniqueOptions(laptops.map((l) => operatingSystemLabel(l.operating_system))),
+    render: (laptop) => (
+      <div className="flex min-w-0 items-center gap-2.5">
+        <OsIcon operatingSystem={laptop.operating_system} />
+        <span className="truncate text-fg">{operatingSystemLabel(laptop.operating_system)}</span>
+      </div>
+    ),
   },
   {
     key: "status",
@@ -197,7 +220,7 @@ export function Hardware() {
     direction: null,
   });
   const [visibleKeys, setVisibleKeys] = useColumnPrefs(
-    "catalogit:hardware:columns",
+    "catalogit:hardware:columns:v2",
     ALL_COLUMN_KEYS,
   );
   const { canEdit } = useAuth();
@@ -236,7 +259,8 @@ export function Hardware() {
         laptop.status.toLowerCase().includes(q) ||
         (laptop.hardware_status?.name ?? "").toLowerCase().includes(q) ||
         locName.toLowerCase().includes(q) ||
-        getAssigneeName(laptop).toLowerCase().includes(q);
+        getAssigneeName(laptop).toLowerCase().includes(q) ||
+        operatingSystemLabel(laptop.operating_system).toLowerCase().includes(q);
 
       if (!matchesSearch) {
         return false;

@@ -27,6 +27,7 @@ class CostRecordOut(BaseModel):
     classification: str | None
     category_name: str | None
     cost_center_name: str | None = None
+    operating_system: str | None = None
     fiscal_year: int
     amount: float
     record_type: str
@@ -91,6 +92,7 @@ async def get_dashboard(
                     ),
                     category_name=cat_name,
                     cost_center_name=cc_name,
+                    operating_system=None,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,
@@ -111,6 +113,7 @@ async def get_dashboard(
                     classification="hardware",
                     category_name="Hardware",
                     cost_center_name=None,
+                    operating_system=lap.operating_system,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,
