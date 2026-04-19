@@ -21,6 +21,7 @@ import { BarRow } from "../components/ui/BarRow";
 import { Avatar } from "../components/ui/Avatar";
 import { formatMoneyCompact } from "../components/ui/money-format";
 import { PlusIcon, XMarkIcon } from "../components/Icons";
+import { CommandPaletteTrigger } from "../components/CommandPaletteTrigger";
 import {
   totalByYear,
   combinedActualEstimatedByYear,
@@ -1582,55 +1583,60 @@ export function Dashboard() {
   return (
     <PageTransition>
       <div className="mx-auto max-w-[1280px]">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="mb-1 flex items-center gap-2 text-[12px] text-fg-3">
-              {todayLabel}
+        <div className="mb-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="mb-1 flex items-center gap-2 text-[12px] text-fg-3">
+                {todayLabel}
+              </div>
+              <h1
+                className="text-fg"
+                style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+              >
+                {greetingForNow(user?.email)}
+              </h1>
+              <div className="mt-1 text-[14px] text-fg-3">
+                <span className="text-fg-2 font-medium">{upcoming30}</span>{" "}
+                renewal{upcoming30 === 1 ? "" : "s"} in the next 30 days ·{" "}
+                <span className="text-fg-2 font-medium">{laptopsInStock}</span>{" "}
+                laptop{laptopsInStock === 1 ? "" : "s"} in stock
+              </div>
             </div>
-            <h1
-              className="text-fg"
-              style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
-            >
-              {greetingForNow(user?.email)}
-            </h1>
-            <div className="mt-1 text-[14px] text-fg-3">
-              <span className="text-fg-2 font-medium">{upcoming30}</span>{" "}
-              renewal{upcoming30 === 1 ? "" : "s"} in the next 30 days ·{" "}
-              <span className="text-fg-2 font-medium">{laptopsInStock}</span>{" "}
-              laptop{laptopsInStock === 1 ? "" : "s"} in stock
+            <div className="flex items-center gap-2">
+              {editMode && (
+                <>
+                  <AddWidgetMenu available={available} onAdd={addWidget} />
+                  <button
+                    type="button"
+                    onClick={resetWidgets}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-[12.5px] font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-2"
+                  >
+                    Reset
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (editMode) {
+                    setDraggingId(null);
+                    setDragOverId(null);
+                    lastDragOverWidgetRef.current = null;
+                  }
+                  setEditMode((v) => !v);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  editMode
+                    ? "bg-accent text-white hover:bg-accent-strong"
+                    : "border border-border bg-surface text-fg-2 hover:bg-surface-2"
+                }`}
+              >
+                {editMode ? "Done" : "Customize"}
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {editMode && (
-              <>
-                <AddWidgetMenu available={available} onAdd={addWidget} />
-                <button
-                  type="button"
-                  onClick={resetWidgets}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-[12.5px] font-medium text-fg-3 hover:text-fg-2 hover:bg-surface-2"
-                >
-                  Reset
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (editMode) {
-                  setDraggingId(null);
-                  setDragOverId(null);
-                  lastDragOverWidgetRef.current = null;
-                }
-                setEditMode((v) => !v);
-              }}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                editMode
-                  ? "bg-accent text-white hover:bg-accent-strong"
-                  : "border border-border bg-surface text-fg-2 hover:bg-surface-2"
-              }`}
-            >
-              {editMode ? "Done" : "Customize"}
-            </button>
+          <div className="mt-6">
+            <CommandPaletteTrigger variant="prominent" />
           </div>
         </div>
 
