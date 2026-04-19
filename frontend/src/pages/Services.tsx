@@ -21,6 +21,7 @@ import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
+import { MultiSelectFacet } from "../components/ui/MultiSelectFacet";
 import { Monogram } from "../components/ui/Monogram";
 import { Avatar, AvatarStack } from "../components/ui/Avatar";
 import { Days } from "../components/ui/Days";
@@ -370,107 +371,6 @@ function getServiceExportValue(
   }
   const def = columnDefinitions.find((column) => column.key === key);
   return def ? def.getFilterValue(service) : "";
-}
-
-interface FacetFilterProps {
-  label: string;
-  options: FacetOption[];
-  values: string[];
-  onChange: (next: string[]) => void;
-}
-
-function FacetFilter({ label, options, values, onChange }: FacetFilterProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const active = values.length > 0;
-
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  function toggle(value: string) {
-    onChange(
-      values.includes(value)
-        ? values.filter((v) => v !== value)
-        : [...values, value],
-    );
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={[
-          "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12.5px] font-medium transition-colors",
-          active
-            ? "border-accent bg-accent-soft text-accent-strong"
-            : "border-border bg-surface text-fg-2 hover:border-border-strong hover:bg-surface-2",
-        ].join(" ")}
-      >
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4.5 6h15l-6 7.5v4.5l-3 1.5v-6L4.5 6z"
-          />
-        </svg>
-        <span>{label}</span>
-        {active && (
-          <span className="tnum rounded-sm bg-accent px-1 text-[10px] font-semibold text-white">
-            {values.length}
-          </span>
-        )}
-        <svg className="h-3 w-3 text-fg-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute left-0 z-20 mt-1 w-56 rounded-md border border-border bg-surface py-1 shadow-lg">
-          {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-fg-3">No values</div>
-          ) : (
-            <div className="max-h-64 overflow-y-auto">
-              {options.map((opt) => {
-                const checked = values.includes(opt.value);
-                return (
-                  <label
-                    key={opt.value}
-                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[13px] text-fg-2 hover:bg-surface-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggle(opt.value)}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="truncate">{opt.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          {active && (
-            <div className="border-t border-border px-2 py-1.5">
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="w-full rounded px-2 py-1 text-left text-[12px] text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 interface GalleryCardProps {
@@ -974,13 +874,13 @@ export function Services() {
                   placeholder="Search services..."
                 />
               </div>
-              <FacetFilter
+              <MultiSelectFacet
                 label="Status"
                 options={facetOptions.status}
                 values={Array.isArray(filters.status) ? filters.status : []}
                 onChange={(values) => setFacet("status", values)}
               />
-              <FacetFilter
+              <MultiSelectFacet
                 label="Category"
                 options={facetOptions.category}
                 values={
@@ -990,7 +890,7 @@ export function Services() {
                 }
                 onChange={(values) => setFacet("spending_category", values)}
               />
-              <FacetFilter
+              <MultiSelectFacet
                 label="Type"
                 options={facetOptions.classification}
                 values={

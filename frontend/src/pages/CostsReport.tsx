@@ -5,6 +5,7 @@ import client from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
 import { PageTransition } from "../components/PageTransition";
 import { StackedBar } from "../components/charts/StackedBar";
+import { MultiSelectFacet } from "../components/ui/MultiSelectFacet";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Money } from "../components/ui/Money";
 import { Monogram } from "../components/ui/Monogram";
@@ -200,43 +201,70 @@ function StatCell({
   sub,
   delta,
   first,
+  variant = "row",
+  valueClassName,
+  deltaSemantic = "default",
 }: {
   label: string;
   value: string;
   sub?: string;
   delta?: number | null;
   first?: boolean;
+  variant?: "row" | "grid";
+  /** Tailwind classes for the main value (e.g. semantic YoY coloring). */
+  valueClassName?: string;
+  /** "cost": YoY up = bad (red), down = good (green). "default": opposite. */
+  deltaSemantic?: "default" | "cost";
 }) {
   return (
     <div
-      className={`min-w-0 flex-1 px-4 py-3 ${
-        first ? "" : "border-l border-border"
-      }`}
+      className={
+        variant === "grid"
+          ? "flex min-h-0 w-full flex-1 flex-col justify-center px-5 py-5 sm:px-6 sm:py-6"
+          : `min-w-0 flex-1 px-4 py-3 ${
+              first ? "" : "border-l border-border"
+            }`
+      }
     >
       <div
-        className="mb-1 text-[11px] font-semibold uppercase text-fg-3"
+        className={`mb-1 font-semibold uppercase text-fg-3 ${
+          variant === "grid" ? "text-xs" : "text-[11px]"
+        }`}
         style={{ letterSpacing: "0.06em" }}
       >
         {label}
       </div>
       <div
-        className="tnum text-fg"
-        style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em" }}
+        className={`tnum ${valueClassName ?? "text-fg"}`}
+        style={{
+          fontSize: variant === "grid" ? 26 : 22,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          lineHeight: variant === "grid" ? 1.15 : undefined,
+        }}
       >
         {value}
       </div>
       {(sub || delta != null) && (
-        <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px]">
+        <div
+          className={`flex items-center gap-1.5 ${
+            variant === "grid"
+              ? "mt-1.5 text-[13px] leading-snug"
+              : "mt-0.5 text-[11.5px]"
+          }`}
+        >
           {delta != null && (
             <span
               className="font-medium"
               style={{
-                color:
-                  delta > 0
-                    ? "var(--success)"
-                    : delta < 0
-                      ? "var(--danger)"
-                      : "var(--fg-3)",
+                color: (() => {
+                  if (delta === 0) return "var(--fg-3)";
+                  const upIsGood = deltaSemantic === "default";
+                  const good = "var(--success)";
+                  const bad = "var(--danger)";
+                  if (delta > 0) return upIsGood ? good : bad;
+                  return upIsGood ? bad : good;
+                })(),
               }}
             >
               {delta > 0 ? "▲" : delta < 0 ? "▼" : "·"} {Math.abs(delta).toFixed(1)}% YoY
@@ -245,167 +273,6 @@ function StatCell({
           {sub && <span className="truncate text-fg-3">{sub}</span>}
         </div>
       )}
-    </div>
-  );
-}
-
-interface MonthlyTrendProps {
-  values: number[];
-  labels: string[];
-}
-
-function MonthlyTrendChart({ values, labels }: MonthlyTrendProps) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(...values, 1);
-  const w = 720;
-  const h = 160;
-  const padT = 18;
-  const padB = 22;
-  const ih = h - padT - padB;
-  const gap = 8;
-  const barW = (w - gap * (values.length - 1)) / values.length;
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      style={{ width: "100%", height: "auto" }}
-      preserveAspectRatio="none"
-      onMouseLeave={() => setHover(null)}
-    >
-      {values.map((v, i) => {
-        const bh = Math.max(1, (v / max) * ih);
-        const x = i * (barW + gap);
-        const y = padT + ih - bh;
-        const active = hover === i;
-        return (
-          <g key={i} onMouseEnter={() => setHover(i)}>
-            <rect
-              x={x}
-              y={padT}
-              width={barW}
-              height={ih}
-              fill="transparent"
-            />
-            <rect
-              x={x}
-              y={y}
-              width={barW}
-              height={bh}
-              fill="var(--accent)"
-              opacity={active ? 1 : 0.75}
-              rx={3}
-            />
-            {active && (
-              <text
-                x={x + barW / 2}
-                y={y - 5}
-                textAnchor="middle"
-                fontSize={10.5}
-                fill="var(--fg-2)"
-                fontFamily="'IBM Plex Mono', ui-monospace, monospace"
-              >
-                {formatMoneyCompact(v)}
-              </text>
-            )}
-            <text
-              x={x + barW / 2}
-              y={h - 6}
-              textAnchor="middle"
-              fontSize={10.5}
-              fill={active ? "var(--fg)" : "var(--fg-3)"}
-              fontWeight={active ? 600 : 400}
-            >
-              {labels[i]}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function MultiStringSelect({
-  id,
-  label,
-  options,
-  values,
-  onChange,
-  hint,
-}: {
-  id: string;
-  label: string;
-  options: { value: string; label: string }[];
-  values: string[];
-  onChange: (next: string[]) => void;
-  hint?: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-        {label}
-      </label>
-      <select
-        id={id}
-        multiple
-        value={values}
-        onChange={(e) => {
-          onChange(Array.from(e.target.selectedOptions, (o) => o.value));
-        }}
-        size={Math.min(6, Math.max(3, options.length))}
-        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {hint && (
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{hint}</p>
-      )}
-    </div>
-  );
-}
-
-function MultiYearSelect({
-  id,
-  label,
-  years,
-  values,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  years: number[];
-  values: number[];
-  onChange: (next: number[]) => void;
-}) {
-  const strValues = values.map(String);
-  return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-        {label}
-      </label>
-      <select
-        id={id}
-        multiple
-        value={strValues}
-        onChange={(e) => {
-          onChange(
-            Array.from(e.target.selectedOptions, (o) => Number.parseInt(o.value, 10)),
-          );
-        }}
-        size={Math.min(6, Math.max(3, years.length))}
-        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-      >
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
-      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-        Empty = include all years in the filtered data.
-      </p>
     </div>
   );
 }
@@ -641,6 +508,10 @@ export function CostsReport() {
     return chartYears[chartYears.length - 1];
   }, [chartYears, focusYear]);
 
+  useEffect(() => {
+    setSelectedBucket(null);
+  }, [displayYear]);
+
   const costByYearA = useMemo(
     () => totalByYear(visualRecordsTypeA, chartYears),
     [visualRecordsTypeA, chartYears],
@@ -704,10 +575,37 @@ export function CostsReport() {
     currentYear,
   ]);
 
-  const yoyA =
-    displayYear !== null ? yoyPercent(visualCostByYearA, displayYear) : 0;
-  const yoyB =
-    displayYear !== null ? yoyPercent(visualCostByYearB, displayYear) : 0;
+  /** Spend by FY for YoY Actual + Estimated KPI: combined A+E for current/future FYs when enabled, else actual-only. */
+  const actualEstimatedKpiSpendByYear = useMemo(() => {
+    const result: Record<number, number> = {};
+    for (const y of chartYears) {
+      if (
+        combineActualEstimatedCfYears &&
+        isCurrentOrFutureFiscalYear(y, currentYear)
+      ) {
+        result[y] = combinedByYear[y] ?? 0;
+      } else {
+        result[y] = recordsForSelectedVisuals
+          .filter((r) => r.fiscal_year === y && r.record_type === "actual")
+          .reduce((s, r) => s + r.amount, 0);
+      }
+    }
+    return result;
+  }, [
+    chartYears,
+    combineActualEstimatedCfYears,
+    combinedByYear,
+    currentYear,
+    recordsForSelectedVisuals,
+  ]);
+
+  const yoyActualEstimatedKpi = useMemo(
+    () =>
+      displayYear !== null
+        ? yoyPercent(actualEstimatedKpiSpendByYear, displayYear)
+        : null,
+    [displayYear, actualEstimatedKpiSpendByYear],
+  );
 
   const categoryNamesForStackA = useMemo(
     () => distinctCategoryNames(visualRecordsTypeA),
@@ -791,10 +689,6 @@ export function CostsReport() {
     return RECORD_TYPE_LABELS[recordType] ?? recordType;
   }
 
-  function yoyLabelForType(recordType: string, fiscalYear: number): string {
-    return `YoY ${displayRecordTypeLabel(recordType, fiscalYear)} (${fiscalYear})`;
-  }
-
   function handleDownloadCsv() {
     const headers = [
       "Source",
@@ -837,16 +731,54 @@ export function CostsReport() {
 
   const hasData = filteredRecords.length > 0;
 
-  const statYear = useMemo(() => {
-    if (apiYears.includes(currentYear)) return currentYear;
-    if (apiYears.length > 0) return apiYears[apiYears.length - 1];
-    return currentYear;
-  }, [apiYears, currentYear]);
-
   const actualRecords = useMemo(
     () => filteredRecords.filter((r) => r.record_type === "actual"),
     [filteredRecords],
   );
+
+  /** FYs that still have actual rows after all filters (used to align KPI year with visible data). */
+  const fiscalYearsPresentInActual = useMemo(() => {
+    const s = new Set(actualRecords.map((r) => r.fiscal_year));
+    return Array.from(s).sort((a, b) => a - b);
+  }, [actualRecords]);
+
+  /**
+   * FY used for Annualized / Highest category / FY labels in stats.
+   * When fiscal years are filtered, uses the latest selected FY that appears in actuals
+   * (so e.g. filtering to 2025 alone does not still target calendar "current" FY with no rows).
+   * Breakdown below uses displayYear (focus year) instead.
+   */
+  const statYear = useMemo(() => {
+    const present = fiscalYearsPresentInActual;
+    const presentSet = new Set(present);
+
+    const baseFromApi = (): number => {
+      if (apiYears.includes(currentYear)) return currentYear;
+      if (apiYears.length > 0) return apiYears[apiYears.length - 1];
+      return currentYear;
+    };
+
+    if (fiscalYearsFilter.length > 0) {
+      const inFilterAndPresent = fiscalYearsFilter.filter((y) =>
+        presentSet.has(y),
+      );
+      if (inFilterAndPresent.length > 0) {
+        return Math.max(...inFilterAndPresent);
+      }
+      return Math.max(...fiscalYearsFilter);
+    }
+
+    let candidate = baseFromApi();
+    if (present.length > 0 && !presentSet.has(candidate)) {
+      candidate = present[present.length - 1];
+    }
+    return candidate;
+  }, [
+    fiscalYearsFilter,
+    fiscalYearsPresentInActual,
+    apiYears,
+    currentYear,
+  ]);
 
   const annualizedCurrent = useMemo(
     () =>
@@ -898,39 +830,37 @@ export function CostsReport() {
     return { name: categoryDisplayName(top[0]), amount: top[1] };
   }, [statYearRecords]);
 
-  const avgPerService = useMemo(() => {
-    const ids = new Set<string>();
-    statYearRecords.forEach((r) => {
-      const id = r.service_id ?? r.laptop_id ?? r.service_name;
-      if (id) ids.add(id);
-    });
-    const count = ids.size;
-    return count > 0 ? annualizedCurrent / count : 0;
-  }, [statYearRecords, annualizedCurrent]);
-
-  const breakdownSource = useMemo(() => {
-    if (breakdownDim === "month") return statYearRecords;
-    return actualRecords;
-  }, [breakdownDim, actualRecords, statYearRecords]);
+  /** Actual rows for the chart focus year (same FY as Total spend by year selected column). */
+  const breakdownYearRecords = useMemo(
+    () =>
+      displayYear !== null
+        ? actualRecords.filter((r) => r.fiscal_year === displayYear)
+        : [],
+    [actualRecords, displayYear],
+  );
 
   const buckets = useMemo(() => {
     if (breakdownDim === "month") {
-      const monthly = monthlySpendFromRecords(actualRecords, statYear);
+      if (displayYear === null) return [];
+      const monthly = monthlySpendFromRecords(actualRecords, displayYear);
       return monthly.map((value, i) => ({
         key: String(i),
         label: MONTH_LABELS[i],
         value,
-        records: statYearRecords,
+        records: breakdownYearRecords,
       }));
     }
-    return buildBreakdownBuckets(breakdownSource, breakdownDim, vendorByServiceId);
+    return buildBreakdownBuckets(
+      breakdownYearRecords,
+      breakdownDim,
+      vendorByServiceId,
+    );
   }, [
     breakdownDim,
-    breakdownSource,
+    breakdownYearRecords,
     vendorByServiceId,
     actualRecords,
-    statYear,
-    statYearRecords,
+    displayYear,
   ]);
 
   const bucketTotal = useMemo(
@@ -981,11 +911,6 @@ export function CostsReport() {
     });
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
   }, [drillRecords]);
-
-  const monthlyTrendValues = useMemo(
-    () => monthlySpendFromRecords(actualRecords, statYear),
-    [actualRecords, statYear],
-  );
 
   const breakdownOptions: { value: BreakdownDimension; label: string }[] = [
     { value: "category", label: "Category" },
@@ -1059,10 +984,10 @@ export function CostsReport() {
                 : "Hardware only"}
           </li>
           <li>
-            <strong>Spending categories:</strong>{" "}
-            {categories.length === 0
-              ? "All"
-              : categories.map(categoryDisplayName).join(", ")}
+            <strong>Fiscal years:</strong>{" "}
+            {fiscalYearsFilter.length === 0
+              ? "All (within filtered data)"
+              : [...fiscalYearsFilter].sort((a, b) => a - b).join(", ")}
           </li>
           <li>
             <strong>Classification:</strong>{" "}
@@ -1071,13 +996,13 @@ export function CostsReport() {
               : classifications.map(classificationLabel).join(", ")}
           </li>
           <li>
-            <strong>Cost center / hardware:</strong> {costCenterFilterSummary}
+            <strong>Spending categories:</strong>{" "}
+            {categories.length === 0
+              ? "All"
+              : categories.map(categoryDisplayName).join(", ")}
           </li>
           <li>
-            <strong>Fiscal years:</strong>{" "}
-            {fiscalYearsFilter.length === 0
-              ? "All (within filtered data)"
-              : [...fiscalYearsFilter].sort((a, b) => a - b).join(", ")}
+            <strong>Cost center / hardware:</strong> {costCenterFilterSummary}
           </li>
           <li>
             <strong>Combine actual + estimated (current/future years):</strong>{" "}
@@ -1090,71 +1015,7 @@ export function CostsReport() {
       </div>
 
       <div className="print:hidden mt-6 space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MultiStringSelect
-            id="cr-cat"
-            label="Spending category"
-            options={categoryOptions}
-            values={categories}
-            onChange={setCategories}
-            hint="Empty = all categories."
-          />
-          <div>
-            <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Source
-            </span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(
-                [
-                  ["all", "All"],
-                  ["service", "Software"],
-                  ["hardware", "Hardware"],
-                ] as const
-              ).map(([val, lab]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setSource(val)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium ${
-                    source === val
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                  }`}
-                >
-                  {lab}
-                </button>
-              ))}
-            </div>
-          </div>
-          <MultiStringSelect
-            id="cr-class"
-            label="Classification"
-            options={classificationOptions}
-            values={classifications}
-            onChange={setClassifications}
-            hint="Empty = all."
-          />
-          <MultiStringSelect
-            id="cr-cc"
-            label="Cost center / hardware"
-            options={costCenterOptions.map((o) => ({
-              value: o.key,
-              label: o.label,
-            }))}
-            values={costCenters}
-            onChange={setCostCenters}
-            hint="Empty = all. Hardware matches “Hardware (assets)”."
-          />
-          <MultiYearSelect
-            id="cr-yr"
-            label="Fiscal years"
-            years={apiYears}
-            values={fiscalYearsFilter}
-            onChange={setFiscalYearsFilter}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 pb-4 dark:border-gray-700">
           <span className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
             View
           </span>
@@ -1210,261 +1071,147 @@ export function CostsReport() {
             </button>
           </div>
         </div>
+
+        <div
+          className={`grid gap-4 ${hasData ? "lg:grid-cols-2" : ""}`}
+        >
+          {hasData && (
+            <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-border shadow-sm lg:h-full lg:min-h-[20rem]">
+              <div className="grid min-h-[17rem] flex-1 grid-cols-2 grid-rows-2 gap-px bg-border sm:min-h-[19rem] lg:min-h-0">
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="Annualized spend"
+                    value={formatMoneyCompact(annualizedCurrent)}
+                    delta={yoyPct}
+                    deltaSemantic="cost"
+                    sub={`FY ${statYear} actual`}
+                  />
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="Next 30 days"
+                    value={next30Days == null ? "—" : formatMoneyCompact(next30Days)}
+                    sub={next30Days == null ? "requires renewals" : "upcoming renewals"}
+                  />
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="Highest category"
+                    value={
+                      highestCategory
+                        ? formatMoneyCompact(highestCategory.amount)
+                        : "—"
+                    }
+                    sub={highestCategory?.name}
+                  />
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="YoY Actual + Estimated"
+                    value={
+                      displayYear !== null && yoyActualEstimatedKpi != null
+                        ? `${yoyActualEstimatedKpi >= 0 ? "+" : ""}${yoyActualEstimatedKpi.toFixed(1)}%`
+                        : "—"
+                    }
+                    sub={
+                      displayYear !== null
+                        ? `(${displayYear})`
+                        : undefined
+                    }
+                    valueClassName={
+                      displayYear !== null && yoyActualEstimatedKpi != null
+                        ? yoyActualEstimatedKpi < 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : yoyActualEstimatedKpi > 0
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-fg"
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="min-w-0">
+              <span className="block text-xs font-medium text-fg-3">Source</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(
+                  [
+                    ["all", "All"],
+                    ["service", "Software"],
+                    ["hardware", "Hardware"],
+                  ] as const
+                ).map(([val, lab]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setSource(val)}
+                    className={`rounded-md px-3 py-1 text-xs font-medium ${
+                      source === val
+                        ? "bg-brand-600 text-white"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                    }`}
+                  >
+                    {lab}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <MultiSelectFacet
+              label="Fiscal years"
+              options={apiYears.map((y) => ({ value: String(y), label: String(y) }))}
+              values={fiscalYearsFilter.map(String)}
+              onChange={(next) =>
+                setFiscalYearsFilter(
+                  next
+                    .map((v) => Number.parseInt(v, 10))
+                    .filter((n) => !Number.isNaN(n))
+                    .sort((a, b) => a - b),
+                )
+              }
+              hint="Empty = include all years in the filtered data."
+              fullWidth
+            />
+            <MultiSelectFacet
+              label="Classification"
+              options={classificationOptions}
+              values={classifications}
+              onChange={setClassifications}
+              hint="Empty = all."
+              fullWidth
+            />
+            <MultiSelectFacet
+              label="Spending category"
+              options={categoryOptions}
+              values={categories}
+              onChange={setCategories}
+              hint="Empty = all categories."
+              fullWidth
+            />
+            <MultiSelectFacet
+              label="Cost center / hardware"
+              options={costCenterOptions.map((o) => ({
+                value: o.key,
+                label: o.label,
+              }))}
+              values={costCenters}
+              onChange={setCostCenters}
+              hint='Empty = all. Hardware matches "Hardware (assets)".'
+              fullWidth
+            />
+          </div>
+        </div>
       </div>
 
       {hasData && (
-        <section className="print:hidden mt-6 space-y-4">
-          <div className="flex items-stretch overflow-hidden rounded-[10px] border border-border bg-surface shadow-sm">
-            <StatCell
-              first
-              label="Annualized spend"
-              value={formatMoneyCompact(annualizedCurrent)}
-              delta={yoyPct}
-              sub={`FY ${statYear} actual`}
-            />
-            <StatCell
-              label="Next 30 days"
-              value={next30Days == null ? "—" : formatMoneyCompact(next30Days)}
-              sub={next30Days == null ? "requires renewals" : "upcoming renewals"}
-            />
-            <StatCell
-              label="Highest category"
-              value={
-                highestCategory
-                  ? formatMoneyCompact(highestCategory.amount)
-                  : "—"
-              }
-              sub={highestCategory?.name}
-            />
-            <StatCell
-              label="Avg per service"
-              value={formatMoneyCompact(avgPerService)}
-              sub={`FY ${statYear}`}
-            />
-          </div>
-
-          <div className="rounded-[10px] border border-border bg-surface p-4 shadow-sm">
-            {selectedBucket ? (
-              <>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedBucket(null)}
-                      className="text-[12px] font-medium text-fg-3 hover:text-fg"
-                    >
-                      ← Back to all
-                    </button>
-                    <div className="mt-1 flex items-baseline gap-2">
-                      <div
-                        className="text-[10.5px] font-semibold uppercase text-fg-3"
-                        style={{ letterSpacing: "0.06em" }}
-                      >
-                        {
-                          breakdownOptions.find(
-                            (o) => o.value === selectedBucket.dimension,
-                          )?.label
-                        }
-                      </div>
-                      <div
-                        className="text-fg"
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 600,
-                          letterSpacing: "-0.01em",
-                        }}
-                      >
-                        {selectedBucket.label}
-                      </div>
-                      <div className="text-[12px] text-fg-3">
-                        {drillByService.length} items ·{" "}
-                        {formatMoneyCompact(
-                          drillRecords.reduce((s, r) => s + r.amount, 0),
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBucket(null)}
-                    className="rounded-md border border-border bg-surface px-2.5 py-1 text-[12px] font-medium text-fg-2 hover:bg-surface-2"
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="overflow-hidden rounded-md border border-border">
-                  <table className="w-full text-[13px]">
-                    <thead className="bg-surface-2">
-                      <tr className="text-left text-fg-3">
-                        <th className="px-3 py-2 font-medium">Service</th>
-                        <th className="px-3 py-2 font-medium">Category</th>
-                        <th className="px-3 py-2 font-medium">Classification</th>
-                        <th className="px-3 py-2 text-right font-medium">FY</th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {drillByService.slice(0, 50).map((row) => {
-                        const service = serviceById.get(row.id);
-                        const linkTo = row.isService
-                          ? `/services/${row.id}`
-                          : null;
-                        return (
-                          <tr
-                            key={row.id}
-                            className="border-t border-border hover:bg-surface-2"
-                          >
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <Monogram
-                                  name={service?.name ?? row.name}
-                                  seed={row.id}
-                                  size={22}
-                                />
-                                {linkTo ? (
-                                  <Link
-                                    to={linkTo}
-                                    className="truncate font-medium text-fg hover:text-accent"
-                                  >
-                                    {row.name}
-                                  </Link>
-                                ) : (
-                                  <span className="truncate font-medium text-fg">
-                                    {row.name}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-fg-2">
-                              {row.category}
-                            </td>
-                            <td className="px-3 py-2 text-fg-2">
-                              {row.classification}
-                            </td>
-                            <td className="mono px-3 py-2 text-right text-fg-2">
-                              {row.fiscalYear}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              <Money value={row.amount} />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {drillByService.length > 50 && (
-                    <div className="border-t border-border bg-surface-2 px-3 py-2 text-[11.5px] text-fg-3">
-                      Showing top 50 of {drillByService.length}
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3
-                      className="text-fg"
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 600,
-                        letterSpacing: "-0.01em",
-                        margin: 0,
-                      }}
-                    >
-                      Breakdown
-                    </h3>
-                    <div className="mt-0.5 text-[12px] text-fg-3">
-                      Click a bar to drill into specific services
-                    </div>
-                  </div>
-                  <SegmentedControl
-                    value={breakdownDim}
-                    onChange={(v) => {
-                      setBreakdownDim(v);
-                      setSelectedBucket(null);
-                    }}
-                    options={breakdownOptions}
-                  />
-                </div>
-                {buckets.length === 0 ? (
-                  <div className="py-8 text-center text-[13px] text-fg-3">
-                    No actual spend to break down.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {buckets.slice(0, 12).map((b) => (
-                      <InteractiveBarRow
-                        key={b.key}
-                        label={b.label}
-                        value={b.value}
-                        max={bucketMax}
-                        pctOfTotal={
-                          bucketTotal > 0 ? (b.value / bucketTotal) * 100 : 0
-                        }
-                        selected={false}
-                        onClick={() =>
-                          breakdownDim === "month"
-                            ? undefined
-                            : setSelectedBucket({
-                                dimension: breakdownDim,
-                                key: b.key,
-                                label: b.label,
-                              })
-                        }
-                      />
-                    ))}
-                    {buckets.length > 12 && (
-                      <div className="pt-1 text-[11.5px] text-fg-3">
-                        +{buckets.length - 12} more
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {!selectedBucket && (
-            <div className="rounded-[10px] border border-border bg-surface p-4 shadow-sm">
-              <div className="mb-2 flex items-baseline justify-between gap-3">
-                <h3
-                  className="text-fg"
-                  style={{
-                    fontSize: 16,
-                    fontWeight: 600,
-                    letterSpacing: "-0.01em",
-                    margin: 0,
-                  }}
-                >
-                  Monthly trend
-                </h3>
-                <div className="text-[12px] text-fg-3">FY {statYear} estimate</div>
-              </div>
-              <MonthlyTrendChart values={monthlyTrendValues} labels={MONTH_LABELS} />
-            </div>
-          )}
-        </section>
-      )}
-
-      {!hasData && (
-        <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
-          No cost rows match the current filters.
-        </p>
-      )}
-
-      {hasData && (
         <>
-          {displayYear !== null && (
-            <div
-              className={`mt-6 grid gap-3 print:grid-cols-2 ${
-                isOnlyActual
-                  ? "grid-cols-2 sm:max-w-2xl"
-                  : "grid-cols-2 sm:grid-cols-4 print:grid-cols-4"
-              }`}
-            >
+          {!isOnlyActual && displayYear !== null && (
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 print:grid-cols-2">
               <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                 <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   {displayRecordTypeLabel(comparisonTypes[0] ?? "", displayYear)} ({displayYear})
@@ -1473,47 +1220,13 @@ export function CostsReport() {
                   {fmtFull(visualCostByYearA[displayYear] ?? 0)}
                 </p>
               </div>
-              {!isOnlyActual && comparisonTypes[1] !== undefined && (
+              {comparisonTypes[1] !== undefined && (
                 <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                   <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {displayRecordTypeLabel(comparisonTypes[1], displayYear)} ({displayYear})
                   </p>
                   <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-100">
                     {fmtFull(visualCostByYearB[displayYear] ?? 0)}
-                  </p>
-                </div>
-              )}
-              <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {yoyLabelForType(comparisonTypes[0] ?? "", displayYear)}
-                </p>
-                <p
-                  className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
-                    yoyA < 0
-                      ? "text-emerald-600"
-                      : yoyA > 0
-                        ? "text-red-600"
-                        : "text-gray-900 dark:text-gray-100"
-                  }`}
-                >
-                  {`${yoyA >= 0 ? "+" : ""}${yoyA.toFixed(1)}%`}
-                </p>
-              </div>
-              {!isOnlyActual && comparisonTypes[1] !== undefined && (
-                <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                  <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {yoyLabelForType(comparisonTypes[1], displayYear)}
-                  </p>
-                  <p
-                    className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
-                      yoyB < 0
-                        ? "text-emerald-600"
-                        : yoyB > 0
-                          ? "text-red-600"
-                          : "text-gray-900 dark:text-gray-100"
-                    }`}
-                  >
-                    {`${yoyB >= 0 ? "+" : ""}${yoyB.toFixed(1)}%`}
                   </p>
                 </div>
               )}
@@ -1662,6 +1375,193 @@ export function CostsReport() {
             </div>
           )}
 
+          <section className="print:hidden mt-6 space-y-4">
+            <div className="rounded-[10px] border border-border bg-surface p-4 shadow-sm">
+              {selectedBucket ? (
+                <>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBucket(null)}
+                        className="text-[12px] font-medium text-fg-3 hover:text-fg"
+                      >
+                        ← Back to all
+                      </button>
+                      <div className="mt-1 flex items-baseline gap-2">
+                        <div
+                          className="text-[10.5px] font-semibold uppercase text-fg-3"
+                          style={{ letterSpacing: "0.06em" }}
+                        >
+                          {
+                            breakdownOptions.find(
+                              (o) => o.value === selectedBucket.dimension,
+                            )?.label
+                          }
+                        </div>
+                        <div
+                          className="text-fg"
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 600,
+                            letterSpacing: "-0.01em",
+                          }}
+                        >
+                          {selectedBucket.label}
+                        </div>
+                        <div className="text-[12px] text-fg-3">
+                          {drillByService.length} items ·{" "}
+                          {formatMoneyCompact(
+                            drillRecords.reduce((s, r) => s + r.amount, 0),
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBucket(null)}
+                      className="rounded-md border border-border bg-surface px-2.5 py-1 text-[12px] font-medium text-fg-2 hover:bg-surface-2"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="overflow-hidden rounded-md border border-border">
+                    <table className="w-full text-[13px]">
+                      <thead className="bg-surface-2">
+                        <tr className="text-left text-fg-3">
+                          <th className="px-3 py-2 font-medium">Service</th>
+                          <th className="px-3 py-2 font-medium">Category</th>
+                          <th className="px-3 py-2 font-medium">Classification</th>
+                          <th className="px-3 py-2 text-right font-medium">FY</th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Amount
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillByService.slice(0, 50).map((row) => {
+                          const service = serviceById.get(row.id);
+                          const linkTo = row.isService
+                            ? `/services/${row.id}`
+                            : null;
+                          return (
+                            <tr
+                              key={row.id}
+                              className="border-t border-border hover:bg-surface-2"
+                            >
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <Monogram
+                                    name={service?.name ?? row.name}
+                                    seed={row.id}
+                                    size={22}
+                                  />
+                                  {linkTo ? (
+                                    <Link
+                                      to={linkTo}
+                                      className="truncate font-medium text-fg hover:text-accent"
+                                    >
+                                      {row.name}
+                                    </Link>
+                                  ) : (
+                                    <span className="truncate font-medium text-fg">
+                                      {row.name}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-fg-2">
+                                {row.category}
+                              </td>
+                              <td className="px-3 py-2 text-fg-2">
+                                {row.classification}
+                              </td>
+                              <td className="mono px-3 py-2 text-right text-fg-2">
+                                {row.fiscalYear}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Money value={row.amount} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {drillByService.length > 50 && (
+                      <div className="border-t border-border bg-surface-2 px-3 py-2 text-[11.5px] text-fg-3">
+                        Showing top 50 of {drillByService.length}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3
+                        className="text-fg"
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 600,
+                          letterSpacing: "-0.01em",
+                          margin: 0,
+                        }}
+                      >
+                        Breakdown
+                      </h3>
+                      <div className="mt-0.5 text-[12px] text-fg-3">
+                        {displayYear !== null ? `FY ${displayYear} actual · ` : null}
+                        Click a bar to drill into specific services
+                      </div>
+                    </div>
+                    <SegmentedControl
+                      value={breakdownDim}
+                      onChange={(v) => {
+                        setBreakdownDim(v);
+                        setSelectedBucket(null);
+                      }}
+                      options={breakdownOptions}
+                    />
+                  </div>
+                  {buckets.length === 0 ? (
+                    <div className="py-8 text-center text-[13px] text-fg-3">
+                      No actual spend to break down.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {buckets.slice(0, 12).map((b) => (
+                        <InteractiveBarRow
+                          key={b.key}
+                          label={b.label}
+                          value={b.value}
+                          max={bucketMax}
+                          pctOfTotal={
+                            bucketTotal > 0 ? (b.value / bucketTotal) * 100 : 0
+                          }
+                          selected={false}
+                          onClick={() =>
+                            breakdownDim === "month"
+                              ? undefined
+                              : setSelectedBucket({
+                                  dimension: breakdownDim,
+                                  key: b.key,
+                                  label: b.label,
+                                })
+                          }
+                        />
+                      ))}
+                      {buckets.length > 12 && (
+                        <div className="pt-1 text-[11.5px] text-fg-3">
+                          +{buckets.length - 12} more
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+
           <div className="print-table-section mt-8 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 print:break-inside-avoid">
             <h2 className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
               Line items ({sortedDetail.length})
@@ -1743,6 +1643,12 @@ export function CostsReport() {
             </div>
           </div>
         </>
+      )}
+
+      {!hasData && (
+        <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
+          No cost rows match the current filters.
+        </p>
       )}
     </div>
     </PageTransition>
