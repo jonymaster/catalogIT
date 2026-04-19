@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import "./CostsReport.print.css";
 import client from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
+import type { ChartYScaleMode } from "../components/charts/chartAxis";
 import { PageTransition } from "../components/PageTransition";
 import { StackedBar } from "../components/charts/StackedBar";
 import { MultiSelectFacet } from "../components/ui/MultiSelectFacet";
@@ -311,6 +312,8 @@ export function CostsReport() {
   const [costCenters, setCostCenters] = useState<string[]>([]);
   const [fiscalYearsFilter, setFiscalYearsFilter] = useState<number[]>([]);
   const [focusYear, setFocusYear] = useState<number | null>(null);
+  const [yearBarChartScale, setYearBarChartScale] =
+    useState<ChartYScaleMode>("linearFocused");
   const [printGeneratedAt, setPrintGeneratedAt] = useState("");
   const [combineActualEstimatedCfYears, setCombineActualEstimatedCfYears] =
     useState(true);
@@ -1305,10 +1308,30 @@ export function CostsReport() {
 
           {isOnlyActual ? (
             <div className="print-chart-card mt-6 min-h-[300px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
-              <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Total spend by year (actual)
-              </h2>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 gap-y-2">
+                <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Total spend by year (actual)
+                </h2>
+                <div className="flex flex-wrap items-center gap-2 print:hidden">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Year column axis
+                  </span>
+                  <SegmentedControl<ChartYScaleMode>
+                    value={yearBarChartScale}
+                    onChange={setYearBarChartScale}
+                    size="sm"
+                    activeTone="brand"
+                    options={[
+                      { value: "linearZero", label: "Full" },
+                      { value: "linearFocused", label: "Focus" },
+                      { value: "log", label: "Log" },
+                    ]}
+                  />
+                </div>
+              </div>
               <BarChart
+                scale={yearBarChartScale}
+                showAxisHint
                 data={chartYears.map((y) => ({
                   label: String(y),
                   value: visualCostByYearA[y] ?? 0,
@@ -1322,11 +1345,29 @@ export function CostsReport() {
             </div>
           ) : (
             <div className="mt-6 grid gap-4 lg:grid-cols-2 print:grid-cols-1">
+              <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-2 print:hidden">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Year column axis
+                </span>
+                <SegmentedControl<ChartYScaleMode>
+                  value={yearBarChartScale}
+                  onChange={setYearBarChartScale}
+                  size="sm"
+                  activeTone="brand"
+                  options={[
+                    { value: "linearZero", label: "Full" },
+                    { value: "linearFocused", label: "Focus" },
+                    { value: "log", label: "Log" },
+                  ]}
+                />
+              </div>
               <div className="print-chart-card min-h-[280px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5 print:break-inside-avoid">
                 <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {RECORD_TYPE_LABELS[comparisonTypes[0]]} — total by year
                 </h2>
                 <BarChart
+                  scale={yearBarChartScale}
+                  showAxisHint
                   data={chartYears.map((y) => ({
                     label: String(y),
                     value: visualCostByYearA[y] ?? 0,
@@ -1344,6 +1385,8 @@ export function CostsReport() {
                     {RECORD_TYPE_LABELS[comparisonTypes[1]]} — total by year
                   </h2>
                   <BarChart
+                    scale={yearBarChartScale}
+                    showAxisHint
                     data={chartYears.map((y) => ({
                       label: String(y),
                       value: visualCostByYearB[y] ?? 0,
@@ -1388,6 +1431,8 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataA}
+                scale={yearBarChartScale}
+                showAxisHint
                 onYearClick={(y) => {
                   setFocusYear(y);
                   setSelectedBucket(null);
@@ -1426,6 +1471,8 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataB}
+                scale={yearBarChartScale}
+                showAxisHint
                 onYearClick={(y) => {
                   setFocusYear(y);
                   setSelectedBucket(null);
