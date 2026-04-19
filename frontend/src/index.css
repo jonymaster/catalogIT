@@ -2,31 +2,91 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Sidebar chrome: light default, dark when html.dark (see ThemeSync) */
+/* ── Ledger design tokens (light) ─────────────────────────────
+   Ported from design_handoff_catalogit/prototype.html */
 :root {
-  --sidebar-surface-bg:          #f4f4f5;
-  --sidebar-surface-bg-hover:    #e4e4e7;
-  --sidebar-surface-bg-active:   #d4d4d8;
-  --sidebar-surface-text:        #71717a;
-  --sidebar-surface-text-active: #18181b;
-  --sidebar-surface-accent:      #6366f1;
-  --sidebar-surface-border:      #e4e4e7;
+  --bg:            #fafafa;
+  --surface:       #ffffff;
+  --surface-2:     #f5f5f4;
+  --surface-3:     #eeeeec;
+  --border:        #e7e5e1;
+  --border-strong: #d6d3ce;
+  --fg:            #1c1b1a;
+  --fg-2:          #44423e;
+  --fg-3:          #737068;
+  --fg-4:          #a3a09a;
+  --accent:        #3b5bdb;
+  --accent-soft:   #e9edfb;
+  --accent-strong: #2f48b0;
+  --success:       #1f7a43;
+  --success-soft:  #e3f1e8;
+  --warn:          #b16b1e;
+  --warn-soft:     #fbefdf;
+  --danger:        #b3261e;
+  --danger-soft:   #f8e1df;
+  --info:          #1f6b8f;
+  --info-soft:     #e2f0f6;
+  --purple:        #6b3fa0;
+  --purple-soft:   #ede6f6;
+
+  --radius:    10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 0 rgba(16,14,10,.04), 0 1px 2px rgba(16,14,10,.04);
+  --shadow-md: 0 1px 0 rgba(16,14,10,.03), 0 8px 24px -12px rgba(16,14,10,.12);
+
+  /* Sidebar chrome (legacy vars, kept for back-compat) */
+  --sidebar-surface-bg:          var(--surface);
+  --sidebar-surface-bg-hover:    var(--surface-2);
+  --sidebar-surface-bg-active:   var(--surface-3);
+  --sidebar-surface-text:        var(--fg-3);
+  --sidebar-surface-text-active: var(--fg);
+  --sidebar-surface-accent:      var(--accent);
+  --sidebar-surface-border:      var(--border);
 }
 
+/* ── Ledger design tokens (dark) ───────────────────────────── */
 html.dark {
-  --sidebar-surface-bg:          #0f1117;
-  --sidebar-surface-bg-hover:    #1a1d2b;
-  --sidebar-surface-bg-active:   #242838;
-  --sidebar-surface-text:        #9ca3af;
-  --sidebar-surface-text-active: #f3f4f6;
-  --sidebar-surface-accent:      #6366f1;
-  --sidebar-surface-border:      #1f2937;
+  --bg:            #0f1011;
+  --surface:       #17181a;
+  --surface-2:     #1c1d20;
+  --surface-3:     #232428;
+  --border:        #262729;
+  --border-strong: #35373b;
+  --fg:            #f3f2ef;
+  --fg-2:          #cdcbc7;
+  --fg-3:          #8c8a85;
+  --fg-4:          #5d5b57;
+  --accent:        #7b92ef;
+  --accent-soft:   #1e2447;
+  --accent-strong: #a0b2f3;
+  --success:       #4ea475;
+  --success-soft:  #162a1f;
+  --warn:          #d89a4a;
+  --warn-soft:     #2e2317;
+  --danger:        #e16458;
+  --danger-soft:   #2c1a17;
+  --info:          #6cb0cf;
+  --info-soft:     #152732;
+  --purple:        #a78bd1;
+  --purple-soft:   #241d33;
+
+  --shadow-sm: 0 1px 0 rgba(0,0,0,.3);
+  --shadow-md: 0 8px 24px -12px rgba(0,0,0,.5);
+
+  --sidebar-surface-bg:          var(--surface);
+  --sidebar-surface-bg-hover:    var(--surface-2);
+  --sidebar-surface-bg-active:   var(--surface-3);
+  --sidebar-surface-text:        var(--fg-3);
+  --sidebar-surface-text-active: var(--fg);
+  --sidebar-surface-accent:      var(--accent);
+  --sidebar-surface-border:      var(--border);
 }
 
-/* ── Design tokens ───────────────────────────────────────────── */
-
+/* ── Tailwind theme extensions ─────────────────────────────── */
 @theme {
-  /* Brand palette (indigo-based) */
+  /* Brand palette (indigo-based, kept for back-compat with existing code) */
   --color-brand-50:  #eef2ff;
   --color-brand-100: #e0e7ff;
   --color-brand-200: #c7d2fe;
@@ -39,7 +99,31 @@ html.dark {
   --color-brand-900: #312e81;
   --color-brand-950: #1e1b4b;
 
-  /* Sidebar (theme-aware; variables from :root / html.dark above) */
+  /* Ledger tokens exposed as Tailwind color utilities (bg-surface, text-fg, ...) */
+  --color-bg:            var(--bg);
+  --color-surface:       var(--surface);
+  --color-surface-2:     var(--surface-2);
+  --color-surface-3:     var(--surface-3);
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg:            var(--fg);
+  --color-fg-2:          var(--fg-2);
+  --color-fg-3:          var(--fg-3);
+  --color-fg-4:          var(--fg-4);
+  --color-accent:        var(--accent);
+  --color-accent-soft:   var(--accent-soft);
+  --color-accent-strong: var(--accent-strong);
+  --color-success:       var(--success);
+  --color-success-soft:  var(--success-soft);
+  --color-warn:          var(--warn);
+  --color-warn-soft:     var(--warn-soft);
+  --color-danger:        var(--danger);
+  --color-danger-soft:   var(--danger-soft);
+  --color-info:          var(--info);
+  --color-info-soft:     var(--info-soft);
+  --color-purple-ledger:      var(--purple);
+  --color-purple-ledger-soft: var(--purple-soft);
+
   --color-sidebar-bg:          var(--sidebar-surface-bg);
   --color-sidebar-bg-hover:    var(--sidebar-surface-bg-hover);
   --color-sidebar-bg-active:   var(--sidebar-surface-bg-active);
@@ -49,8 +133,12 @@ html.dark {
   --color-sidebar-border:      var(--sidebar-surface-border);
 
   /* Geometry */
-  --sidebar-expanded: 256px;
-  --sidebar-collapsed: 72px;
+  --sidebar-expanded: 212px;
+  --sidebar-collapsed: 56px;
+
+  --radius-sm-ledger: var(--radius-sm);
+  --radius-md-ledger: var(--radius);
+  --radius-lg-ledger: var(--radius-lg);
 
   /* Easing */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -60,6 +148,7 @@ html.dark {
   --animate-fade-in-up:     fade-in-up 0.4s var(--ease-out-expo) both;
   --animate-scale-in:       scale-in 0.2s var(--ease-out-expo) both;
   --animate-slide-in-right: slide-in-right 0.3s var(--ease-out-expo) both;
+  --animate-pop-in:         pop-in 160ms cubic-bezier(.22,.9,.3,1.2) both;
   --animate-stagger-1:      fade-in-up 0.4s var(--ease-out-expo) 0.00s both;
   --animate-stagger-2:      fade-in-up 0.4s var(--ease-out-expo) 0.06s both;
   --animate-stagger-3:      fade-in-up 0.4s var(--ease-out-expo) 0.12s both;
@@ -87,3 +176,53 @@ html.dark {
   from { opacity: 0; transform: translateX(-12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Global type + utility rules (Ledger) ──────────────────── */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+.tnum { font-variant-numeric: tabular-nums; }
+.mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-feature-settings: "tnum"; }
+
+/* Keyboard shortcut chip (⌘K style) */
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 5px; height: 18px; min-width: 18px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  background: var(--surface);
+  border-radius: 4px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--fg-3);
+}
+
+/* Hover-underline link style used across the app */
+.hlink {
+  color: inherit;
+  border-bottom: 1px dashed transparent;
+  transition: color 120ms, border-color 120ms;
+  cursor: pointer;
+}
+.hlink:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Scrollbars */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; border: 2px solid var(--bg); }
+*::-webkit-scrollbar-thumb:hover { background: var(--fg-4); }
+
+::selection { background: var(--accent-soft); color: var(--accent-strong); }
+html.dark ::selection { background: var(--accent-soft); color: var(--accent-strong); }
+
+/* Modal helpers used by CommandPalette / dialogs */
+.noscroll { overflow: hidden; }

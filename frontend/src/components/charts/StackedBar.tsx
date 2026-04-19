@@ -14,8 +14,14 @@ interface Props {
   yearData: YearData[];
   width?: number;
   height?: number;
-  /** Called with fiscal year when a year column is clicked (dashboard). */
+  /** Called with fiscal year when a year column is clicked (empty area / label). */
   onYearClick?: (year: number) => void;
+  /** Called with fiscal year and category id when a specific stack segment is clicked. */
+  onCategoryClick?: (year: number, categoryId: string) => void;
+  /** Currently selected year (used together with selectedCategoryId to dim siblings). */
+  selectedYear?: number | null;
+  /** Currently selected category id (dim other segments in the same column). */
+  selectedCategoryId?: string | null;
 }
 
 const fmt = (n: number) =>
@@ -26,6 +32,9 @@ export function StackedBar({
   width = 640,
   height = 300,
   onYearClick,
+  onCategoryClick,
+  selectedYear = null,
+  selectedCategoryId = null,
 }: Props) {
   const max = yearData.length
     ? Math.max(
@@ -44,6 +53,8 @@ export function StackedBar({
   const n = Math.max(yearData.length, 1);
   const slot = (width - startX - 20) / n;
   const bw = Math.min(104, Math.max(28, slot - 12));
+  const hasCategorySelection =
+    selectedYear !== null && selectedCategoryId !== null;
 
   return (
     <svg
@@ -82,15 +93,17 @@ export function StackedBar({
         let cumH = 0;
         const total = yd.cats.reduce((s, c) => s + c.value, 0);
         return (
-          <g
-            key={i}
-            className={onYearClick ? "cursor-pointer" : undefined}
-            onClick={() => onYearClick?.(yd.year)}
-          >
+          <g key={i}>
             {yd.cats.map((c, ci) => {
               const bh = (c.value / max) * chartH;
               const y = chartTop + chartH - cumH - bh;
               cumH += bh;
+              const isSelected =
+                hasCategorySelection &&
+                yd.year === selectedYear &&
+                c.id === selectedCategoryId;
+              const opacity =
+                hasCategorySelection && !isSelected ? 0.24 : 0.8;
               return (
                 <rect
                   key={ci}
@@ -100,8 +113,21 @@ export function StackedBar({
                   height={Math.max(bh, 0)}
                   rx="3"
                   fill={c.color}
-                  opacity="0.8"
-                />
+                  opacity={opacity}
+                  className={onCategoryClick ? "cursor-pointer" : undefined}
+                  onClick={(e) => {
+                    if (onCategoryClick) {
+                      e.stopPropagation();
+                      onCategoryClick(yd.year, c.id);
+                    } else if (onYearClick) {
+                      onYearClick(yd.year);
+                    }
+                  }}
+                >
+                  <title>
+                    {c.name} — {fmt(c.value)} (FY {yd.year})
+                  </title>
+                </rect>
               );
             })}
             <text
@@ -110,7 +136,10 @@ export function StackedBar({
               textAnchor="middle"
               fontSize="14"
               fontWeight="600"
-              className="fill-gray-900 dark:fill-gray-50"
+              className={`fill-gray-900 dark:fill-gray-50 ${
+                onYearClick ? "cursor-pointer" : ""
+              }`}
+              onClick={() => onYearClick?.(yd.year)}
             >
               {fmt(total)}
             </text>
@@ -120,7 +149,10 @@ export function StackedBar({
               textAnchor="middle"
               fontSize="14"
               fontWeight="600"
-              className="fill-gray-700 dark:fill-gray-300"
+              className={`fill-gray-700 dark:fill-gray-300 ${
+                onYearClick ? "cursor-pointer" : ""
+              }`}
+              onClick={() => onYearClick?.(yd.year)}
             >
               {yd.year}
             </text>

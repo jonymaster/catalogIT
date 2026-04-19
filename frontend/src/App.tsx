@@ -15,16 +15,19 @@ import { ServiceDetail } from "./pages/ServiceDetail";
 import { ServiceOverview } from "./pages/ServiceOverview";
 import { ServiceCosts } from "./pages/ServiceCosts";
 import { ServiceAssignments } from "./pages/ServiceAssignments";
+import { ServiceAttachments } from "./pages/ServiceAttachments";
 import { CostRecordCreate } from "./pages/CostRecordCreate";
 import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
 import { LaptopDetail } from "./pages/LaptopDetail";
+import { LaptopOverview } from "./pages/LaptopOverview";
+import { LaptopAttachments } from "./pages/LaptopAttachments";
 import { ServiceCreate } from "./pages/ServiceCreate";
-import { ServiceEdit } from "./pages/ServiceEdit";
 import { LaptopCreate } from "./pages/LaptopCreate";
 import { LaptopEdit } from "./pages/LaptopEdit";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
+import { UserDetail } from "./pages/UserDetail";
 import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
 import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
@@ -67,13 +70,16 @@ export default function App() {
                   <Route index element={<ServiceOverview />} />
                   <Route path="costs" element={<ServiceCosts />} />
                   <Route path="assignments" element={<ServiceAssignments />} />
+                  <Route path="attachments" element={<ServiceAttachments />} />
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
-                <Route path="/services/:id/edit" element={<ServiceEdit />} />
                 <Route path="/hardware" element={<Hardware />} />
                 <Route path="/hardware/new" element={<LaptopCreate />} />
-                <Route path="/hardware/:id" element={<LaptopDetail />} />
+                <Route path="/hardware/:id" element={<LaptopDetail />}>
+                  <Route index element={<LaptopOverview />} />
+                  <Route path="attachments" element={<LaptopAttachments />} />
+                </Route>
                 <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
                 <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
@@ -81,6 +87,7 @@ export default function App() {
             <Route element={<ProtectedRoute requiredRole="admin" />}>
               <Route element={<Shell />}>
                 <Route path="/users" element={<Users />} />
+                <Route path="/users/:id" element={<UserDetail />} />
                 <Route path="/audit" element={<SettingsAuditLog />} />
                 <Route path="/settings" element={<Settings />}>
                   <Route index element={<Navigate to="oidc" replace />} />

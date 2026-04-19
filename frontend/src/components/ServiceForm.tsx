@@ -7,9 +7,9 @@ import {
   SERVICE_VIEW_SECTIONS,
   type ServiceFieldKey,
 } from "../service/serviceViewLayout";
+import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
 import type {
   Service,
-  User,
   Vendor,
   Category,
   CostCenter,
@@ -88,7 +88,6 @@ export function ServiceForm({ initial }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [users, setUsers] = useState<User[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -100,15 +99,13 @@ export function ServiceForm({ initial }: Props) {
 
   useEffect(() => {
     Promise.all([
-      client.get<User[]>("/api/users/"),
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
       client.get<ServiceStatus[]>("/api/service-statuses/"),
       client.get<ServiceClassification[]>("/api/service-classifications/"),
-    ]).then(([u, v, c, cc, p, s, cl]) => {
-      setUsers(u.data);
+    ]).then(([v, c, cc, p, s, cl]) => {
       setVendors(v.data);
       setCategories(c.data);
       setCostCenters(cc.data);
@@ -296,26 +293,14 @@ export function ServiceForm({ initial }: Props) {
         return (
           <div>
             <label className={labelCls}>{SERVICE_FIELD_LABELS.owners}</label>
-            <select
-              multiple
-              className={inputCls + " h-28"}
-              value={form.owner_ids}
-              onChange={(e) =>
-                set(
-                  "owner_ids",
-                  Array.from(e.target.selectedOptions, (o) => o.value),
-                )
-              }
-            >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.first_name} {u.last_name} ({u.email})
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Hold Ctrl/Cmd to select multiple
-            </p>
+            <div className="mt-1">
+              <UserDirectoryCheckboxPicker
+                variant="form"
+                value={form.owner_ids}
+                onChange={(ids) => set("owner_ids", ids)}
+                seedUsers={initial?.owners}
+              />
+            </div>
           </div>
         );
       case "classification":

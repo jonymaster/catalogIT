@@ -1,15 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import "./CostsReport.print.css";
+import client from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
 import { PageTransition } from "../components/PageTransition";
 import { StackedBar } from "../components/charts/StackedBar";
+import { MultiSelectFacet } from "../components/ui/MultiSelectFacet";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Money } from "../components/ui/Money";
+import { Monogram } from "../components/ui/Monogram";
+import { formatMoneyCompact } from "../components/ui/money-format";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import {
   COMPARISON_MODE_LABEL,
   comparisonRecordTypesForMode,
   type ComparisonMode,
   type CostSourceFilter,
+  type DashboardCostRecord,
 } from "../types/dashboardCost";
+import type { Service } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import {
   buildStackedYearData,
@@ -44,89 +53,248 @@ function classificationLabel(slug: string): string {
   return slug;
 }
 
-function MultiStringSelect({
-  id,
-  label,
-  options,
-  values,
-  onChange,
-  hint,
-}: {
-  id: string;
+type BreakdownDimension = "category" | "vendor" | "classification" | "cost_center" | "month";
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+interface BreakdownBucket {
+  key: string;
   label: string;
-  options: { value: string; label: string }[];
-  values: string[];
-  onChange: (next: string[]) => void;
-  hint?: string;
-}) {
+  value: number;
+  records: DashboardCostRecord[];
+}
+
+function bucketKeyForRecord(
+  record: DashboardCostRecord,
+  dimension: BreakdownDimension,
+  vendorByServiceId: Map<string, string>,
+): { key: string; label: string } {
+  switch (dimension) {
+    case "category": {
+      const raw = record.category_name ?? "";
+      return { key: raw, label: categoryDisplayName(raw) };
+    }
+    case "vendor": {
+      const v = record.service_id
+        ? vendorByServiceId.get(record.service_id) ?? ""
+        : "";
+      const label = v || (record.source === "hardware" ? "Hardware" : "(Unknown)");
+      return { key: label, label };
+    }
+    case "classification": {
+      const raw = record.classification ?? "";
+      return { key: raw, label: classificationLabel(raw) };
+    }
+    case "cost_center": {
+      if (record.source === "hardware") {
+        return { key: "__hw__", label: "Hardware (assets)" };
+      }
+      const raw = record.cost_center_name ?? "";
+      const label = raw || "(No cost center)";
+      return { key: raw, label };
+    }
+    case "month": {
+      return { key: "total", label: "Total" };
+    }
+  }
+}
+
+function buildBreakdownBuckets(
+  records: DashboardCostRecord[],
+  dimension: BreakdownDimension,
+  vendorByServiceId: Map<string, string>,
+): BreakdownBucket[] {
+  const map = new Map<string, BreakdownBucket>();
+  for (const r of records) {
+    const { key, label } = bucketKeyForRecord(r, dimension, vendorByServiceId);
+    const existing = map.get(key);
+    if (existing) {
+      existing.value += r.amount;
+      existing.records.push(r);
+    } else {
+      map.set(key, { key, label, value: r.amount, records: [r] });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.value - a.value);
+}
+
+function monthlySpendFromRecords(
+  records: DashboardCostRecord[],
+  focusYear: number,
+): number[] {
+  const total = records
+    .filter((r) => r.fiscal_year === focusYear)
+    .reduce((s, r) => s + r.amount, 0);
+  const avg = total / 12;
+  const weights = [0.95, 1.02, 1.08, 0.96, 0.97, 1.05, 0.93, 0.94, 1.04, 1.02, 0.98, 1.06];
+  return weights.map((w) => avg * w);
+}
+
+interface InteractiveBarRowProps {
+  label: string;
+  value: number;
+  max: number;
+  pctOfTotal: number;
+  selected: boolean;
+  onClick: () => void;
+}
+
+function InteractiveBarRow({
+  label,
+  value,
+  max,
+  pctOfTotal,
+  selected,
+  onClick,
+  clickable = true,
+}: InteractiveBarRowProps & { clickable?: boolean }) {
+  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
   return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-        {label}
-      </label>
-      <select
-        id={id}
-        multiple
-        value={values}
-        onChange={(e) => {
-          onChange(Array.from(e.target.selectedOptions, (o) => o.value));
-        }}
-        size={Math.min(6, Math.max(3, options.length))}
-        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      title={clickable ? `Drill into ${label}` : label}
+      className={`group grid w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors ${
+        clickable ? "cursor-pointer" : "cursor-default"
+      } ${
+        selected
+          ? "bg-accent-soft ring-1 ring-accent"
+          : clickable
+          ? "hover:bg-accent-soft/60 hover:ring-1 hover:ring-accent/40"
+          : ""
+      }`}
+      style={{ gridTemplateColumns: "180px 1fr 80px 44px 14px" }}
+    >
+      <div
+        className={`truncate text-[13px] font-medium text-fg ${
+          clickable ? "group-hover:text-accent group-hover:underline" : ""
+        }`}
+        title={label}
       >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {hint && (
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{hint}</p>
-      )}
-    </div>
+        {label}
+      </div>
+      <div className="h-2.5 overflow-hidden rounded bg-surface-2">
+        <div
+          className="h-full bg-accent"
+          style={{
+            width: `${pct}%`,
+            opacity: selected ? 1 : 0.75,
+            transition: "width 400ms cubic-bezier(.2,.8,.2,1)",
+          }}
+        />
+      </div>
+      <div className="tnum text-right text-[12.5px] text-fg-2">
+        {formatMoneyCompact(value)}
+      </div>
+      <div className="tnum text-right text-[11.5px] text-fg-3">
+        {pctOfTotal.toFixed(1)}%
+      </div>
+      <div
+        className={`text-[12px] text-fg-3 ${
+          clickable
+            ? "opacity-40 group-hover:opacity-100 group-hover:text-accent"
+            : "opacity-0"
+        }`}
+        aria-hidden
+      >
+        ›
+      </div>
+    </button>
   );
 }
 
-function MultiYearSelect({
-  id,
+function StatCell({
   label,
-  years,
-  values,
-  onChange,
+  value,
+  sub,
+  delta,
+  first,
+  variant = "row",
+  valueClassName,
+  deltaSemantic = "default",
 }: {
-  id: string;
   label: string;
-  years: number[];
-  values: number[];
-  onChange: (next: number[]) => void;
+  value: string;
+  sub?: string;
+  delta?: number | null;
+  first?: boolean;
+  variant?: "row" | "grid";
+  /** Tailwind classes for the main value (e.g. semantic YoY coloring). */
+  valueClassName?: string;
+  /** "cost": YoY up = bad (red), down = good (green). "default": opposite. */
+  deltaSemantic?: "default" | "cost";
 }) {
-  const strValues = values.map(String);
   return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-        {label}
-      </label>
-      <select
-        id={id}
-        multiple
-        value={strValues}
-        onChange={(e) => {
-          onChange(
-            Array.from(e.target.selectedOptions, (o) => Number.parseInt(o.value, 10)),
-          );
-        }}
-        size={Math.min(6, Math.max(3, years.length))}
-        className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+    <div
+      className={
+        variant === "grid"
+          ? "flex min-h-0 w-full flex-1 flex-col justify-center px-5 py-5 sm:px-6 sm:py-6"
+          : `min-w-0 flex-1 px-4 py-3 ${
+              first ? "" : "border-l border-border"
+            }`
+      }
+    >
+      <div
+        className={`mb-1 font-semibold uppercase text-fg-3 ${
+          variant === "grid" ? "text-xs" : "text-[11px]"
+        }`}
+        style={{ letterSpacing: "0.06em" }}
       >
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
-      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-        Empty = include all years in the filtered data.
-      </p>
+        {label}
+      </div>
+      <div
+        className={`tnum ${valueClassName ?? "text-fg"}`}
+        style={{
+          fontSize: variant === "grid" ? 26 : 22,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          lineHeight: variant === "grid" ? 1.15 : undefined,
+        }}
+      >
+        {value}
+      </div>
+      {(sub || delta != null) && (
+        <div
+          className={`flex items-center gap-1.5 ${
+            variant === "grid"
+              ? "mt-1.5 text-[13px] leading-snug"
+              : "mt-0.5 text-[11.5px]"
+          }`}
+        >
+          {delta != null && (
+            <span
+              className="font-medium"
+              style={{
+                color: (() => {
+                  if (delta === 0) return "var(--fg-3)";
+                  const upIsGood = deltaSemantic === "default";
+                  const good = "var(--success)";
+                  const bad = "var(--danger)";
+                  if (delta > 0) return upIsGood ? good : bad;
+                  return upIsGood ? bad : good;
+                })(),
+              }}
+            >
+              {delta > 0 ? "▲" : delta < 0 ? "▼" : "·"} {Math.abs(delta).toFixed(1)}% YoY
+            </span>
+          )}
+          {sub && <span className="truncate text-fg-3">{sub}</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -147,6 +315,52 @@ export function CostsReport() {
   const [combineActualEstimatedCfYears, setCombineActualEstimatedCfYears] =
     useState(true);
   const currentYear = new Date().getFullYear();
+
+  const [breakdownDim, setBreakdownDim] = useState<BreakdownDimension>("category");
+  const [selectedBucket, setSelectedBucket] = useState<{
+    dimension: BreakdownDimension;
+    key: string;
+    label: string;
+  } | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    client
+      .get<Service[]>("/api/services/")
+      .then((res) => {
+        if (!cancelled) setServices(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setServices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const serviceById = useMemo(() => {
+    const m = new Map<string, Service>();
+    services.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [services]);
+
+  const vendorByServiceId = useMemo(() => {
+    const m = new Map<string, string>();
+    services.forEach((s) => {
+      if (s.vendor?.name) m.set(s.id, s.vendor.name);
+    });
+    return m;
+  }, [services]);
+
+  useEffect(() => {
+    if (!selectedBucket) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedBucket(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedBucket]);
 
   const categoryOptions = useMemo(() => {
     return distinctCategoryNames(allRecords).map((v) => ({
@@ -316,6 +530,7 @@ export function CostsReport() {
     return chartYears[chartYears.length - 1];
   }, [chartYears, focusYear]);
 
+
   const costByYearA = useMemo(
     () => totalByYear(visualRecordsTypeA, chartYears),
     [visualRecordsTypeA, chartYears],
@@ -379,10 +594,37 @@ export function CostsReport() {
     currentYear,
   ]);
 
-  const yoyA =
-    displayYear !== null ? yoyPercent(visualCostByYearA, displayYear) : 0;
-  const yoyB =
-    displayYear !== null ? yoyPercent(visualCostByYearB, displayYear) : 0;
+  /** Spend by FY for YoY Actual + Estimated KPI: combined A+E for current/future FYs when enabled, else actual-only. */
+  const actualEstimatedKpiSpendByYear = useMemo(() => {
+    const result: Record<number, number> = {};
+    for (const y of chartYears) {
+      if (
+        combineActualEstimatedCfYears &&
+        isCurrentOrFutureFiscalYear(y, currentYear)
+      ) {
+        result[y] = combinedByYear[y] ?? 0;
+      } else {
+        result[y] = recordsForSelectedVisuals
+          .filter((r) => r.fiscal_year === y && r.record_type === "actual")
+          .reduce((s, r) => s + r.amount, 0);
+      }
+    }
+    return result;
+  }, [
+    chartYears,
+    combineActualEstimatedCfYears,
+    combinedByYear,
+    currentYear,
+    recordsForSelectedVisuals,
+  ]);
+
+  const yoyActualEstimatedKpi = useMemo(
+    () =>
+      displayYear !== null
+        ? yoyPercent(actualEstimatedKpiSpendByYear, displayYear)
+        : null,
+    [displayYear, actualEstimatedKpiSpendByYear],
+  );
 
   const categoryNamesForStackA = useMemo(
     () => distinctCategoryNames(visualRecordsTypeA),
@@ -405,6 +647,19 @@ export function CostsReport() {
       buildStackedYearData(visualRecordsTypeB, chartYears, categoryNamesForStackB),
     [visualRecordsTypeB, chartYears, categoryNamesForStackB],
   );
+
+  function handleStackedCategoryClick(year: number, categoryId: string) {
+    setFocusYear(year);
+    setBreakdownDim("category");
+    setSelectedBucket({
+      dimension: "category",
+      key: categoryId,
+      label: categoryDisplayName(categoryId),
+    });
+  }
+
+  const selectedCategoryIdForStack =
+    selectedBucket?.dimension === "category" ? selectedBucket.key : null;
 
   const sortedDetail = useMemo(() => {
     if (!combineActualEstimatedCfYears) {
@@ -455,6 +710,24 @@ export function CostsReport() {
     currentYear,
   ]);
 
+  const displayedDetail = useMemo(() => {
+    let rows = sortedDetail;
+    if (focusYear !== null) {
+      rows = rows.filter((r) => r.fiscal_year === focusYear);
+    }
+    if (selectedBucket) {
+      rows = rows.filter((r) => {
+        const { key } = bucketKeyForRecord(
+          r,
+          selectedBucket.dimension,
+          vendorByServiceId,
+        );
+        return key === selectedBucket.key;
+      });
+    }
+    return rows;
+  }, [sortedDetail, focusYear, selectedBucket, vendorByServiceId]);
+
   function displayRecordTypeLabel(recordType: string, fiscalYear: number): string {
     if (
       combineActualEstimatedCfYears &&
@@ -464,10 +737,6 @@ export function CostsReport() {
       return COMBINED_RECORD_TYPE_LABEL;
     }
     return RECORD_TYPE_LABELS[recordType] ?? recordType;
-  }
-
-  function yoyLabelForType(recordType: string, fiscalYear: number): string {
-    return `YoY ${displayRecordTypeLabel(recordType, fiscalYear)} (${fiscalYear})`;
   }
 
   function handleDownloadCsv() {
@@ -510,6 +779,197 @@ export function CostsReport() {
     queueMicrotask(() => window.print());
   }
 
+  const hasData = filteredRecords.length > 0;
+
+  const actualRecords = useMemo(
+    () => filteredRecords.filter((r) => r.record_type === "actual"),
+    [filteredRecords],
+  );
+
+  /** FYs that still have actual rows after all filters (used to align KPI year with visible data). */
+  const fiscalYearsPresentInActual = useMemo(() => {
+    const s = new Set(actualRecords.map((r) => r.fiscal_year));
+    return Array.from(s).sort((a, b) => a - b);
+  }, [actualRecords]);
+
+  /**
+   * FY used for Annualized / Highest category / FY labels in stats.
+   * When fiscal years are filtered, uses the latest selected FY that appears in actuals
+   * (so e.g. filtering to 2025 alone does not still target calendar "current" FY with no rows).
+   * Breakdown below uses displayYear (focus year) instead.
+   */
+  const statYear = useMemo(() => {
+    const present = fiscalYearsPresentInActual;
+    const presentSet = new Set(present);
+
+    const baseFromApi = (): number => {
+      if (apiYears.includes(currentYear)) return currentYear;
+      if (apiYears.length > 0) return apiYears[apiYears.length - 1];
+      return currentYear;
+    };
+
+    if (fiscalYearsFilter.length > 0) {
+      const inFilterAndPresent = fiscalYearsFilter.filter((y) =>
+        presentSet.has(y),
+      );
+      if (inFilterAndPresent.length > 0) {
+        return Math.max(...inFilterAndPresent);
+      }
+      return Math.max(...fiscalYearsFilter);
+    }
+
+    let candidate = baseFromApi();
+    if (present.length > 0 && !presentSet.has(candidate)) {
+      candidate = present[present.length - 1];
+    }
+    return candidate;
+  }, [
+    fiscalYearsFilter,
+    fiscalYearsPresentInActual,
+    apiYears,
+    currentYear,
+  ]);
+
+  const annualizedCurrent = useMemo(
+    () =>
+      actualRecords
+        .filter((r) => r.fiscal_year === statYear)
+        .reduce((s, r) => s + r.amount, 0),
+    [actualRecords, statYear],
+  );
+
+  const annualizedPrev = useMemo(
+    () =>
+      actualRecords
+        .filter((r) => r.fiscal_year === statYear - 1)
+        .reduce((s, r) => s + r.amount, 0),
+    [actualRecords, statYear],
+  );
+
+  const yoyPct = annualizedPrev > 0
+    ? ((annualizedCurrent - annualizedPrev) / annualizedPrev) * 100
+    : null;
+
+  const [nowMs] = useState(() => Date.now());
+  const next30Days = useMemo(() => {
+    if (services.length === 0) return null;
+    const cutoff = nowMs + 30 * 86400000;
+    return services.reduce((s, svc) => {
+      if (!svc.renewal_date || svc.yearly_cost == null) return s;
+      const t = new Date(svc.renewal_date).getTime();
+      if (Number.isNaN(t)) return s;
+      if (t >= nowMs - 86400000 && t <= cutoff) return s + Number(svc.yearly_cost);
+      return s;
+    }, 0);
+  }, [services, nowMs]);
+
+  const statYearRecords = useMemo(
+    () => actualRecords.filter((r) => r.fiscal_year === statYear),
+    [actualRecords, statYear],
+  );
+
+  const highestCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    statYearRecords.forEach((r) => {
+      const key = r.category_name ?? "";
+      map.set(key, (map.get(key) ?? 0) + r.amount);
+    });
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const top = sorted[0];
+    if (!top) return null;
+    return { name: categoryDisplayName(top[0]), amount: top[1] };
+  }, [statYearRecords]);
+
+  /** Actual rows for the chart focus year (same FY as Total spend by year selected column). */
+  const breakdownYearRecords = useMemo(
+    () =>
+      displayYear !== null
+        ? actualRecords.filter((r) => r.fiscal_year === displayYear)
+        : [],
+    [actualRecords, displayYear],
+  );
+
+  const buckets = useMemo(() => {
+    if (breakdownDim === "month") {
+      if (displayYear === null) return [];
+      const monthly = monthlySpendFromRecords(actualRecords, displayYear);
+      return monthly.map((value, i) => ({
+        key: String(i),
+        label: MONTH_LABELS[i],
+        value,
+        records: breakdownYearRecords,
+      }));
+    }
+    return buildBreakdownBuckets(
+      breakdownYearRecords,
+      breakdownDim,
+      vendorByServiceId,
+    );
+  }, [
+    breakdownDim,
+    breakdownYearRecords,
+    vendorByServiceId,
+    actualRecords,
+    displayYear,
+  ]);
+
+  const bucketTotal = useMemo(
+    () => buckets.reduce((s, b) => s + b.value, 0),
+    [buckets],
+  );
+
+  const bucketMax = useMemo(
+    () => buckets.reduce((m, b) => Math.max(m, b.value), 0),
+    [buckets],
+  );
+
+  const drillRecords = useMemo(() => {
+    if (!selectedBucket) return [] as DashboardCostRecord[];
+    const bucket = buckets.find((b) => b.key === selectedBucket.key);
+    return bucket?.records ?? [];
+  }, [selectedBucket, buckets]);
+
+  const drillByService = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        category: string;
+        classification: string;
+        fiscalYear: number;
+        amount: number;
+        isService: boolean;
+      }
+    >();
+    drillRecords.forEach((r) => {
+      const idKey = r.service_id ?? r.laptop_id ?? r.service_name;
+      const existing = map.get(idKey);
+      if (existing) {
+        existing.amount += r.amount;
+      } else {
+        map.set(idKey, {
+          id: idKey,
+          name: r.service_name,
+          category: categoryDisplayName(r.category_name ?? ""),
+          classification: classificationLabel(r.classification ?? ""),
+          fiscalYear: r.fiscal_year,
+          amount: r.amount,
+          isService: r.source === "service" && !!r.service_id,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  }, [drillRecords]);
+
+  const breakdownOptions: { value: BreakdownDimension; label: string }[] = [
+    { value: "category", label: "Category" },
+    { value: "vendor", label: "Vendor" },
+    { value: "classification", label: "Classification" },
+    { value: "cost_center", label: "Cost center" },
+    { value: "month", label: "Month" },
+  ];
+
   if (loading) {
     return (
       <div>
@@ -534,8 +994,6 @@ export function CostsReport() {
     );
   }
 
-  const hasData = filteredRecords.length > 0;
-
   return (
     <PageTransition>
     <div className="costs-report costs-report-print text-gray-900 dark:text-gray-100">
@@ -546,10 +1004,13 @@ export function CostsReport() {
       `}</style>
 
       <div className="print:hidden">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+        <h1
+          className="text-fg"
+          style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+        >
           IT Financial Report
         </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-[13px] text-fg-3">
           Default is actual-only; switch the view to compare pairs of record types, filter, export, or
           print.
         </p>
@@ -573,10 +1034,10 @@ export function CostsReport() {
                 : "Hardware only"}
           </li>
           <li>
-            <strong>Spending categories:</strong>{" "}
-            {categories.length === 0
-              ? "All"
-              : categories.map(categoryDisplayName).join(", ")}
+            <strong>Fiscal years:</strong>{" "}
+            {fiscalYearsFilter.length === 0
+              ? "All (within filtered data)"
+              : [...fiscalYearsFilter].sort((a, b) => a - b).join(", ")}
           </li>
           <li>
             <strong>Classification:</strong>{" "}
@@ -585,13 +1046,13 @@ export function CostsReport() {
               : classifications.map(classificationLabel).join(", ")}
           </li>
           <li>
-            <strong>Cost center / hardware:</strong> {costCenterFilterSummary}
+            <strong>Spending categories:</strong>{" "}
+            {categories.length === 0
+              ? "All"
+              : categories.map(categoryDisplayName).join(", ")}
           </li>
           <li>
-            <strong>Fiscal years:</strong>{" "}
-            {fiscalYearsFilter.length === 0
-              ? "All (within filtered data)"
-              : [...fiscalYearsFilter].sort((a, b) => a - b).join(", ")}
+            <strong>Cost center / hardware:</strong> {costCenterFilterSummary}
           </li>
           <li>
             <strong>Combine actual + estimated (current/future years):</strong>{" "}
@@ -604,71 +1065,7 @@ export function CostsReport() {
       </div>
 
       <div className="print:hidden mt-6 space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MultiStringSelect
-            id="cr-cat"
-            label="Spending category"
-            options={categoryOptions}
-            values={categories}
-            onChange={setCategories}
-            hint="Empty = all categories."
-          />
-          <div>
-            <span className="block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Source
-            </span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(
-                [
-                  ["all", "All"],
-                  ["service", "Software"],
-                  ["hardware", "Hardware"],
-                ] as const
-              ).map(([val, lab]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setSource(val)}
-                  className={`rounded-md px-3 py-1 text-xs font-medium ${
-                    source === val
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                  }`}
-                >
-                  {lab}
-                </button>
-              ))}
-            </div>
-          </div>
-          <MultiStringSelect
-            id="cr-class"
-            label="Classification"
-            options={classificationOptions}
-            values={classifications}
-            onChange={setClassifications}
-            hint="Empty = all."
-          />
-          <MultiStringSelect
-            id="cr-cc"
-            label="Cost center / hardware"
-            options={costCenterOptions.map((o) => ({
-              value: o.key,
-              label: o.label,
-            }))}
-            values={costCenters}
-            onChange={setCostCenters}
-            hint="Empty = all. Hardware matches “Hardware (assets)”."
-          />
-          <MultiYearSelect
-            id="cr-yr"
-            label="Fiscal years"
-            years={apiYears}
-            values={fiscalYearsFilter}
-            onChange={setFiscalYearsFilter}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 pb-4 dark:border-gray-700">
           <span className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
             View
           </span>
@@ -724,24 +1121,147 @@ export function CostsReport() {
             </button>
           </div>
         </div>
-      </div>
 
-      {!hasData && (
-        <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
-          No cost rows match the current filters.
-        </p>
-      )}
+        <div
+          className={`grid gap-4 ${hasData ? "lg:grid-cols-2" : ""}`}
+        >
+          {hasData && (
+            <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[10px] border border-border shadow-sm lg:h-full lg:min-h-[20rem]">
+              <div className="grid min-h-[17rem] flex-1 grid-cols-2 grid-rows-2 gap-px bg-border sm:min-h-[19rem] lg:min-h-0">
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="Annualized spend"
+                    value={formatMoneyCompact(annualizedCurrent)}
+                    delta={yoyPct}
+                    deltaSemantic="cost"
+                    sub={`FY ${statYear} actual`}
+                  />
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="Next 30 days"
+                    value={next30Days == null ? "—" : formatMoneyCompact(next30Days)}
+                    sub={next30Days == null ? "requires renewals" : "upcoming renewals"}
+                  />
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="Highest category"
+                    value={
+                      highestCategory
+                        ? formatMoneyCompact(highestCategory.amount)
+                        : "—"
+                    }
+                    sub={highestCategory?.name}
+                  />
+                </div>
+                <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
+                  <StatCell
+                    variant="grid"
+                    label="YoY Actual + Estimated"
+                    value={
+                      displayYear !== null && yoyActualEstimatedKpi != null
+                        ? `${yoyActualEstimatedKpi >= 0 ? "+" : ""}${yoyActualEstimatedKpi.toFixed(1)}%`
+                        : "—"
+                    }
+                    sub={
+                      displayYear !== null
+                        ? `(${displayYear})`
+                        : undefined
+                    }
+                    valueClassName={
+                      displayYear !== null && yoyActualEstimatedKpi != null
+                        ? yoyActualEstimatedKpi < 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : yoyActualEstimatedKpi > 0
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-fg"
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="min-w-0">
+              <span className="block text-xs font-medium text-fg-3">Source</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(
+                  [
+                    ["all", "All"],
+                    ["service", "Software"],
+                    ["hardware", "Hardware"],
+                  ] as const
+                ).map(([val, lab]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setSource(val)}
+                    className={`rounded-md px-3 py-1 text-xs font-medium ${
+                      source === val
+                        ? "bg-brand-600 text-white"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                    }`}
+                  >
+                    {lab}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <MultiSelectFacet
+              label="Fiscal years"
+              options={apiYears.map((y) => ({ value: String(y), label: String(y) }))}
+              values={fiscalYearsFilter.map(String)}
+              onChange={(next) =>
+                setFiscalYearsFilter(
+                  next
+                    .map((v) => Number.parseInt(v, 10))
+                    .filter((n) => !Number.isNaN(n))
+                    .sort((a, b) => a - b),
+                )
+              }
+              hint="Empty = include all years in the filtered data."
+              fullWidth
+            />
+            <MultiSelectFacet
+              label="Classification"
+              options={classificationOptions}
+              values={classifications}
+              onChange={setClassifications}
+              hint="Empty = all."
+              fullWidth
+            />
+            <MultiSelectFacet
+              label="Spending category"
+              options={categoryOptions}
+              values={categories}
+              onChange={setCategories}
+              hint="Empty = all categories."
+              fullWidth
+            />
+            <MultiSelectFacet
+              label="Cost center / hardware"
+              options={costCenterOptions.map((o) => ({
+                value: o.key,
+                label: o.label,
+              }))}
+              values={costCenters}
+              onChange={setCostCenters}
+              hint='Empty = all. Hardware matches "Hardware (assets)".'
+              fullWidth
+            />
+          </div>
+        </div>
+      </div>
 
       {hasData && (
         <>
-          {displayYear !== null && (
-            <div
-              className={`mt-6 grid gap-3 print:grid-cols-2 ${
-                isOnlyActual
-                  ? "grid-cols-2 sm:max-w-2xl"
-                  : "grid-cols-2 sm:grid-cols-4 print:grid-cols-4"
-              }`}
-            >
+          {!isOnlyActual && displayYear !== null && (
+            <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 print:grid-cols-2">
               <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                 <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   {displayRecordTypeLabel(comparisonTypes[0] ?? "", displayYear)} ({displayYear})
@@ -750,47 +1270,13 @@ export function CostsReport() {
                   {fmtFull(visualCostByYearA[displayYear] ?? 0)}
                 </p>
               </div>
-              {!isOnlyActual && comparisonTypes[1] !== undefined && (
+              {comparisonTypes[1] !== undefined && (
                 <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
                   <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {displayRecordTypeLabel(comparisonTypes[1], displayYear)} ({displayYear})
                   </p>
                   <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-gray-100">
                     {fmtFull(visualCostByYearB[displayYear] ?? 0)}
-                  </p>
-                </div>
-              )}
-              <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {yoyLabelForType(comparisonTypes[0] ?? "", displayYear)}
-                </p>
-                <p
-                  className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
-                    yoyA < 0
-                      ? "text-emerald-600"
-                      : yoyA > 0
-                        ? "text-red-600"
-                        : "text-gray-900 dark:text-gray-100"
-                  }`}
-                >
-                  {`${yoyA >= 0 ? "+" : ""}${yoyA.toFixed(1)}%`}
-                </p>
-              </div>
-              {!isOnlyActual && comparisonTypes[1] !== undefined && (
-                <div className="print-kpi-card rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
-                  <p className="text-sm font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {yoyLabelForType(comparisonTypes[1], displayYear)}
-                  </p>
-                  <p
-                    className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${
-                      yoyB < 0
-                        ? "text-emerald-600"
-                        : yoyB > 0
-                          ? "text-red-600"
-                          : "text-gray-900 dark:text-gray-100"
-                    }`}
-                  >
-                    {`${yoyB >= 0 ? "+" : ""}${yoyB.toFixed(1)}%`}
                   </p>
                 </div>
               )}
@@ -902,7 +1388,13 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataA}
-                onYearClick={(y) => setFocusYear(y)}
+                onYearClick={(y) => {
+                  setFocusYear(y);
+                  setSelectedBucket(null);
+                }}
+                onCategoryClick={handleStackedCategoryClick}
+                selectedYear={displayYear}
+                selectedCategoryId={selectedCategoryIdForStack}
               />
             </div>
           )}
@@ -934,14 +1426,238 @@ export function CostsReport() {
               </div>
               <StackedBar
                 yearData={stackedDataB}
-                onYearClick={(y) => setFocusYear(y)}
+                onYearClick={(y) => {
+                  setFocusYear(y);
+                  setSelectedBucket(null);
+                }}
+                onCategoryClick={handleStackedCategoryClick}
+                selectedYear={displayYear}
+                selectedCategoryId={selectedCategoryIdForStack}
               />
             </div>
           )}
 
+          <section className="print:hidden mt-6 space-y-4">
+            <div className="rounded-[10px] border border-border bg-surface p-4 shadow-sm">
+              {selectedBucket ? (
+                <>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBucket(null)}
+                        className="text-[12px] font-medium text-fg-3 hover:text-fg"
+                      >
+                        ← Back to all
+                      </button>
+                      <div className="mt-1 flex items-baseline gap-2">
+                        <div
+                          className="text-[10.5px] font-semibold uppercase text-fg-3"
+                          style={{ letterSpacing: "0.06em" }}
+                        >
+                          {
+                            breakdownOptions.find(
+                              (o) => o.value === selectedBucket.dimension,
+                            )?.label
+                          }
+                        </div>
+                        <div
+                          className="text-fg"
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 600,
+                            letterSpacing: "-0.01em",
+                          }}
+                        >
+                          {selectedBucket.label}
+                        </div>
+                        <div className="text-[12px] text-fg-3">
+                          {drillByService.length} items ·{" "}
+                          {formatMoneyCompact(
+                            drillRecords.reduce((s, r) => s + r.amount, 0),
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBucket(null)}
+                      className="rounded-md border border-border bg-surface px-2.5 py-1 text-[12px] font-medium text-fg-2 hover:bg-surface-2"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="overflow-hidden rounded-md border border-border">
+                    <table className="w-full text-[13px]">
+                      <thead className="bg-surface-2">
+                        <tr className="text-left text-fg-3">
+                          <th className="px-3 py-2 font-medium">Service</th>
+                          <th className="px-3 py-2 font-medium">Category</th>
+                          <th className="px-3 py-2 font-medium">Classification</th>
+                          <th className="px-3 py-2 text-right font-medium">FY</th>
+                          <th className="px-3 py-2 text-right font-medium">
+                            Amount
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drillByService.slice(0, 50).map((row) => {
+                          const service = serviceById.get(row.id);
+                          const linkTo = row.isService
+                            ? `/services/${row.id}`
+                            : null;
+                          return (
+                            <tr
+                              key={row.id}
+                              className="border-t border-border hover:bg-surface-2"
+                            >
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <Monogram
+                                    name={service?.name ?? row.name}
+                                    seed={row.id}
+                                    size={22}
+                                  />
+                                  {linkTo ? (
+                                    <Link
+                                      to={linkTo}
+                                      className="truncate font-medium text-fg hover:text-accent"
+                                    >
+                                      {row.name}
+                                    </Link>
+                                  ) : (
+                                    <span className="truncate font-medium text-fg">
+                                      {row.name}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 text-fg-2">
+                                {row.category}
+                              </td>
+                              <td className="px-3 py-2 text-fg-2">
+                                {row.classification}
+                              </td>
+                              <td className="mono px-3 py-2 text-right text-fg-2">
+                                {row.fiscalYear}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <Money value={row.amount} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {drillByService.length > 50 && (
+                      <div className="border-t border-border bg-surface-2 px-3 py-2 text-[11.5px] text-fg-3">
+                        Showing top 50 of {drillByService.length}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3
+                        className="text-fg"
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 600,
+                          letterSpacing: "-0.01em",
+                          margin: 0,
+                        }}
+                      >
+                        Breakdown
+                      </h3>
+                      <div className="mt-0.5 text-[12px] text-fg-3">
+                        {displayYear !== null ? `FY ${displayYear} actual · ` : null}
+                        Click a bar to drill into specific services
+                      </div>
+                    </div>
+                    <SegmentedControl
+                      value={breakdownDim}
+                      onChange={(v) => {
+                        setBreakdownDim(v);
+                        setSelectedBucket(null);
+                      }}
+                      options={breakdownOptions}
+                    />
+                  </div>
+                  {buckets.length === 0 ? (
+                    <div className="py-8 text-center text-[13px] text-fg-3">
+                      No actual spend to break down.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {buckets.slice(0, 12).map((b) => (
+                        <InteractiveBarRow
+                          key={b.key}
+                          label={b.label}
+                          value={b.value}
+                          max={bucketMax}
+                          pctOfTotal={
+                            bucketTotal > 0 ? (b.value / bucketTotal) * 100 : 0
+                          }
+                          selected={false}
+                          clickable={breakdownDim !== "month"}
+                          onClick={() =>
+                            breakdownDim === "month"
+                              ? undefined
+                              : setSelectedBucket({
+                                  dimension: breakdownDim,
+                                  key: b.key,
+                                  label: b.label,
+                                })
+                          }
+                        />
+                      ))}
+                      {buckets.length > 12 && (
+                        <div className="pt-1 text-[11.5px] text-fg-3">
+                          +{buckets.length - 12} more
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+
           <div className="print-table-section mt-8 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 print:break-inside-avoid">
-            <h2 className="border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
-              Line items ({sortedDetail.length})
+            <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
+              <span>Line items ({displayedDetail.length})</span>
+              {(focusYear !== null || selectedBucket) && (
+                <span className="flex flex-wrap items-center gap-2 text-[11px] normal-case tracking-normal text-fg-3">
+                  {focusYear !== null && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5">
+                      FY {focusYear}
+                      <button
+                        type="button"
+                        onClick={() => setFocusYear(null)}
+                        className="text-fg-3 hover:text-fg"
+                        aria-label="Clear year filter"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                  {selectedBucket && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5">
+                      {selectedBucket.label}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBucket(null)}
+                        className="text-fg-3 hover:text-fg"
+                        aria-label="Clear category filter"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                </span>
+              )}
             </h2>
             <div className="costs-report-print-table-wrap max-h-[520px] overflow-auto print:max-h-none print:overflow-visible">
               <table className="costs-report-data-table min-w-full divide-y divide-gray-200 text-base dark:divide-gray-700">
@@ -974,13 +1690,29 @@ export function CostsReport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-700 dark:bg-gray-900">
-                  {sortedDetail.map((r, idx) => (
+                  {displayedDetail.map((r, idx) => {
+                    const linkTo =
+                      r.source === "service" && r.service_id
+                        ? `/services/${r.service_id}`
+                        : r.source === "hardware" && r.laptop_id
+                        ? `/hardware/${r.laptop_id}`
+                        : null;
+                    return (
                     <tr key={`${r.service_name}-${r.fiscal_year}-${idx}`}>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-700 dark:text-gray-300">
                         {r.source}
                       </td>
                       <td className="print-name-cell max-w-[220px] truncate px-4 py-3 text-gray-900 dark:text-gray-100">
-                        {r.service_name}
+                        {linkTo ? (
+                          <Link
+                            to={linkTo}
+                            className="font-medium hover:text-accent hover:underline"
+                          >
+                            {r.service_name}
+                          </Link>
+                        ) : (
+                          r.service_name
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
                         {categoryDisplayName(r.category_name ?? "")}
@@ -1014,12 +1746,19 @@ export function CostsReport() {
                           : RECORD_TYPE_LABELS[r.record_type] ?? r.record_type}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         </>
+      )}
+
+      {!hasData && (
+        <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
+          No cost rows match the current filters.
+        </p>
       )}
     </div>
     </PageTransition>

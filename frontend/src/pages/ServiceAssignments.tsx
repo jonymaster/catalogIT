@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useOutletContext } from "react-router-dom";
+import { Link, useOutletContext } from "react-router-dom";
 import client from "../api/client";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
@@ -288,7 +288,9 @@ export function ServiceAssignments() {
               .map((u) => (
                 <li key={u.id} className="px-4 py-3">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {u.first_name} {u.last_name}
+                    <Link to={`/users/${u.id}`} className="hlink">
+                      {u.first_name} {u.last_name}
+                    </Link>
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {u.email}

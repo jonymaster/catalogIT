@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import client from "../api/client";
 import { Badge } from "../components/Badge";
 import { PageTransition } from "../components/PageTransition";
@@ -269,21 +270,24 @@ export function Users() {
   return (
     <PageTransition>
     <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Users</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage user roles and access.
+          <h1
+            className="text-fg"
+            style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+          >
+            People
+          </h1>
+          <p className="mt-1 text-[13px] text-fg-3">
+            Manage user roles and access. {users.length} user
+            {users.length !== 1 ? "s" : ""}.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {users.length} user{users.length !== 1 ? "s" : ""}
-          </span>
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+            className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-strong"
           >
             Add user
           </button>
@@ -583,9 +587,12 @@ export function Users() {
                             />
                           </div>
                         ) : (
-                          <span className="whitespace-nowrap">
+                          <Link
+                            to={`/users/${user.id}`}
+                            className="hlink whitespace-nowrap"
+                          >
                             {user.first_name} {user.last_name}
-                          </span>
+                          </Link>
                         )}
                       </td>
                       <td className="max-w-[12rem] px-4 py-3 text-sm text-gray-500 dark:text-gray-400">

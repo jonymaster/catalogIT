@@ -1,22 +1,26 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 
 function ShellInner() {
   const { collapsed } = useSidebar();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-bg text-fg">
       <Sidebar />
-      <main
-        className="min-h-screen overflow-auto p-8"
+      <div
+        className="min-h-screen flex flex-col"
         style={{
           marginLeft: collapsed ? "var(--sidebar-collapsed)" : "var(--sidebar-expanded)",
-          transition: "margin-left 250ms var(--ease-out-expo)",
+          transition: "margin-left 220ms cubic-bezier(.2,.8,.2,1)",
         }}
       >
-        <Outlet />
-      </main>
+        <TopBar />
+        <main className="flex-1 overflow-auto px-7 pt-6 pb-12">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
