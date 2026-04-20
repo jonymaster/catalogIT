@@ -804,69 +804,45 @@ export function CostsReport() {
     [filteredRecords],
   );
 
-  /** FYs that still have actual rows after all filters (used to align KPI year with visible data). */
-  const fiscalYearsPresentInActual = useMemo(() => {
-    const s = new Set(actualRecords.map((r) => r.fiscal_year));
-    return Array.from(s).sort((a, b) => a - b);
-  }, [actualRecords]);
-
-  /**
-   * FY used for Annualized / Highest category / FY labels in stats.
-   * When fiscal years are filtered, uses the latest selected FY that appears in actuals
-   * (so e.g. filtering to 2025 alone does not still target calendar "current" FY with no rows).
-   * Breakdown below uses displayYear (focus year) instead.
-   */
-  const statYear = useMemo(() => {
-    const present = fiscalYearsPresentInActual;
-    const presentSet = new Set(present);
-
-    const baseFromApi = (): number => {
-      if (apiYears.includes(currentYear)) return currentYear;
-      if (apiYears.length > 0) return apiYears[apiYears.length - 1];
-      return currentYear;
-    };
-
-    if (fiscalYearsFilter.length > 0) {
-      const inFilterAndPresent = fiscalYearsFilter.filter((y) =>
-        presentSet.has(y),
-      );
-      if (inFilterAndPresent.length > 0) {
-        return Math.max(...inFilterAndPresent);
+  const { annualizedCurrent, annualizedPrev } = useMemo(() => {
+    const spendForYear = (y: number): number => {
+      if (
+        combineActualEstimatedCfYears &&
+        isCurrentOrFutureFiscalYear(y, currentYear)
+      ) {
+        const precomputed = combinedByYear[y];
+        if (precomputed != null) return precomputed;
+        return (
+          combinedActualEstimatedByYear(
+            recordsForSelectedVisuals,
+            [y],
+            currentYear,
+          )[y] ?? 0
+        );
       }
-      return Math.max(...fiscalYearsFilter);
+      return recordsForSelectedVisuals
+        .filter((r) => r.fiscal_year === y && r.record_type === "actual")
+        .reduce((s, r) => s + r.amount, 0);
+    };
+    if (displayYear === null) {
+      return { annualizedCurrent: 0, annualizedPrev: 0 };
     }
-
-    let candidate = baseFromApi();
-    if (present.length > 0 && !presentSet.has(candidate)) {
-      candidate = present[present.length - 1];
-    }
-    return candidate;
+    return {
+      annualizedCurrent: spendForYear(displayYear),
+      annualizedPrev: spendForYear(displayYear - 1),
+    };
   }, [
-    fiscalYearsFilter,
-    fiscalYearsPresentInActual,
-    apiYears,
+    displayYear,
+    combineActualEstimatedCfYears,
     currentYear,
+    combinedByYear,
+    recordsForSelectedVisuals,
   ]);
 
-  const annualizedCurrent = useMemo(
-    () =>
-      actualRecords
-        .filter((r) => r.fiscal_year === statYear)
-        .reduce((s, r) => s + r.amount, 0),
-    [actualRecords, statYear],
-  );
-
-  const annualizedPrev = useMemo(
-    () =>
-      actualRecords
-        .filter((r) => r.fiscal_year === statYear - 1)
-        .reduce((s, r) => s + r.amount, 0),
-    [actualRecords, statYear],
-  );
-
-  const yoyPct = annualizedPrev > 0
-    ? ((annualizedCurrent - annualizedPrev) / annualizedPrev) * 100
-    : null;
+  const yoyPct =
+    displayYear !== null && annualizedPrev > 0
+      ? ((annualizedCurrent - annualizedPrev) / annualizedPrev) * 100
+      : null;
 
   const [nowMs] = useState(() => Date.now());
   const next30Days = useMemo(() => {
@@ -881,14 +857,24 @@ export function CostsReport() {
     }, 0);
   }, [services, nowMs]);
 
-  const statYearRecords = useMemo(
-    () => actualRecords.filter((r) => r.fiscal_year === statYear),
-    [actualRecords, statYear],
-  );
-
   const highestCategory = useMemo(() => {
+    if (displayYear === null) return null;
+
+    const rows =
+      combineActualEstimatedCfYears &&
+      isCurrentOrFutureFiscalYear(displayYear, currentYear)
+        ? recordsForSelectedVisuals.filter(
+            (r) =>
+              r.fiscal_year === displayYear &&
+              (r.record_type === "actual" || r.record_type === "estimated"),
+          )
+        : recordsForSelectedVisuals.filter(
+            (r) =>
+              r.fiscal_year === displayYear && r.record_type === "actual",
+          );
+
     const map = new Map<string, number>();
-    statYearRecords.forEach((r) => {
+    rows.forEach((r) => {
       const key = r.category_name ?? "";
       map.set(key, (map.get(key) ?? 0) + r.amount);
     });
@@ -896,7 +882,12 @@ export function CostsReport() {
     const top = sorted[0];
     if (!top) return null;
     return { name: categoryDisplayName(top[0]), amount: top[1] };
-  }, [statYearRecords]);
+  }, [
+    displayYear,
+    combineActualEstimatedCfYears,
+    currentYear,
+    recordsForSelectedVisuals,
+  ]);
 
   /** Actual rows for the chart focus year (same FY as Total spend by year selected column). */
   const breakdownYearRecords = useMemo(
@@ -1256,10 +1247,24 @@ export function CostsReport() {
                   <StatCell
                     variant="grid"
                     label="Annualized spend"
-                    value={formatMoneyCompact(annualizedCurrent)}
+                    value={
+                      displayYear === null
+                        ? "—"
+                        : formatMoneyCompact(annualizedCurrent)
+                    }
                     delta={yoyPct}
                     deltaSemantic="cost"
-                    sub={`FY ${statYear} actual`}
+                    sub={
+                      displayYear === null
+                        ? undefined
+                        : combineActualEstimatedCfYears &&
+                            isCurrentOrFutureFiscalYear(
+                              displayYear,
+                              currentYear,
+                            )
+                          ? `FY ${displayYear} — ${COMBINED_RECORD_TYPE_LABEL}`
+                          : `FY ${displayYear} actual`
+                    }
                   />
                 </div>
                 <div className="flex h-full min-h-0 min-w-0 flex-col bg-surface">
