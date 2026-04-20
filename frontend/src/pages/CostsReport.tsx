@@ -20,17 +20,21 @@ import {
   classificationDisplayName,
   costCenterFilterOptions,
   dimensionFilterOptions,
-  dimensionValueForRecord,
+  dimensionValuesForRecord,
   distinctCategoryNames,
   distinctClassifications,
+  environmentDisplayName,
   filterCostRecords,
   fmtFull,
   getCategoryColor,
   isCurrentOrFutureFiscalYear,
+  subcategoryDisplayName,
+  teamDisplayName,
   totalsByDimension,
   vendorDisplayName,
   sourceDisplayName,
   buildStackedDimensionData,
+  recordMatchesDimensionKey,
 } from "../utils/dashboardCostAggregates";
 
 type RecordType = "actual" | "estimated" | "budget";
@@ -53,8 +57,11 @@ const RECORD_TYPE_OPTIONS: { value: RecordType; label: string }[] = [
 
 const REPORT_DIMENSIONS: DashboardCostDimension[] = [
   "category",
+  "subcategory",
   "classification",
   "vendor",
+  "team",
+  "environment",
   "cost_center",
   "source",
 ];
@@ -193,6 +200,12 @@ function dimensionColor(dimension: DashboardCostDimension, key: string) {
   return getCategoryColor(`${dimension}:${key || "__none__"}`);
 }
 
+function dimensionVisualizationLabel(dimension: DashboardCostDimension) {
+  return dimension === "team"
+    ? "Team attribution"
+    : DASHBOARD_COST_DIMENSION_LABEL[dimension];
+}
+
 function formatRecordType(recordType: string) {
   return RECORD_TYPE_OPTIONS.find((option) => option.value === recordType)?.label ?? recordType;
 }
@@ -211,17 +224,18 @@ function timeStackGroups(
     records
       .filter((record) => record.fiscal_year === year)
       .forEach((record) => {
-        const value = dimensionValueForRecord(record, secondaryDimension);
-        const existing = slices.get(value.key);
-        if (existing) {
-          existing.value += record.amount;
-          return;
-        }
-        slices.set(value.key, {
-          id: value.key,
-          name: value.label,
-          value: record.amount,
-          color: dimensionColor(secondaryDimension, value.key),
+        dimensionValuesForRecord(record, secondaryDimension).forEach((value) => {
+          const existing = slices.get(value.key);
+          if (existing) {
+            existing.value += record.amount;
+            return;
+          }
+          slices.set(value.key, {
+            id: value.key,
+            name: value.label,
+            value: record.amount,
+            color: dimensionColor(secondaryDimension, value.key),
+          });
         });
       });
 
@@ -258,9 +272,14 @@ export function CostsReport() {
   const [analysisMode, setAnalysisMode] = useState<ReportAnalysisMode>("time");
   const [source, setSource] = useState<"all" | "service" | "hardware">("all");
   const [categories, setCategories] = useState<string[]>([]);
+  const [subcategories, setSubcategories] = useState<string[]>([]);
   const [classifications, setClassifications] = useState<string[]>([]);
   const [vendors, setVendors] = useState<string[]>([]);
+  const [teams, setTeams] = useState<string[]>([]);
+  const [environments, setEnvironments] = useState<string[]>([]);
   const [costCenters, setCostCenters] = useState<string[]>([]);
+  const [amounts, setAmounts] = useState<string[]>([]);
+  const [noteValues, setNoteValues] = useState<string[]>([]);
   const [recordTypes, setRecordTypes] = useState<string[]>(["actual"]);
   const [fiscalYearsFilter, setFiscalYearsFilter] = useState<number[]>([]);
   const [primaryDimension, setPrimaryDimension] =
@@ -309,9 +328,36 @@ export function CostsReport() {
     }));
   }, [allRecords]);
 
+  const subcategoryOptions = useMemo(
+    () =>
+      dimensionFilterOptions(allRecords, "subcategory").map((option) => ({
+        value: option.key,
+        label: option.label,
+      })),
+    [allRecords],
+  );
+
   const vendorOptions = useMemo(
     () =>
       dimensionFilterOptions(allRecords, "vendor").map((option) => ({
+        value: option.key,
+        label: option.label,
+      })),
+    [allRecords],
+  );
+
+  const teamOptions = useMemo(
+    () =>
+      dimensionFilterOptions(allRecords, "team").map((option) => ({
+        value: option.key,
+        label: option.label,
+      })),
+    [allRecords],
+  );
+
+  const environmentOptions = useMemo(
+    () =>
+      dimensionFilterOptions(allRecords, "environment").map((option) => ({
         value: option.key,
         label: option.label,
       })),
@@ -331,13 +377,31 @@ export function CostsReport() {
     () =>
       filterCostRecords(allRecords, {
         categories,
+        subcategories,
         classifications,
         vendors,
+        teams,
+        environments,
         costCenters,
+        amounts,
+        noteValues,
         fiscalYears: fiscalYearsFilter,
         source,
       }),
-    [allRecords, categories, classifications, vendors, costCenters, fiscalYearsFilter, source],
+    [
+      allRecords,
+      amounts,
+      categories,
+      classifications,
+      costCenters,
+      environments,
+      fiscalYearsFilter,
+      noteValues,
+      source,
+      subcategories,
+      teams,
+      vendors,
+    ],
   );
 
   const visualRecords = useMemo(
@@ -411,15 +475,19 @@ export function CostsReport() {
       }
 
       if (analysisMode === "dimension" && drilldown.primaryKey != null) {
-        const value = dimensionValueForRecord(record, primaryDimension);
-        if (value.key !== drilldown.primaryKey) {
+        if (!recordMatchesDimensionKey(record, primaryDimension, drilldown.primaryKey)) {
           return false;
         }
       }
 
       if (drilldown.secondaryKey != null) {
-        const value = dimensionValueForRecord(record, effectiveSecondaryDimension);
-        if (value.key !== drilldown.secondaryKey) {
+        if (
+          !recordMatchesDimensionKey(
+            record,
+            effectiveSecondaryDimension,
+            drilldown.secondaryKey,
+          )
+        ) {
           return false;
         }
       }
@@ -453,12 +521,22 @@ export function CostsReport() {
     [drilldownRecords],
   );
 
+  const teamAttributionVisible =
+    analysisMode === "dimension"
+      ? primaryDimension === "team" || effectiveSecondaryDimension === "team"
+      : effectiveSecondaryDimension === "team";
+
   function resetFilters() {
     setSource("all");
     setCategories([]);
+    setSubcategories([]);
     setClassifications([]);
     setVendors([]);
+    setTeams([]);
+    setEnvironments([]);
     setCostCenters([]);
+    setAmounts([]);
+    setNoteValues([]);
     setRecordTypes(["actual"]);
     setFiscalYearsFilter([]);
     setPrimaryDimension("vendor");
@@ -484,7 +562,7 @@ export function CostsReport() {
   }
 
   const handleQuickFilter = useCallback((
-    dimension: DashboardCostDimension | "fiscal_year",
+    dimension: DashboardCostDimension | "fiscal_year" | "record_type" | "amount" | "notes",
     key: string,
   ) => {
     clearDrilldown();
@@ -496,6 +574,10 @@ export function CostsReport() {
       setCategories([key]);
       return;
     }
+    if (dimension === "subcategory") {
+      setSubcategories([key]);
+      return;
+    }
     if (dimension === "classification") {
       setClassifications([key]);
       return;
@@ -504,8 +586,28 @@ export function CostsReport() {
       setVendors([key]);
       return;
     }
+    if (dimension === "team") {
+      setTeams([key]);
+      return;
+    }
+    if (dimension === "environment") {
+      setEnvironments([key]);
+      return;
+    }
     if (dimension === "cost_center") {
       setCostCenters([key]);
+      return;
+    }
+    if (dimension === "record_type") {
+      setRecordTypes([key]);
+      return;
+    }
+    if (dimension === "amount") {
+      setAmounts([key]);
+      return;
+    }
+    if (dimension === "notes") {
+      setNoteValues([key]);
       return;
     }
     setSource(key as "service" | "hardware");
@@ -517,7 +619,10 @@ export function CostsReport() {
       "Name",
       "Vendor",
       "Category",
+      "Subcategory",
       "Classification",
+      "Team",
+      "Environment",
       "Cost center",
       "Fiscal year",
       "Amount",
@@ -529,7 +634,12 @@ export function CostsReport() {
       row.service_name,
       vendorDisplayName(row.vendor_name ?? ""),
       categoryDisplayName(row.category_name ?? ""),
+      subcategoryDisplayName(row.subcategory_name ?? ""),
       classificationDisplayName(row.classification ?? "", row.classification_name),
+      row.team_names.length > 0
+        ? row.team_names.map((team) => teamDisplayName(team)).join(", ")
+        : teamDisplayName(""),
+      environmentDisplayName(row.environment_name ?? ""),
       row.cost_center_name ?? (row.source === "hardware" ? "Hardware (assets)" : "(No cost center)"),
       String(row.fiscal_year),
       String(row.amount),
@@ -609,6 +719,19 @@ export function CostsReport() {
         ),
       },
       {
+        key: "subcategory_name",
+        header: "Subcategory",
+        render: (row) =>
+          row.subcategory_name?.trim() ? (
+            <QuickFilterButton
+              label={subcategoryDisplayName(row.subcategory_name)}
+              onClick={() => handleQuickFilter("subcategory", row.subcategory_name ?? "")}
+            />
+          ) : (
+            "—"
+          ),
+      },
+      {
         key: "classification",
         header: "Classification",
         render: (row) => (
@@ -637,6 +760,37 @@ export function CostsReport() {
         },
       },
       {
+        key: "team_name",
+        header: "Team",
+        render: (row) =>
+          row.team_names.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {row.team_names.map((teamName) => (
+                <QuickFilterButton
+                  key={teamName}
+                  label={teamDisplayName(teamName)}
+                  onClick={() => handleQuickFilter("team", teamName)}
+                />
+              ))}
+            </div>
+          ) : (
+            "—"
+          ),
+      },
+      {
+        key: "environment_name",
+        header: "Environment",
+        render: (row) =>
+          row.environment_name?.trim() ? (
+            <QuickFilterButton
+              label={environmentDisplayName(row.environment_name)}
+              onClick={() => handleQuickFilter("environment", row.environment_name ?? "")}
+            />
+          ) : (
+            "—"
+          ),
+      },
+      {
         key: "fiscal_year",
         header: "Year",
         render: (row) => (
@@ -649,17 +803,35 @@ export function CostsReport() {
       {
         key: "amount",
         header: "Amount",
-        render: (row) => fmtFull(row.amount),
+        render: (row) => (
+          <QuickFilterButton
+            label={fmtFull(row.amount)}
+            onClick={() => handleQuickFilter("amount", String(row.amount))}
+          />
+        ),
       },
       {
         key: "record_type",
         header: "Type",
-        render: (row) => formatRecordType(row.record_type),
+        render: (row) => (
+          <QuickFilterButton
+            label={formatRecordType(row.record_type)}
+            onClick={() => handleQuickFilter("record_type", row.record_type)}
+          />
+        ),
       },
       {
         key: "notes",
         header: "Notes",
-        render: (row) => row.notes?.trim() || "—",
+        render: (row) =>
+          row.notes?.trim() ? (
+            <QuickFilterButton
+              label={row.notes}
+              onClick={() => handleQuickFilter("notes", row.notes?.trim() ?? "")}
+            />
+          ) : (
+            "—"
+          ),
       },
     ],
     [handleQuickFilter],
@@ -667,9 +839,14 @@ export function CostsReport() {
 
   const activeFilterSummary = [
     categories.length > 0 ? `${categories.length} categories` : null,
+    subcategories.length > 0 ? `${subcategories.length} subcategories` : null,
     classifications.length > 0 ? `${classifications.length} classifications` : null,
     vendors.length > 0 ? `${vendors.length} vendors` : null,
+    teams.length > 0 ? `${teams.length} teams` : null,
+    environments.length > 0 ? `${environments.length} environments` : null,
     costCenters.length > 0 ? `${costCenters.length} cost centers` : null,
+    amounts.length > 0 ? `${amounts.length} amounts` : null,
+    noteValues.length > 0 ? `${noteValues.length} notes` : null,
     fiscalYearsFilter.length > 0 ? `${fiscalYearsFilter.length} years` : null,
     source !== "all" ? sourceDisplayName(source) : null,
     recordTypes.length > 0 ? recordTypes.map(formatRecordType).join(", ") : null,
@@ -856,12 +1033,22 @@ export function CostsReport() {
               onChange={setCategories}
             />
             <MultiStringSelect
+              id="subcategories"
+              label="Subcategories"
+              options={subcategoryOptions}
+              values={subcategories}
+              onChange={setSubcategories}
+            />
+            <MultiStringSelect
               id="classifications"
               label="Classifications"
               options={classificationOptions}
               values={classifications}
               onChange={setClassifications}
             />
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-4">
             <MultiStringSelect
               id="vendors"
               label="Vendors"
@@ -869,9 +1056,20 @@ export function CostsReport() {
               values={vendors}
               onChange={setVendors}
             />
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <MultiStringSelect
+              id="teams"
+              label="Teams"
+              options={teamOptions}
+              values={teams}
+              onChange={setTeams}
+            />
+            <MultiStringSelect
+              id="environments"
+              label="Environments"
+              options={environmentOptions}
+              values={environments}
+              onChange={setEnvironments}
+            />
             <MultiStringSelect
               id="cost-centers"
               label="Cost centers"
@@ -879,6 +1077,9 @@ export function CostsReport() {
               values={costCenters}
               onChange={setCostCenters}
             />
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <MultiYearSelect
               years={fiscalYears.length > 0 ? fiscalYears : yearsInScope}
               values={fiscalYearsFilter}
@@ -938,17 +1139,25 @@ export function CostsReport() {
             }
             subtext={
               analysisMode === "dimension"
-                ? `Ranking by ${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension].toLowerCase()}`
-                : `Stacked by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension].toLowerCase()}`
+                ? `Ranking by ${dimensionVisualizationLabel(primaryDimension).toLowerCase()}`
+                : `Stacked by ${dimensionVisualizationLabel(effectiveSecondaryDimension).toLowerCase()}`
             }
           />
         </div>
+
+        {teamAttributionVisible && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+            Team attribution is inclusive. Services owned by multiple departments
+            contribute to each matching team bucket, so team totals can exceed the
+            overall spend in scope.
+          </div>
+        )}
 
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               {analysisMode === "dimension"
-                ? `Spend by ${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension]}`
+                ? `Spend by ${dimensionVisualizationLabel(primaryDimension)}`
                 : "Spend by fiscal year"}
             </h2>
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
@@ -986,8 +1195,8 @@ export function CostsReport() {
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               {analysisMode === "dimension"
-                ? `${DASHBOARD_COST_DIMENSION_LABEL[primaryDimension]} split by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension]}`
-                : `Fiscal year split by ${DASHBOARD_COST_DIMENSION_LABEL[effectiveSecondaryDimension]}`}
+                ? `${dimensionVisualizationLabel(primaryDimension)} split by ${dimensionVisualizationLabel(effectiveSecondaryDimension)}`
+                : `Fiscal year split by ${dimensionVisualizationLabel(effectiveSecondaryDimension)}`}
             </h2>
             <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
               Click a stack to drill into a group, or click a segment to isolate a specific slice.
@@ -1045,7 +1254,7 @@ export function CostsReport() {
                 Underlying Records
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Use the clickable values in the table to isolate category, classification, vendor, cost center, source, or year instantly.
+                Use the clickable values in the table to isolate dimensions, record type, notes, amount, source, or year instantly.
               </p>
             </div>
             <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">

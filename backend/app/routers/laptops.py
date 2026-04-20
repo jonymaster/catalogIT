@@ -252,6 +252,11 @@ async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: 
         hardware_status_id=body.hardware_status_id,
         status_name=body.status,
     )
+    if body.status and body.status != "In Stock" and hw_status is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hardware status not found",
+        )
     hw_location = await _get_hardware_location(db, body.hardware_location_id)
     assigned_user = await _get_assigned_user(db, body.assigned_to_id)
 
@@ -323,8 +328,13 @@ async def update_laptop(
 
     if status_name is not ... and not (hardware_status_id is not ... and hardware_status_id is not None):
         if status_name is not None:
-            laptop.status = status_name
             matched = await _find_hardware_status_by_name(status_name, db)
+            if matched is None and status_name != laptop.status:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Hardware status not found",
+                )
+            laptop.status = status_name
             laptop.hardware_status_id = matched.id if matched else None
 
     if assigned_to_id is not ...:

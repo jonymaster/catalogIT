@@ -74,6 +74,9 @@ function makeService(): Service {
     payment_method: null,
     service_status: null,
     service_classification: null,
+    subcategory: null,
+    environment: null,
+    related_services: [],
     created_at: "2026-04-19T00:00:00Z",
     updated_at: "2026-04-19T00:00:00Z",
   };

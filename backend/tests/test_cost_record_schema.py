@@ -59,6 +59,18 @@ class CostRecordSchemaTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             CostRecordUpdate(record_type="forecast")
 
+    def test_update_rejects_null_fiscal_year(self) -> None:
+        with self.assertRaises(ValidationError):
+            CostRecordUpdate(fiscal_year=None)
+
+    def test_update_rejects_null_amount(self) -> None:
+        with self.assertRaises(ValidationError):
+            CostRecordUpdate(amount=None)
+
+    def test_update_rejects_null_record_type(self) -> None:
+        with self.assertRaises(ValidationError):
+            CostRecordUpdate(record_type=None)
+
     def test_laptop_hardware_cost_put_allows_zero(self) -> None:
         m = LaptopHardwareCostPut(amount=0)
         self.assertEqual(m.amount, 0)

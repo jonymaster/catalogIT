@@ -48,6 +48,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         classification_id = uuid.uuid4()
         service_record_id = uuid.uuid4()
         hardware_record_id = uuid.uuid4()
+        owner_id = uuid.uuid4()
 
         service_record = SimpleNamespace(
             id=service_record_id,
@@ -80,6 +81,9 @@ class DashboardReportingPayloadTest(unittest.TestCase):
                 slug="core_saas",
                 name="Core SaaS",
             ),
+            subcategory="Collaboration",
+            environment="Production",
+            owners=[SimpleNamespace(id=owner_id, department="IT Operations")],
         )
         laptop = SimpleNamespace(
             id=laptop_id,
@@ -113,6 +117,10 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         self.assertEqual(service_row.category_name, "Productivity")
         self.assertEqual(service_row.cost_center_id, str(cost_center_id))
         self.assertEqual(service_row.cost_center_name, "Finance")
+        self.assertEqual(service_row.subcategory_name, "Collaboration")
+        self.assertEqual(service_row.environment_name, "Production")
+        self.assertEqual(service_row.team_name, "IT Operations")
+        self.assertEqual(service_row.team_names, ["IT Operations"])
         self.assertEqual(service_row.classification_id, str(classification_id))
         self.assertEqual(service_row.classification, "core_saas")
         self.assertEqual(service_row.classification_name, "Core SaaS")
@@ -126,9 +134,58 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         self.assertEqual(hardware_row.category_name, "Hardware")
         self.assertEqual(hardware_row.classification, "hardware")
         self.assertEqual(hardware_row.classification_name, "Hardware")
+        self.assertIsNone(hardware_row.subcategory_name)
+        self.assertIsNone(hardware_row.environment_name)
+        self.assertIsNone(hardware_row.team_name)
+        self.assertEqual(hardware_row.team_names, [])
         self.assertIsNone(hardware_row.vendor_id)
         self.assertIsNone(hardware_row.vendor_name)
         self.assertIsNone(hardware_row.cost_center_id)
+
+    def test_dashboard_rows_preserve_each_owner_department_for_team_dimension(self) -> None:
+        service_id = uuid.uuid4()
+        service_record_id = uuid.uuid4()
+        service_record = SimpleNamespace(
+            id=service_record_id,
+            service_id=service_id,
+            laptop_id=None,
+            fiscal_year=2026,
+            purchase_year=2025,
+            amount=900,
+            record_type="actual",
+            notes=None,
+        )
+        service = SimpleNamespace(
+            id=service_id,
+            name="Shared Platform",
+            category_id=None,
+            vendor=None,
+            cost_center=None,
+            service_classification=None,
+            subcategory=None,
+            environment=None,
+            owners=[
+                SimpleNamespace(id=uuid.uuid4(), department="Finance"),
+                SimpleNamespace(id=uuid.uuid4(), department="IT"),
+                SimpleNamespace(id=uuid.uuid4(), department="Finance"),
+            ],
+        )
+        db = _FakeDb(
+            [
+                [service_record],
+                [service],
+                [],
+                [],
+            ]
+        )
+
+        payload = asyncio.run(get_dashboard(_user=MagicMock(), db=db))
+
+        self.assertEqual(len(payload.cost_records), 1)
+        row = payload.cost_records[0]
+        self.assertEqual(row.cost_record_id, str(service_record_id))
+        self.assertEqual(row.team_names, ["Finance", "IT"])
+        self.assertEqual(row.team_name, "Finance, IT")
 
 
 if __name__ == "__main__":

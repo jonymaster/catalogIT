@@ -117,8 +117,20 @@ export function categoryDisplayName(raw: string): string {
   return raw === "" ? "(Uncategorized)" : raw;
 }
 
+export function subcategoryDisplayName(raw: string): string {
+  return raw === "" ? "(No subcategory)" : raw;
+}
+
 export function vendorDisplayName(raw: string): string {
   return raw === "" ? "(No vendor)" : raw;
+}
+
+export function teamDisplayName(raw: string): string {
+  return raw === "" ? "(No team)" : raw;
+}
+
+export function environmentDisplayName(raw: string): string {
+  return raw === "" ? "(No environment)" : raw;
 }
 
 export function sourceDisplayName(raw: CostSourceFilter | DashboardCostRecord["source"]): string {
@@ -155,6 +167,29 @@ export interface DimensionValue {
   label: string;
 }
 
+function teamDimensionValues(record: DashboardCostRecord): DimensionValue[] {
+  // Team analysis is inclusive: a multi-department record contributes to each team bucket.
+  const teamNames = Array.from(
+    new Set(
+      (record.team_names ?? [])
+        .map((team) => team.trim())
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+
+  if (teamNames.length === 0) {
+    return [{
+      key: "",
+      label: teamDisplayName(""),
+    }];
+  }
+
+  return teamNames.map((teamName) => ({
+    key: teamName,
+    label: teamDisplayName(teamName),
+  }));
+}
+
 export function costCenterDimensionValue(
   record: DashboardCostRecord,
 ): DimensionValue {
@@ -171,37 +206,64 @@ export function costCenterDimensionValue(
   };
 }
 
-export function dimensionValueForRecord(
+export function dimensionValuesForRecord(
   record: DashboardCostRecord,
   dimension: DashboardCostDimension,
-): DimensionValue {
+): DimensionValue[] {
   switch (dimension) {
     case "category":
-      return {
+      return [{
         key: record.category_name ?? "",
         label: categoryDisplayName(record.category_name ?? ""),
-      };
+      }];
+    case "subcategory":
+      return [{
+        key: record.subcategory_name ?? "",
+        label: subcategoryDisplayName(record.subcategory_name ?? ""),
+      }];
     case "classification":
-      return {
+      return [{
         key: record.classification ?? "",
         label: classificationDisplayName(
           record.classification ?? "",
           record.classification_name,
         ),
-      };
+      }];
     case "vendor":
-      return {
+      return [{
         key: record.vendor_name ?? "",
         label: vendorDisplayName(record.vendor_name ?? ""),
-      };
+      }];
+    case "team":
+      return teamDimensionValues(record);
+    case "environment":
+      return [{
+        key: record.environment_name ?? "",
+        label: environmentDisplayName(record.environment_name ?? ""),
+      }];
     case "cost_center":
-      return costCenterDimensionValue(record);
+      return [costCenterDimensionValue(record)];
     case "source":
-      return {
+      return [{
         key: record.source,
         label: sourceDisplayName(record.source),
-      };
+      }];
   }
+}
+
+export function dimensionValueForRecord(
+  record: DashboardCostRecord,
+  dimension: DashboardCostDimension,
+): DimensionValue {
+  return dimensionValuesForRecord(record, dimension)[0];
+}
+
+export function recordMatchesDimensionKey(
+  record: DashboardCostRecord,
+  dimension: DashboardCostDimension,
+  key: string,
+): boolean {
+  return dimensionValuesForRecord(record, dimension).some((value) => value.key === key);
 }
 
 export function dimensionFilterOptions(
@@ -210,8 +272,9 @@ export function dimensionFilterOptions(
 ): { key: string; label: string }[] {
   const options = new Map<string, string>();
   records.forEach((record) => {
-    const { key, label } = dimensionValueForRecord(record, dimension);
-    options.set(key, label);
+    dimensionValuesForRecord(record, dimension).forEach(({ key, label }) => {
+      options.set(key, label);
+    });
   });
 
   return Array.from(options.entries())
@@ -243,17 +306,18 @@ export function totalsByDimension(
   const grouped = new Map<string, DimensionTotalRow>();
 
   records.forEach((record) => {
-    const { key, label } = dimensionValueForRecord(record, dimension);
-    const existing = grouped.get(key);
-    if (existing) {
-      existing.total += record.amount;
-      return;
-    }
+    dimensionValuesForRecord(record, dimension).forEach(({ key, label }) => {
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.total += record.amount;
+        return;
+      }
 
-    grouped.set(key, {
-      key,
-      label,
-      total: record.amount,
+      grouped.set(key, {
+        key,
+        label,
+        total: record.amount,
+      });
     });
   });
 
@@ -360,12 +424,17 @@ export const COST_CENTER_HARDWARE_KEY = "__hw__";
 export interface CostFilterCriteria {
   /** Internal keys: "" means uncategorized */
   categories?: readonly string[];
+  subcategories?: readonly string[];
   source?: CostSourceFilter;
   classifications?: readonly string[];
   /** Include only rows whose record_type is in this list (one or two types). */
   recordTypes?: readonly string[];
   costCenters?: readonly string[];
   vendors?: readonly string[];
+  teams?: readonly string[];
+  environments?: readonly string[];
+  amounts?: readonly string[];
+  noteValues?: readonly string[];
   /** Empty = all years present in `records` baseline (caller passes allowed years) */
   fiscalYears?: readonly number[];
 }
@@ -389,6 +458,11 @@ export function filterCostRecords(
       if (!f.classifications?.includes(key)) return false;
     }
 
+    if ((f.subcategories?.length ?? 0) > 0) {
+      const key = r.subcategory_name ?? "";
+      if (!f.subcategories?.includes(key)) return false;
+    }
+
     if ((f.recordTypes?.length ?? 0) > 0) {
       const allowedTypes = new Set(f.recordTypes);
       if (!allowedTypes.has(r.record_type)) {
@@ -403,9 +477,36 @@ export function filterCostRecords(
       }
     }
 
+    if ((f.teams?.length ?? 0) > 0) {
+      if (!f.teams?.some((team) => recordMatchesDimensionKey(r, "team", team))) {
+        return false;
+      }
+    }
+
+    if ((f.environments?.length ?? 0) > 0) {
+      const key = r.environment_name ?? "";
+      if (!f.environments?.includes(key)) {
+        return false;
+      }
+    }
+
     if ((f.costCenters?.length ?? 0) > 0) {
       const { key } = costCenterDimensionValue(r);
       if (!f.costCenters?.includes(key)) return false;
+    }
+
+    if ((f.amounts?.length ?? 0) > 0) {
+      const key = String(r.amount);
+      if (!f.amounts?.includes(key)) {
+        return false;
+      }
+    }
+
+    if ((f.noteValues?.length ?? 0) > 0) {
+      const key = r.notes?.trim() ?? "";
+      if (!f.noteValues?.includes(key)) {
+        return false;
+      }
     }
 
     if ((f.fiscalYears?.length ?? 0) > 0 && !f.fiscalYears?.includes(r.fiscal_year)) {
@@ -446,31 +547,37 @@ export function buildStackedDimensionData(
   >();
 
   records.forEach((record) => {
-    const primary = dimensionValueForRecord(record, primaryDimension);
-    const secondary = dimensionValueForRecord(record, secondaryDimension);
-    let primaryEntry = primaryMap.get(primary.key);
-    if (!primaryEntry) {
-      primaryEntry = {
-        key: primary.key,
-        label: primary.label,
-        total: 0,
-        slices: new Map(),
-      };
-      primaryMap.set(primary.key, primaryEntry);
-    }
+    const primaryValues = dimensionValuesForRecord(record, primaryDimension);
+    const secondaryValues = dimensionValuesForRecord(record, secondaryDimension);
 
-    primaryEntry.total += record.amount;
-    const slice = primaryEntry.slices.get(secondary.key);
-    if (slice) {
-      slice.value += record.amount;
-      return;
-    }
+    primaryValues.forEach((primary) => {
+      let primaryEntry = primaryMap.get(primary.key);
+      if (!primaryEntry) {
+        primaryEntry = {
+          key: primary.key,
+          label: primary.label,
+          total: 0,
+          slices: new Map(),
+        };
+        primaryMap.set(primary.key, primaryEntry);
+      }
 
-    primaryEntry.slices.set(secondary.key, {
-      id: secondary.key,
-      name: secondary.label,
-      value: record.amount,
-      color: dimensionColor(secondaryDimension, secondary.key),
+      primaryEntry.total += record.amount;
+
+      secondaryValues.forEach((secondary) => {
+        const slice = primaryEntry.slices.get(secondary.key);
+        if (slice) {
+          slice.value += record.amount;
+          return;
+        }
+
+        primaryEntry.slices.set(secondary.key, {
+          id: secondary.key,
+          name: secondary.label,
+          value: record.amount,
+          color: dimensionColor(secondaryDimension, secondary.key),
+        });
+      });
     });
   });
 

@@ -4,6 +4,7 @@ import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import {
   ArrowDownTrayIcon,
+  InformationCircleIcon,
   PlusIcon,
 } from "../components/Icons";
 import {
@@ -14,23 +15,21 @@ import {
 } from "../components/Badge";
 import {
   ColumnHeaderMenu,
-  type SortDirection,
 } from "../components/ColumnHeaderMenu";
 import { ColumnSelector } from "../components/ColumnSelector";
 import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
-import { Monogram } from "../components/ui/Monogram";
-import { Avatar, AvatarStack } from "../components/ui/Avatar";
-import { Days } from "../components/ui/Days";
-import { Money } from "../components/ui/Money";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { formatMoneyFull } from "../components/ui/money-format";
+import { UserLinkList } from "../components/UserLinks";
 import { useAuth } from "../context/useAuth";
-import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { formatBillingSchedule } from "../service/serviceBilling";
-import type { Service, User, UserPreferences } from "../types/models";
+import type {
+  Service,
+  ServiceListPreferences,
+  ServiceListSortPreference,
+  UserPreferences,
+} from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import { formatDateOnly } from "../utils/formatting";
 
@@ -48,12 +47,8 @@ interface ServiceColumnDefinition {
 }
 
 type ServiceFilters = Record<string, string | string[]>;
-type ViewMode = "table" | "gallery";
 
-interface SortState {
-  key: string | null;
-  direction: SortDirection | null;
-}
+type SortState = ServiceListSortPreference;
 
 interface HoveredDescriptionState {
   text: string;
@@ -61,31 +56,16 @@ interface HoveredDescriptionState {
   top: number;
 }
 
-interface FacetOption {
-  value: string;
-  label: string;
+interface ResolvedServiceListPreferences {
+  visible_columns: string[];
+  filters: ServiceFilters;
+  sort: SortState;
 }
 
-const VIEW_STORAGE_KEY = "catalogit:services:view";
-
-function loadViewPref(): ViewMode {
-  try {
-    const stored = localStorage.getItem(VIEW_STORAGE_KEY);
-    if (stored === "table" || stored === "gallery") return stored;
-  } catch {
-    /* ignore */
-  }
-  return "table";
-}
+const SERVICE_LIST_PREFERENCES_STORAGE_KEY = "catalogit:services:preferences";
 
 function getOwnerNames(service: Service) {
   return service.owners.map((owner) => `${owner.first_name} ${owner.last_name}`).join(", ");
-}
-
-function getOwnerDisplayName(user: Pick<User, "first_name" | "last_name" | "display_name" | "email">) {
-  const full = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
-  if (full) return full;
-  return user.display_name ?? user.email;
 }
 
 function getBooleanLabel(value: boolean) {
@@ -150,6 +130,15 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     filterPlaceholder: "Filter by name...",
     getFilterValue: (service) => service.name,
     getSortValue: (service) => service.name,
+  },
+  {
+    key: "description",
+    label: "Description",
+    filterType: "text",
+    filterPlaceholder: "Filter by description...",
+    getFilterValue: (service) => service.description ?? "",
+    getSortValue: (service) => service.description ?? "",
+    render: (service) => service.description?.trim() || "—",
   },
   {
     key: "status",
@@ -243,7 +232,10 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getFilterValue: (service) =>
       service.yearly_cost != null ? String(service.yearly_cost) : "--",
     getSortValue: (service) => service.yearly_cost ?? -1,
-    render: (service) => <Money value={service.yearly_cost} />,
+    render: (service) =>
+      service.yearly_cost != null
+        ? `$${Number(service.yearly_cost).toLocaleString()}`
+        : "--",
   },
   {
     key: "payment_method",
@@ -323,29 +315,164 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     filterPlaceholder: "Filter by owner...",
     getFilterValue: (service) => getOwnerNames(service) || "--",
     getSortValue: (service) => getOwnerNames(service),
-    render: (service) => {
-      if (service.owners.length === 0) {
-        return <span className="text-fg-4">—</span>;
-      }
-      if (service.owners.length === 1) {
-        const owner = service.owners[0];
-        return (
-          <Link
-            to={`/users/${owner.id}`}
-            onClick={(event) => event.stopPropagation()}
-            className="hlink inline-flex items-center gap-1.5 text-[13px] text-fg-2"
-          >
-            <Avatar user={owner} size={20} />
-            <span>{getOwnerDisplayName(owner)}</span>
-          </Link>
-        );
-      }
-      return <AvatarStack users={service.owners} max={4} size={22} />;
+    render: (service) => <UserLinkList users={service.owners} />,
+  },
+  {
+    key: "seat_usage",
+    label: "Seat Usage",
+    filterType: "text",
+    filterPlaceholder: "Filter by seat usage...",
+    getFilterValue: (service) => {
+      const occupied = service.assignees?.length ?? 0;
+      const capacity = service.total_seats != null ? String(service.total_seats) : "Unlimited";
+      return `${occupied} / ${capacity}`;
     },
+    getSortValue: (service) => service.assignees?.length ?? 0,
+    render: (service) => {
+      const occupied = service.assignees?.length ?? 0;
+      return `${occupied} / ${service.total_seats ?? "Unlimited"}`;
+    },
+  },
+  {
+    key: "point_of_contact",
+    label: "Point of Contact",
+    filterType: "text",
+    filterPlaceholder: "Filter by contact...",
+    getFilterValue: (service) => service.point_of_contact ?? "",
+    getSortValue: (service) => service.point_of_contact ?? "",
+    render: (service) => service.point_of_contact?.trim() || "—",
   },
 ];
 
 const ALL_COLUMN_KEYS = columnDefinitions.map((column) => column.key);
+const DEFAULT_VISIBLE_COLUMN_KEYS = [
+  "name",
+  "status",
+  "spending_category",
+  "cost_center",
+  "classification",
+  "criticality",
+  "nonprofit_pricing",
+  "yearly_cost",
+  "payment_method",
+  "billing_schedule",
+  "renewal_date",
+  "sso_integrated",
+  "scim_enabled",
+  "vendor",
+  "owners",
+];
+
+function createDefaultServiceFilters(): ServiceFilters {
+  return Object.fromEntries(
+    columnDefinitions.map((column) => [
+      column.key,
+      column.filterType === "select" ? [] : "",
+    ]),
+  ) as ServiceFilters;
+}
+
+function cloneServiceFilters(filters: ServiceFilters): ServiceFilters {
+  return Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? [...value] : value,
+    ]),
+  ) as ServiceFilters;
+}
+
+function normalizeVisibleColumns(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [...DEFAULT_VISIBLE_COLUMN_KEYS];
+  }
+
+  const valid = Array.from(
+    new Set(
+      raw.filter(
+        (key): key is string =>
+          typeof key === "string" && ALL_COLUMN_KEYS.includes(key),
+      ),
+    ),
+  );
+
+  return valid.length > 0 ? valid : [...DEFAULT_VISIBLE_COLUMN_KEYS];
+}
+
+function normalizeSortPreference(raw: unknown): SortState {
+  if (!raw || typeof raw !== "object") {
+    return { key: null, direction: null };
+  }
+
+  const candidate = raw as { key?: unknown; direction?: unknown };
+  const key =
+    typeof candidate.key === "string" && ALL_COLUMN_KEYS.includes(candidate.key)
+      ? candidate.key
+      : null;
+  const direction =
+    candidate.direction === "asc" || candidate.direction === "desc"
+      ? candidate.direction
+      : null;
+
+  if (!key || !direction) {
+    return { key: null, direction: null };
+  }
+
+  return { key, direction };
+}
+
+function normalizeFilters(raw: unknown): ServiceFilters {
+  const defaults = createDefaultServiceFilters();
+  if (!raw || typeof raw !== "object") {
+    return defaults;
+  }
+
+  const source = raw as Record<string, unknown>;
+  return Object.fromEntries(
+    columnDefinitions.map((column) => {
+      const value = source[column.key];
+      if (column.filterType === "select") {
+        const selected = Array.isArray(value)
+          ? Array.from(
+              new Set(
+                value.filter(
+                  (entry): entry is string =>
+                    typeof entry === "string" && entry.trim().length > 0,
+                ),
+              ),
+            )
+          : [];
+        return [column.key, selected];
+      }
+
+      return [column.key, typeof value === "string" ? value : ""];
+    }),
+  ) as ServiceFilters;
+}
+
+function normalizeServiceListPreferences(
+  raw: ServiceListPreferences | null | undefined,
+): ResolvedServiceListPreferences {
+  return {
+    visible_columns: normalizeVisibleColumns(raw?.visible_columns),
+    filters: normalizeFilters(raw?.filters),
+    sort: normalizeSortPreference(raw?.sort),
+  };
+}
+
+function readStoredServiceListPreferences(): ResolvedServiceListPreferences {
+  try {
+    const stored = localStorage.getItem(SERVICE_LIST_PREFERENCES_STORAGE_KEY);
+    if (!stored) {
+      return normalizeServiceListPreferences(null);
+    }
+
+    return normalizeServiceListPreferences(
+      JSON.parse(stored) as ServiceListPreferences,
+    );
+  } catch {
+    return normalizeServiceListPreferences(null);
+  }
+}
 
 function todayFilenameDate(): string {
   const d = new Date();
@@ -372,204 +499,110 @@ function getServiceExportValue(
   return def ? def.getFilterValue(service) : "";
 }
 
-interface FacetFilterProps {
-  label: string;
-  options: FacetOption[];
-  values: string[];
-  onChange: (next: string[]) => void;
-}
-
-function FacetFilter({ label, options, values, onChange }: FacetFilterProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const active = values.length > 0;
-
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  function toggle(value: string) {
-    onChange(
-      values.includes(value)
-        ? values.filter((v) => v !== value)
-        : [...values, value],
-    );
-  }
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={[
-          "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12.5px] font-medium transition-colors",
-          active
-            ? "border-accent bg-accent-soft text-accent-strong"
-            : "border-border bg-surface text-fg-2 hover:border-border-strong hover:bg-surface-2",
-        ].join(" ")}
-      >
-        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4.5 6h15l-6 7.5v4.5l-3 1.5v-6L4.5 6z"
-          />
-        </svg>
-        <span>{label}</span>
-        {active && (
-          <span className="tnum rounded-sm bg-accent px-1 text-[10px] font-semibold text-white">
-            {values.length}
-          </span>
-        )}
-        <svg className="h-3 w-3 text-fg-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute left-0 z-20 mt-1 w-56 rounded-md border border-border bg-surface py-1 shadow-lg">
-          {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-fg-3">No values</div>
-          ) : (
-            <div className="max-h-64 overflow-y-auto">
-              {options.map((opt) => {
-                const checked = values.includes(opt.value);
-                return (
-                  <label
-                    key={opt.value}
-                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[13px] text-fg-2 hover:bg-surface-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggle(opt.value)}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="truncate">{opt.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          )}
-          {active && (
-            <div className="border-t border-border px-2 py-1.5">
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="w-full rounded px-2 py-1 text-left text-[12px] text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-              >
-                Clear
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface GalleryCardProps {
-  service: Service;
-  preferences: UserPreferences | null;
-  onOpen: (service: Service) => void;
-}
-
-function ServiceGalleryCard({ service, preferences, onOpen }: GalleryCardProps) {
-  const renewalIso = service.renewal_date;
-  const renewalLabel = formatDateOnly(renewalIso, preferences);
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(service)}
-      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-border-strong hover:shadow-md"
-    >
-      <div className="flex items-start gap-3">
-        <Monogram name={service.name} seed={service.id} size={36} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-semibold text-fg">
-            {service.name}
-          </div>
-          <div className="truncate text-[12px] text-fg-3">
-            {service.vendor?.name ?? "—"}
-            {service.category_rel ? ` · ${service.category_rel.name}` : ""}
-          </div>
-        </div>
-      </div>
-      {service.description && (
-        <div className="line-clamp-2 text-[12.5px] text-fg-3">
-          {service.description}
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {service.service_status ? (
-          <ColoredReferenceBadge
-            label={service.service_status.name}
-            color={service.service_status.color}
-          />
-        ) : (
-          <StatusBadge status={getServiceStatusLabel(service)} />
-        )}
-        {service.service_classification && (
-          <ClassificationBadge classification={service.service_classification} />
-        )}
-      </div>
-      <div className="mt-auto flex items-center justify-between border-t border-border pt-2.5 text-[12px] text-fg-3">
-        <span className="inline-flex items-center gap-1.5">
-          {renewalIso ? (
-            <>
-              <span>Renews {renewalLabel}</span>
-              <Days date={renewalIso} />
-            </>
-          ) : (
-            <span className="text-fg-4">No renewal</span>
-          )}
-        </span>
-        <Money value={service.yearly_cost} className="text-fg-2 font-medium" />
-      </div>
-    </button>
-  );
-}
-
 export function Services() {
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const storedServiceListPreferences = useMemo(
+    () => readStoredServiceListPreferences(),
+    [],
+  );
   const [services, setServices] = useState<Service[]>([]);
   const [view, setView] = useState<"active" | "archived">("active");
   const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewPref());
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<ServiceFilters>(() =>
-    Object.fromEntries(
-      columnDefinitions.map((column) => [
-        column.key,
-        column.filterType === "select" ? [] : "",
-      ]),
-    ) as ServiceFilters,
+    cloneServiceFilters(storedServiceListPreferences.filters),
   );
-  const [sortState, setSortState] = useState<SortState>({
-    key: null,
-    direction: null,
-  });
+  const [sortState, setSortState] = useState<SortState>(() => ({
+    ...storedServiceListPreferences.sort,
+  }));
   const [hoveredDescription, setHoveredDescription] =
     useState<HoveredDescriptionState | null>(null);
-  const [visibleKeys, setVisibleKeys] = useColumnPrefs(
-    "catalogit:services:columns",
-    ALL_COLUMN_KEYS,
+  const [visibleKeys, setVisibleKeys] = useState<string[]>(
+    () => [...storedServiceListPreferences.visible_columns],
   );
-  const { canEdit, preferences } = useAuth();
+  const { canEdit, preferences, preferencesLoading, setPreferences } = useAuth();
   const navigate = useNavigate();
+  const loading = loadedView !== view;
+  const serviceListPreferencesHydratedRef = useRef(false);
+  const lastSyncedServiceListSignatureRef = useRef<string | null>(null);
+
+  const profileServiceListPreferences = useMemo(
+    () => normalizeServiceListPreferences(preferences?.ui_preferences.service_list),
+    [preferences],
+  );
+  const currentServiceListPreferences = useMemo(
+    () =>
+      normalizeServiceListPreferences({
+        visible_columns: visibleKeys,
+        filters,
+        sort: sortState,
+      }),
+    [filters, sortState, visibleKeys],
+  );
 
   useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
-    } catch {
-      /* ignore */
+    if (preferencesLoading || serviceListPreferencesHydratedRef.current) {
+      return;
     }
-  }, [viewMode]);
+
+    const hasProfilePreferences =
+      preferences?.ui_preferences.service_list !== undefined;
+    const sourcePreferences = hasProfilePreferences
+      ? profileServiceListPreferences
+      : storedServiceListPreferences;
+
+    const timeoutId = window.setTimeout(() => {
+      setVisibleKeys([...sourcePreferences.visible_columns]);
+      setFilters(cloneServiceFilters(sourcePreferences.filters));
+      setSortState({ ...sourcePreferences.sort });
+      lastSyncedServiceListSignatureRef.current = hasProfilePreferences
+        ? JSON.stringify(profileServiceListPreferences)
+        : null;
+      serviceListPreferencesHydratedRef.current = true;
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    preferences,
+    preferencesLoading,
+    profileServiceListPreferences,
+    storedServiceListPreferences,
+  ]);
+
+  useEffect(() => {
+    const serialized = JSON.stringify(currentServiceListPreferences);
+
+    try {
+      localStorage.setItem(SERVICE_LIST_PREFERENCES_STORAGE_KEY, serialized);
+    } catch {
+      // Ignore storage failures; per-user persistence still attempts to save.
+    }
+
+    if (!serviceListPreferencesHydratedRef.current) {
+      return;
+    }
+    if (serialized === lastSyncedServiceListSignatureRef.current) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      client
+        .patch<UserPreferences>("/api/me/preferences", {
+          ui_preferences: {
+            service_list: currentServiceListPreferences,
+          },
+        })
+        .then((response) => {
+          lastSyncedServiceListSignatureRef.current = serialized;
+          setPreferences(response.data);
+        })
+        .catch(() => {
+          // Keep local fallback state if profile sync fails.
+        });
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentServiceListPreferences, setPreferences]);
 
   useEffect(() => {
     let cancelled = false;
@@ -578,9 +611,10 @@ export function Services() {
       .then((r) => {
         if (!cancelled) {
           setServices(r.data);
+          setLoadedView(view);
         }
       })
-      .finally(() => {
+      .catch(() => {
         if (!cancelled) {
           setLoadedView(view);
         }
@@ -589,8 +623,6 @@ export function Services() {
       cancelled = true;
     };
   }, [view]);
-
-  const loading = loadedView !== view;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -679,7 +711,7 @@ export function Services() {
   }, [filtered, preferences, visibleKeys]);
 
   const showDescriptionTooltip = useCallback(
-    (event: React.SyntheticEvent<HTMLElement>, description: string) => {
+    (event: React.SyntheticEvent<HTMLSpanElement>, description: string) => {
       const containerRect = pageRef.current?.getBoundingClientRect();
       if (!containerRect) return;
       const rect = event.currentTarget.getBoundingClientRect();
@@ -701,6 +733,14 @@ export function Services() {
     setHoveredDescription(null);
   }, []);
 
+  const resetServiceListView = useCallback(() => {
+    const defaults = normalizeServiceListPreferences(null);
+    setSearch("");
+    setVisibleKeys([...defaults.visible_columns]);
+    setFilters(cloneServiceFilters(defaults.filters));
+    setSortState({ ...defaults.sort });
+  }, []);
+
   const hasActiveFilters = useMemo(() => {
     if (search.trim()) {
       return true;
@@ -709,66 +749,6 @@ export function Services() {
       Array.isArray(value) ? value.length > 0 : value.trim(),
     );
   }, [search, filters]);
-
-  const headerCounts = useMemo(() => {
-    const activeCount = services.filter((service) => {
-      const label = (service.service_status?.name ?? service.status ?? "").toLowerCase();
-      return service.is_active && (label === "" || label === "active" || label === "contract");
-    }).length;
-    const annualTotal = services.reduce(
-      (sum, service) => sum + (service.yearly_cost ?? 0),
-      0,
-    );
-    return { activeCount, annualTotal };
-  }, [services]);
-
-  const facetOptions = useMemo(() => {
-    const statusMap = new Map<string, FacetOption>();
-    const categoryMap = new Map<string, FacetOption>();
-    const classificationMap = new Map<string, FacetOption>();
-    for (const service of services) {
-      const status = service.service_status?.name ?? service.status;
-      if (status) statusMap.set(status, { value: status, label: status });
-      const category = service.category_rel?.name;
-      if (category) categoryMap.set(category, { value: category, label: category });
-      const classification = service.service_classification?.name;
-      if (classification)
-        classificationMap.set(classification, {
-          value: classification,
-          label: classification,
-        });
-    }
-    const sortByLabel = (a: FacetOption, b: FacetOption) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
-    return {
-      status: Array.from(statusMap.values()).sort(sortByLabel),
-      category: Array.from(categoryMap.values()).sort(sortByLabel),
-      classification: Array.from(classificationMap.values()).sort(sortByLabel),
-    };
-  }, [services]);
-
-  const setFacet = useCallback(
-    (key: "status" | "spending_category" | "classification", values: string[]) => {
-      setFilters((current) => ({ ...current, [key]: values }));
-    },
-    [],
-  );
-
-  const clearFacets = useCallback(() => {
-    setFilters((current) => ({
-      ...current,
-      status: [],
-      spending_category: [],
-      classification: [],
-    }));
-  }, []);
-
-  const activeFacetCount =
-    (Array.isArray(filters.status) ? filters.status.length : 0) +
-    (Array.isArray(filters.spending_category)
-      ? filters.spending_category.length
-      : 0) +
-    (Array.isArray(filters.classification) ? filters.classification.length : 0);
 
   const columns = useMemo<Column<Service>[]>(() => {
     return columnDefinitions.map((column) => {
@@ -781,39 +761,31 @@ export function Services() {
         render:
           column.key === "name"
             ? (service) => (
-                <div className="flex items-center gap-2.5">
-                  <Monogram name={service.name} seed={service.id} size={26} />
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-fg">
-                      {service.name}
-                    </div>
-                    {service.description && (
-                      <div
-                        className="max-w-[260px] truncate text-[11.5px] text-fg-3"
-                        onMouseEnter={(event) =>
-                          showDescriptionTooltip(event, service.description ?? "")
-                        }
-                        onMouseLeave={hideDescriptionTooltip}
-                      >
-                        {service.description}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
+              <div className="inline-flex items-center gap-1.5">
+                {service.description && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Description: ${service.description}`}
+                    onMouseEnter={(event) =>
+                      showDescriptionTooltip(event, service.description ?? "")
+                    }
+                    onMouseLeave={hideDescriptionTooltip}
+                    onFocus={(event) =>
+                      showDescriptionTooltip(event, service.description ?? "")
+                    }
+                    onBlur={hideDescriptionTooltip}
+                    className="inline-flex cursor-help text-[#4f46e5]"
+                  >
+                    <InformationCircleIcon className="h-5 w-5" strokeWidth={2.25} />
+                  </span>
+                )}
+                <span>{service.name}</span>
+              </div>
+            )
             : column.key === "renewal_date"
-              ? (service) =>
-                  service.renewal_date ? (
-                    <div className="flex flex-col leading-tight">
-                      <span className="tnum text-[12.5px]">
-                        {formatDateOnly(service.renewal_date, preferences)}
-                      </span>
-                      <Days date={service.renewal_date} />
-                    </div>
-                  ) : (
-                    <span className="text-fg-4">—</span>
-                  )
-              : column.render,
+            ? (service) => formatDateOnly(service.renewal_date, preferences)
+            : column.render,
         header:
           column.filterType === "select" ? (
             <ColumnHeaderMenu
@@ -872,202 +844,120 @@ export function Services() {
 
   return (
     <PageTransition>
-      <div ref={pageRef} className="relative">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1
-              className="text-fg"
-              style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+    <div ref={pageRef} className="relative">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Services</h1>
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="rounded-md border border-gray-300 dark:border-gray-700 p-0.5 flex">
+            <button
+              type="button"
+              onClick={() => setView("active")}
+              className={`px-3 py-1.5 text-sm rounded ${
+                view === "active"
+                  ? "bg-brand-600 text-white"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
             >
-              Services
-            </h1>
-            <div className="mt-1 text-[13px] text-fg-3">
-              {loading ? (
-                "Loading…"
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("archived")}
+              className={`px-3 py-1.5 text-sm rounded ${
+                view === "archived"
+                  ? "bg-brand-600 text-white"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
+            >
+              Archived
+            </button>
+          </div>
+          {!loading && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={filtered.length === 0}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" />
+              Export CSV
+            </button>
+          )}
+          {canEdit && view === "active" && (
+            <Link
+              to="/services/new"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-brand-700"
+            >
+              <PlusIcon className="h-4 w-4" />
+              New Service
+            </Link>
+          )}
+        </div>
+      </div>
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="max-w-sm min-w-[200px] flex-1">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search services..."
+              />
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+              {hasActiveFilters ? (
+                <>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {filtered.length}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400"> / {services.length} </span>
+                  {services.length === 1 ? "service" : "services"}
+                </>
               ) : (
                 <>
-                  <span>
-                    {services.length} {services.length === 1 ? "service" : "services"}
-                  </span>
-                  <span className="mx-1.5">·</span>
-                  <span>{headerCounts.activeCount} active</span>
-                  <span className="mx-1.5">·</span>
-                  <span className="tnum">
-                    {formatMoneyFull(headerCounts.annualTotal, "USD")} annualized
-                  </span>
+                  {services.length}{" "}
+                  {services.length === 1 ? "service" : "services"}
                 </>
               )}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <SegmentedControl<ViewMode>
-              value={viewMode}
-              onChange={setViewMode}
-              size="sm"
-              options={[
-                { value: "table", label: "Table" },
-                { value: "gallery", label: "Gallery" },
-              ]}
+            </p>
+            <ColumnSelector
+              columns={columns}
+              visibleKeys={visibleKeys}
+              onChange={setVisibleKeys}
             />
-            <div className="inline-flex rounded-md border border-border bg-surface-2 p-0.5">
-              <button
-                type="button"
-                onClick={() => setView("active")}
-                className={`rounded px-3 py-1 text-xs font-medium transition-all ${
-                  view === "active"
-                    ? "bg-surface text-fg shadow-sm"
-                    : "text-fg-3 hover:text-fg-2"
-                }`}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("archived")}
-                className={`rounded px-3 py-1 text-xs font-medium transition-all ${
-                  view === "archived"
-                    ? "bg-surface text-fg shadow-sm"
-                    : "text-fg-3 hover:text-fg-2"
-                }`}
-              >
-                Archived
-              </button>
-            </div>
-            {!loading && (
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                disabled={filtered.length === 0}
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <ArrowDownTrayIcon className="h-4 w-4" />
-                Export
-              </button>
-            )}
-            {canEdit && view === "active" && (
-              <Link
-                to="/services/new"
-                className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-strong"
-              >
-                <PlusIcon className="h-4 w-4" />
-                New service
-              </Link>
-            )}
+            <button
+              type="button"
+              onClick={resetServiceListView}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Reset view
+            </button>
           </div>
+          <DataTable
+            columns={columns}
+            data={filtered}
+            visibleKeys={visibleKeys}
+            striped
+            primaryColumnKey="name"
+            onRowClick={(s) => navigate(`/services/${s.id}`)}
+          />
+        </>
+      )}
+      {hoveredDescription && (
+        <div
+          className="pointer-events-none absolute z-[9999] max-w-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1 text-xs text-gray-700 dark:text-gray-200 shadow-lg"
+          style={{ left: hoveredDescription.left, top: hoveredDescription.top }}
+        >
+          {hoveredDescription.text}
         </div>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="h-12 w-full animate-pulse rounded-lg bg-surface-2"
-              />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <div className="min-w-[220px] max-w-sm flex-1">
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Search services..."
-                />
-              </div>
-              <FacetFilter
-                label="Status"
-                options={facetOptions.status}
-                values={Array.isArray(filters.status) ? filters.status : []}
-                onChange={(values) => setFacet("status", values)}
-              />
-              <FacetFilter
-                label="Category"
-                options={facetOptions.category}
-                values={
-                  Array.isArray(filters.spending_category)
-                    ? filters.spending_category
-                    : []
-                }
-                onChange={(values) => setFacet("spending_category", values)}
-              />
-              <FacetFilter
-                label="Type"
-                options={facetOptions.classification}
-                values={
-                  Array.isArray(filters.classification)
-                    ? filters.classification
-                    : []
-                }
-                onChange={(values) => setFacet("classification", values)}
-              />
-              {activeFacetCount > 0 && (
-                <button
-                  type="button"
-                  onClick={clearFacets}
-                  className="rounded-md px-2 py-1 text-[12px] text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-                >
-                  Clear
-                </button>
-              )}
-              <div className="flex-1" />
-              <p className="whitespace-nowrap text-[13px] text-fg-3">
-                {hasActiveFilters ? (
-                  <>
-                    <span className="font-medium text-fg">{filtered.length}</span>
-                    <span className="text-fg-3"> / {services.length} </span>
-                    {services.length === 1 ? "service" : "services"}
-                  </>
-                ) : (
-                  <>
-                    {services.length}{" "}
-                    {services.length === 1 ? "service" : "services"}
-                  </>
-                )}
-              </p>
-              {viewMode === "table" && (
-                <ColumnSelector
-                  columns={columns}
-                  visibleKeys={visibleKeys}
-                  onChange={setVisibleKeys}
-                />
-              )}
-            </div>
-            {viewMode === "table" ? (
-              <DataTable
-                columns={columns}
-                data={filtered}
-                visibleKeys={visibleKeys}
-                striped
-                primaryColumnKey="name"
-                onRowClick={(s) => navigate(`/services/${s.id}`)}
-              />
-            ) : filtered.length === 0 ? (
-              <div className="rounded-lg border border-border bg-surface py-12 text-center text-[13px] text-fg-3">
-                No services match your filters.
-              </div>
-            ) : (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
-                {filtered.map((service) => (
-                  <ServiceGalleryCard
-                    key={service.id}
-                    service={service}
-                    preferences={preferences}
-                    onOpen={(s) => navigate(`/services/${s.id}`)}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-        {hoveredDescription && (
-          <div
-            className="pointer-events-none absolute z-[9999] max-w-xs rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg-2 shadow-lg"
-            style={{ left: hoveredDescription.left, top: hoveredDescription.top }}
-          >
-            {hoveredDescription.text}
-          </div>
-        )}
-      </div>
+      )}
+    </div>
     </PageTransition>
   );
 }

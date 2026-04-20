@@ -26,6 +26,13 @@ service_assignments = Table(
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
 
+service_related_services = Table(
+    "service_related_services",
+    Base.metadata,
+    Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("related_service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Service(Base):
     __tablename__ = "services"
@@ -72,6 +79,8 @@ class Service(Base):
     )
     billing_schedule: Mapped[str] = mapped_column(String(100), default="")
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    subcategory: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    environment: Mapped[str | None] = mapped_column(String(100), nullable=True)
     renewal_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     renewal_offsets_days: Mapped[list[int] | None] = mapped_column(
         ARRAY(Integer), nullable=True
@@ -96,6 +105,13 @@ class Service(Base):
     )
     assignees: Mapped[list["User"]] = relationship(  # noqa: F821
         secondary=service_assignments,
+        lazy="selectin",
+    )
+    related_services: Mapped[list["Service"]] = relationship(
+        "Service",
+        secondary=service_related_services,
+        primaryjoin=id == service_related_services.c.service_id,
+        secondaryjoin=id == service_related_services.c.related_service_id,
         lazy="selectin",
     )
     vendor: Mapped["Vendor | None"] = relationship(lazy="selectin")  # noqa: F821

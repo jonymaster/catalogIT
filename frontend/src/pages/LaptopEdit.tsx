@@ -4,6 +4,7 @@ import client from "../api/client";
 import { LaptopForm } from "../components/LaptopForm";
 import { PageTransition } from "../components/PageTransition";
 import { FormSkeleton } from "../components/Skeleton";
+import { LAPTOP_FIELD_LABELS } from "../hardware/laptopViewLayout";
 import type { HardwareLocation, HardwareStatus, Laptop } from "../types/models";
 
 export function LaptopEdit() {
@@ -93,6 +94,8 @@ export function LaptopEdit() {
   const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1";
   const readOnlyCls = "mt-1 text-sm text-gray-900 dark:text-gray-100";
   const rowGridCls = "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3";
+  const sectionCardCls =
+    "rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm";
 
   return (
     <PageTransition>
@@ -135,61 +138,70 @@ export function LaptopEdit() {
         ) : (
           <form onSubmit={saveArchivedMetadata} className="space-y-6">
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Archived hardware supports metadata-only updates: notes, status, and location. Unarchive to
-              change assignment, specs, cost, and other fields.
+              Archived hardware keeps the same sectioned layout, but only notes, status, and location remain editable until the asset is unarchived.
             </p>
-            <div className={rowGridCls}>
-              <div>
-                <label className={labelCls}>Status</label>
-                <select
-                  className={inputCls}
-                  value={hardwareStatusId}
-                  onChange={(e) => setHardwareStatusId(e.target.value)}
-                  disabled={hardwareStatuses.length === 0}
-                >
-                  {hardwareStatuses.length === 0 ? (
-                    <option value="">Loading…</option>
-                  ) : (
-                    hardwareStatuses.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
+            <div className={sectionCardCls}>
+              <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+                General
+              </h2>
+              <div className={rowGridCls}>
+                <div>
+                  <label className={labelCls}>{LAPTOP_FIELD_LABELS.status}</label>
+                  <select
+                    className={inputCls}
+                    value={hardwareStatusId}
+                    onChange={(e) => setHardwareStatusId(e.target.value)}
+                    disabled={hardwareStatuses.length === 0}
+                  >
+                    {hardwareStatuses.length === 0 ? (
+                      <option value="">Loading…</option>
+                    ) : (
+                      hardwareStatuses.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>{LAPTOP_FIELD_LABELS.assigned_to}</label>
+                  <p className={readOnlyCls}>
+                    {laptop.assigned_to
+                      ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name} (${laptop.assigned_to.email})`
+                      : "Unassigned"}
+                  </p>
+                </div>
+                <div>
+                  <label className={labelCls}>{LAPTOP_FIELD_LABELS.location}</label>
+                  <select
+                    className={inputCls}
+                    value={hardwareLocationId}
+                    onChange={(e) => setHardwareLocationId(e.target.value)}
+                  >
+                    <option value="">— None —</option>
+                    {hardwareLocations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name}
                       </option>
-                    ))
-                  )}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Assigned To</label>
-                <p className={readOnlyCls}>
-                  {laptop.assigned_to
-                    ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name} (${laptop.assigned_to.email})`
-                    : "Unassigned"}
-                </p>
-              </div>
-              <div>
-                <label className={labelCls}>Location</label>
-                <select
-                  className={inputCls}
-                  value={hardwareLocationId}
-                  onChange={(e) => setHardwareLocationId(e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  {hardwareLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-            <div>
-              <label className={labelCls}>Notes</label>
-              <textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                rows={4}
-                className={inputCls}
-              />
+            <div className={sectionCardCls}>
+              <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+                Notes
+              </h2>
+              <div>
+                <label className={labelCls}>{LAPTOP_FIELD_LABELS.notes}</label>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={4}
+                  className={inputCls}
+                />
+              </div>
             </div>
             <button
               type="submit"

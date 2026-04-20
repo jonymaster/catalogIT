@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -35,6 +35,10 @@ class CostRecordOut(BaseModel):
     category_name: str | None
     cost_center_id: str | None = None
     cost_center_name: str | None = None
+    subcategory_name: str | None = None
+    environment_name: str | None = None
+    team_name: str | None = None
+    team_names: list[str] = Field(default_factory=list)
     fiscal_year: int
     amount: float
     record_type: str
@@ -63,6 +67,7 @@ async def get_dashboard(
             selectinload(Service.vendor),
             selectinload(Service.cost_center),
             selectinload(Service.service_classification),
+            selectinload(Service.owners),
         )
     )
     services = {str(s.id): s for s in svc_result.scalars().all()}
@@ -87,6 +92,13 @@ async def get_dashboard(
             if svc.category_id:
                 cat_name = categories.get(str(svc.category_id))
             cc_name = svc.cost_center.name if svc.cost_center else None
+            team_names = sorted(
+                {
+                    owner.department.strip()
+                    for owner in svc.owners
+                    if owner.department and owner.department.strip()
+                }
+            )
             out.append(
                 CostRecordOut(
                     cost_record_id=str(r.id),
@@ -116,6 +128,10 @@ async def get_dashboard(
                     category_name=cat_name,
                     cost_center_id=str(svc.cost_center.id) if svc.cost_center else None,
                     cost_center_name=cc_name,
+                    subcategory_name=svc.subcategory,
+                    environment_name=svc.environment,
+                    team_name=", ".join(team_names) if team_names else None,
+                    team_names=team_names,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,
@@ -144,6 +160,10 @@ async def get_dashboard(
                     category_name="Hardware",
                     cost_center_id=None,
                     cost_center_name=None,
+                    subcategory_name=None,
+                    environment_name=None,
+                    team_name=None,
+                    team_names=[],
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,

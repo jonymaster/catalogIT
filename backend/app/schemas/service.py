@@ -42,12 +42,28 @@ def _normalize_optional_choice(
     return cleaned
 
 
+def _normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+class RelatedServiceRead(BaseModel):
+    id: uuid.UUID
+    name: str
+    status: str
+    is_active: bool
+
+
 class ServiceCreate(BaseModel):
     name: str
     description: str | None = Field(default=None, max_length=255)
     status: str = "Contract"
     billing_schedule: str = ""
     renewal_date: date | None = None
+    subcategory: str | None = Field(default=None, max_length=100)
+    environment: str | None = Field(default=None, max_length=100)
     sso_integrated: bool = False
     point_of_contact: str | None = None
     notes: str | None = None
@@ -67,6 +83,7 @@ class ServiceCreate(BaseModel):
     renewal_offsets_days: list[int] | None = None
     total_seats: int | None = None
     assignee_ids: list[uuid.UUID] = []
+    related_service_ids: list[uuid.UUID] = []
 
     @field_validator("total_seats")
     @classmethod
@@ -79,6 +96,11 @@ class ServiceCreate(BaseModel):
     @classmethod
     def validate_name(cls, value: str) -> str:
         return _normalize_name(value)
+
+    @field_validator("subcategory", "environment")
+    @classmethod
+    def validate_optional_text(cls, value: str | None) -> str | None:
+        return _normalize_optional_text(value)
 
     @field_validator("billing_schedule")
     @classmethod
@@ -116,6 +138,8 @@ class ServiceUpdate(BaseModel):
     status: str | None = None
     billing_schedule: str | None = None
     renewal_date: date | None = None
+    subcategory: str | None = Field(default=None, max_length=100)
+    environment: str | None = Field(default=None, max_length=100)
     sso_integrated: bool | None = None
     point_of_contact: str | None = None
     notes: str | None = None
@@ -136,6 +160,7 @@ class ServiceUpdate(BaseModel):
     renewal_offsets_days: list[int] | None = None
     total_seats: int | None = None
     assignee_ids: list[uuid.UUID] | None = None
+    related_service_ids: list[uuid.UUID] | None = None
 
     @field_validator("total_seats")
     @classmethod
@@ -151,9 +176,16 @@ class ServiceUpdate(BaseModel):
             return value
         return _normalize_name(value)
 
+    @field_validator("subcategory", "environment")
+    @classmethod
+    def validate_optional_text(cls, value: str | None) -> str | None:
+        return _normalize_optional_text(value)
+
     @field_validator("billing_schedule")
     @classmethod
     def validate_billing_schedule(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("billing_schedule cannot be null")
         return _normalize_optional_choice(
             value,
             label="billing_schedule",
@@ -182,12 +214,15 @@ class ServiceRead(BaseModel):
     status: str
     billing_schedule: str
     renewal_date: date | None
+    subcategory: str | None = None
+    environment: str | None = None
     yearly_cost: float | None
     sso_integrated: bool
     point_of_contact: str | None
     notes: str | None
     owners: list[UserRead]
     assignees: list[UserRead]
+    related_services: list[RelatedServiceRead] = Field(default_factory=list)
     total_seats: int | None = None
     # New fields
     vendor_id: uuid.UUID | None = None

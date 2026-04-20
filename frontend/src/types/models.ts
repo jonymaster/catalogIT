@@ -170,6 +170,13 @@ export interface ServiceHistoryEntry {
   created_at: string;
 }
 
+export interface RelatedService {
+  id: string;
+  name: string;
+  status: string;
+  is_active: boolean;
+}
+
 export interface Service {
   id: string;
   name: string;
@@ -177,12 +184,15 @@ export interface Service {
   status: string;
   billing_schedule: string;
   renewal_date: string | null;
+  subcategory: string | null;
+  environment: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;
   point_of_contact: string | null;
   notes: string | null;
   owners: User[];
   assignees: User[];
+  related_services: RelatedService[];
   total_seats: number | null;
   // Normalized fields
   vendor_id: string | null;

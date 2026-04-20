@@ -152,6 +152,43 @@ class MePreferencesRouterTest(unittest.TestCase):
         self.assertEqual(response.json()["ui_preferences"], {})
         self.assertEqual(self.user.ui_preferences, {})
 
+    def test_patch_preferences_rejects_excessive_ui_preferences_depth(self) -> None:
+        nested: dict[str, object] = {}
+        cursor = nested
+        for index in range(10):
+            child: dict[str, object] = {}
+            cursor[f"level_{index}"] = child
+            cursor = child
+
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={"ui_preferences": {"dashboard": nested}},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "UI preferences exceed maximum nesting depth",
+        )
+        self.assertEqual(self.db.flush_calls, 0)
+
+    def test_patch_preferences_rejects_oversized_ui_preferences_payload(self) -> None:
+        response = self.client.patch(
+            "/api/me/preferences",
+            json={
+                "ui_preferences": {
+                    "dashboard": {"notes": "x" * (70 * 1024)},
+                }
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "UI preferences exceed maximum size",
+        )
+        self.assertEqual(self.db.flush_calls, 0)
+
     def test_patch_preferences_rejects_unknown_preference_sections(self) -> None:
         response = self.client.patch(
             "/api/me/preferences",
@@ -159,18 +196,10 @@ class MePreferencesRouterTest(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Unknown UI preference sections: unexpected")
-        self.assertEqual(self.db.flush_calls, 0)
-        self.assertIsNone(self.user.ui_preferences)
-
-    def test_patch_preferences_rejects_oversized_payloads(self) -> None:
-        response = self.client.patch(
-            "/api/me/preferences",
-            json={"ui_preferences": {"dashboard": {"search": "x" * 33000}}},
+        self.assertEqual(
+            response.json()["detail"],
+            "Unknown UI preference sections: unexpected",
         )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "UI preferences payload is too large")
         self.assertEqual(self.db.flush_calls, 0)
         self.assertIsNone(self.user.ui_preferences)
 

@@ -5,12 +5,15 @@
 export type ServiceFieldKey =
   | "status"
   | "owners"
+  | "related_services"
   | "classification"
   | "criticality"
   | "sso_integrated"
   | "scim_enabled"
   | "vendor"
   | "spending_category"
+  | "subcategory"
+  | "environment"
   | "cost_center"
   | "billing_schedule"
   | "renewal_date"
@@ -33,6 +36,7 @@ export const SERVICE_VIEW_SECTIONS: readonly {
     fields: [
       "status",
       "owners",
+      "related_services",
       "classification",
       "criticality",
       "sso_integrated",
@@ -46,6 +50,8 @@ export const SERVICE_VIEW_SECTIONS: readonly {
     title: "Cost Management",
     fields: [
       "spending_category",
+      "subcategory",
+      "environment",
       "cost_center",
       "billing_schedule",
       "renewal_date",
@@ -66,12 +72,15 @@ export const SERVICE_VIEW_SECTIONS: readonly {
 export const SERVICE_FIELD_LABELS: Record<ServiceFieldKey, string> = {
   status: "Status",
   owners: "Owner",
+  related_services: "Related services",
   classification: "Classification",
   criticality: "Criticality",
   sso_integrated: "SSO Integrated",
   scim_enabled: "SCIM Enabled",
   vendor: "Vendor",
   spending_category: "Spending Category",
+  subcategory: "Subcategory",
+  environment: "Environment",
   cost_center: "Cost Center",
   billing_schedule: "Billing Schedule",
   renewal_date: "Renewal Date",

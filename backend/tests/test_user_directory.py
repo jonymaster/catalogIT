@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+from collections.abc import AsyncGenerator
 from types import SimpleNamespace
 import unittest
 import uuid
@@ -86,6 +87,25 @@ class UserDirectorySearchTest(unittest.TestCase):
 
 
 class UserProfileRouteTest(unittest.TestCase):
+    def test_profile_route_rejects_invalid_uuid_path_param(self) -> None:
+        app = FastAPI()
+        app.include_router(user_directory.router)
+
+        async def override_current_user() -> SimpleNamespace:
+            return SimpleNamespace(id=uuid.uuid4(), role="viewer")
+
+        async def override_db() -> AsyncGenerator[SimpleNamespace, None]:
+            yield SimpleNamespace()
+
+        app.dependency_overrides[get_current_user] = override_current_user
+        app.dependency_overrides[get_audited_db] = override_db
+        client = TestClient(app)
+
+        response = client.get("/api/users/not-a-uuid/profile")
+
+        self.assertEqual(response.status_code, 422)
+        client.close()
+
     def test_profile_includes_owned_services_assigned_services_and_laptops(self) -> None:
         async def run() -> None:
             user_id = uuid.uuid4()

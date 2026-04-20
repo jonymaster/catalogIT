@@ -18,7 +18,8 @@ from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferenc
 router = APIRouter(prefix="/api/me", tags=["me"])
 
 _ALLOWED_UI_PREFERENCE_KEYS = {"dashboard", "service_list"}
-_MAX_UI_PREFERENCES_BYTES = 32 * 1024
+_MAX_UI_PREFERENCES_DEPTH = 8
+_MAX_UI_PREFERENCES_JSON_BYTES = 64 * 1024
 
 
 def _normalized_ui_preferences(value: Any) -> dict[str, Any]:
@@ -41,20 +42,43 @@ def _deep_merge_preferences(
     return merged
 
 
+def _validate_ui_preferences_depth(value: Any, *, depth: int = 0) -> None:
+    if depth > _MAX_UI_PREFERENCES_DEPTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences exceed maximum nesting depth",
+        )
+
+    if isinstance(value, dict):
+        for nested_value in value.values():
+            _validate_ui_preferences_depth(nested_value, depth=depth + 1)
+        return
+
+    if isinstance(value, list):
+        for nested_value in value:
+            _validate_ui_preferences_depth(nested_value, depth=depth + 1)
+
+
+def _validate_ui_preferences_size(value: dict[str, Any]) -> None:
+    serialized = json.dumps(value, separators=(",", ":"), sort_keys=True)
+    if len(serialized.encode("utf-8")) > _MAX_UI_PREFERENCES_JSON_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences exceed maximum size",
+        )
+
+
 def _validate_ui_preferences(value: dict[str, Any]) -> None:
-    unknown_keys = sorted(key for key in value if key not in _ALLOWED_UI_PREFERENCE_KEYS)
+    unknown_keys = sorted(
+        key for key in value if key not in _ALLOWED_UI_PREFERENCE_KEYS
+    )
     if unknown_keys:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown UI preference sections: {', '.join(unknown_keys)}",
         )
-
-    encoded = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    if len(encoded) > _MAX_UI_PREFERENCES_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="UI preferences payload is too large",
-        )
+    _validate_ui_preferences_depth(value)
+    _validate_ui_preferences_size(value)
 
 
 @router.get("/profile", response_model=UserRead)
