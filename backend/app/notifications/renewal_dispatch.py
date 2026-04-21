@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.global_audit import record_global_audit_event
+from app.integrations.config_helpers import merged_metadata
+from app.integrations.crypto import decrypt_json
 from app.integrations.gmail_send import send_mail
+from app.integrations.slack_api import post_message
 from app.models.integration_config import IntegrationConfig
 from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.renewal_notification_sent import RenewalNotificationSent
@@ -84,6 +87,15 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
         result.skipped_reason = "no_global_offsets"
         return result
 
+    slack_token = ""
+    slack_channel = ""
+    slack_row = await session.get(IntegrationConfig, "slack")
+    if slack_row is not None and slack_row.enabled:
+        slack_meta = merged_metadata(slack_row, "slack")
+        slack_channel = str(slack_meta.get("default_channel_id") or "").strip()
+        slack_secrets = decrypt_json(slack_row.secrets_encrypted)
+        slack_token = str(slack_secrets.get("access_token") or "").strip()
+
     # Collect admin users and extra recipients for global notifications
     admin_users = (
         await session.execute(
@@ -143,6 +155,7 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
             if trigger != today:
                 continue
             result.eligible_windows += 1
+            sent_any_email_for_window = False
 
             for recipient in recipients_by_id.values():
                 result.eligible_recipients += 1
@@ -189,6 +202,7 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                         )
                         await session.flush()
                     result.emails_sent += 1
+                    sent_any_email_for_window = True
                     await record_global_audit_event(
                         session,
                         category="notification",
@@ -230,6 +244,57 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                             "service_id": str(service.id),
                             "user_id": str(recipient.id),
                             "recipient_email": recipient.email,
+                            "days_before": days_before,
+                            "error": str(exc)[:500],
+                        },
+                        entity_label=service.name,
+                    )
+
+            # Send one Slack summary per due service window only when at least
+            # one new email was sent; this keeps reruns idempotent.
+            if sent_any_email_for_window and slack_token and slack_channel:
+                try:
+                    await post_message(
+                        slack_token,
+                        slack_channel,
+                        (
+                            f"Renewal reminder sent: {service.name} "
+                            f"renews on {service.renewal_date.isoformat()} "
+                            f"({days_before} day{'s' if days_before != 1 else ''} before)."
+                        ),
+                    )
+                    result.slack_sent += 1
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_slack_sent",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary=f"Renewal reminder Slack message sent for {service.name}",
+                        details={
+                            "channel": "slack",
+                            "service_id": str(service.id),
+                            "days_before": days_before,
+                            "renewal_date": service.renewal_date.isoformat(),
+                        },
+                        entity_label=service.name,
+                    )
+                except Exception as exc:
+                    err = f"service={service.id} slack: {exc}"
+                    logger.exception("Renewal slack notification failed: %s", err)
+                    result.errors.append(err[:500])
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_slack_failed",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary="Renewal reminder Slack notification failed",
+                        details={
+                            "channel": "slack",
+                            "service_id": str(service.id),
                             "days_before": days_before,
                             "error": str(exc)[:500],
                         },
