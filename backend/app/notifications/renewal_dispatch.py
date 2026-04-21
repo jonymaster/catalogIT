@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +19,9 @@ from app.global_audit import record_global_audit_event
 from app.integrations.config_helpers import merged_metadata
 from app.integrations.crypto import decrypt_json
 from app.integrations.gmail_send import send_mail
+from app.integrations.http_utils import status_is_success
 from app.integrations.slack_api import post_message
+from app.integrations.telegram_api import normalize_bot_token, send_message
 from app.models.integration_config import IntegrationConfig
 from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.renewal_notification_sent import RenewalNotificationSent
@@ -95,6 +101,24 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
         slack_channel = str(slack_meta.get("default_channel_id") or "").strip()
         slack_secrets = decrypt_json(slack_row.secrets_encrypted)
         slack_token = str(slack_secrets.get("access_token") or "").strip()
+
+    telegram_token = ""
+    telegram_chat_id = ""
+    telegram_row = await session.get(IntegrationConfig, "telegram")
+    if telegram_row is not None and telegram_row.enabled:
+        telegram_meta = merged_metadata(telegram_row, "telegram")
+        telegram_chat_id = str(telegram_meta.get("chat_id") or "").strip()
+        telegram_secrets = decrypt_json(telegram_row.secrets_encrypted)
+        telegram_token = normalize_bot_token(str(telegram_secrets.get("bot_token") or ""))
+
+    webhook_url = ""
+    webhook_signing_secret = ""
+    webhook_row = await session.get(IntegrationConfig, "webhook")
+    if webhook_row is not None and webhook_row.enabled:
+        webhook_meta = merged_metadata(webhook_row, "webhook")
+        webhook_url = str(webhook_meta.get("url") or "").strip()
+        webhook_secrets = decrypt_json(webhook_row.secrets_encrypted)
+        webhook_signing_secret = str(webhook_secrets.get("signing_secret") or "").strip()
 
     # Collect admin users and extra recipients for global notifications
     admin_users = (
@@ -294,6 +318,117 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                         summary="Renewal reminder Slack notification failed",
                         details={
                             "channel": "slack",
+                            "service_id": str(service.id),
+                            "days_before": days_before,
+                            "error": str(exc)[:500],
+                        },
+                        entity_label=service.name,
+                    )
+
+            if sent_any_email_for_window and telegram_token and telegram_chat_id:
+                try:
+                    await send_message(
+                        telegram_token,
+                        telegram_chat_id,
+                        (
+                            f"Renewal reminder sent: {service.name} "
+                            f"renews on {service.renewal_date.isoformat()} "
+                            f"({days_before} day{'s' if days_before != 1 else ''} before)."
+                        ),
+                    )
+                    result.telegram_sent += 1
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_telegram_sent",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary=f"Renewal reminder Telegram message sent for {service.name}",
+                        details={
+                            "channel": "telegram",
+                            "service_id": str(service.id),
+                            "days_before": days_before,
+                            "renewal_date": service.renewal_date.isoformat(),
+                        },
+                        entity_label=service.name,
+                    )
+                except Exception as exc:
+                    err = f"service={service.id} telegram: {exc}"
+                    logger.exception("Renewal telegram notification failed: %s", err)
+                    result.errors.append(err[:500])
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_telegram_failed",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary="Renewal reminder Telegram notification failed",
+                        details={
+                            "channel": "telegram",
+                            "service_id": str(service.id),
+                            "days_before": days_before,
+                            "error": str(exc)[:500],
+                        },
+                        entity_label=service.name,
+                    )
+
+            if sent_any_email_for_window and webhook_url:
+                payload = {
+                    "version": "2026-01",
+                    "event": "renewal_reminder_sent",
+                    "service_id": str(service.id),
+                    "service_name": service.name,
+                    "renewal_date": service.renewal_date.isoformat(),
+                    "days_before": days_before,
+                    "dispatched_at": datetime.utcnow().isoformat() + "Z",
+                }
+                body_bytes = json.dumps(payload, separators=(",", ":")).encode()
+                headers = {"Content-Type": "application/json"}
+                if webhook_signing_secret:
+                    sig = hmac.new(
+                        webhook_signing_secret.encode(), body_bytes, hashlib.sha256
+                    ).hexdigest()
+                    headers["X-CatalogIT-Signature"] = sig
+                try:
+                    async with httpx.AsyncClient(timeout=15) as client:
+                        resp = await client.post(
+                            webhook_url, content=body_bytes, headers=headers
+                        )
+                    if not status_is_success(resp.status_code):
+                        raise ValueError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+                    result.webhook_sent += 1
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_webhook_sent",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary=f"Renewal reminder webhook sent for {service.name}",
+                        details={
+                            "channel": "webhook",
+                            "service_id": str(service.id),
+                            "days_before": days_before,
+                            "renewal_date": service.renewal_date.isoformat(),
+                        },
+                        entity_label=service.name,
+                    )
+                except Exception as exc:
+                    err = f"service={service.id} webhook: {exc}"
+                    logger.exception("Renewal webhook notification failed: %s", err)
+                    result.errors.append(err[:500])
+                    await record_global_audit_event(
+                        session,
+                        category="notification",
+                        event_type="renewal_webhook_failed",
+                        entity_table="services",
+                        entity_key=str(service.id),
+                        actor_user_id=None,
+                        summary="Renewal reminder webhook notification failed",
+                        details={
+                            "channel": "webhook",
                             "service_id": str(service.id),
                             "days_before": days_before,
                             "error": str(exc)[:500],

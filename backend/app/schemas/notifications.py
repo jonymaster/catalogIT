@@ -57,4 +57,6 @@ class RenewalDispatchResult(BaseModel):
     skipped_existing: int = 0
     emails_sent: int = 0
     slack_sent: int = 0
+    telegram_sent: int = 0
+    webhook_sent: int = 0
     errors: list[str] = []
