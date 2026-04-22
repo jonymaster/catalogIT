@@ -9,7 +9,8 @@ from app.models.service_status import ServiceStatus
 from app.models.hardware_status import HardwareStatus
 from app.models.hardware_location import HardwareLocation
 from app.models.contract import Contract
-from app.models.service import Service, service_assignments, service_owners
+from app.models.tag import Tag
+from app.models.service import Service, service_assignments, service_owners, service_tags
 from app.models.cost_record import CostRecord
 from app.models.service_history import ServiceHistoryEntry
 from app.models.laptop import Laptop

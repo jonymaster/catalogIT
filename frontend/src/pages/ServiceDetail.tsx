@@ -162,8 +162,6 @@ export function ServiceDetail() {
       classification_id: draft.classification_id || null,
       billing_schedule: draft.billing_schedule,
       renewal_date: draft.renewal_date || null,
-      yearly_cost:
-        draft.yearly_cost.trim() === "" ? null : Number(draft.yearly_cost),
       criticality: draft.criticality || null,
       total_seats:
         draft.total_seats.trim() === "" ? null : Number(draft.total_seats),
@@ -171,6 +169,7 @@ export function ServiceDetail() {
       scim_enabled: draft.scim_enabled,
       nonprofit_pricing: draft.nonprofit_pricing,
       owner_ids: draft.owner_ids,
+      tag_ids: draft.tags.map((tag) => tag.id),
     };
     try {
       const res = await client.put<Service>(
@@ -383,6 +382,13 @@ export function ServiceDetail() {
                   classification={service.service_classification}
                 />
               )}
+              {service.tags?.map((tag) => (
+                <ColoredReferenceBadge
+                  key={tag.id}
+                  label={tag.name}
+                  color={tag.color}
+                />
+              ))}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">

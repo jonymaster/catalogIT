@@ -94,6 +94,12 @@ export interface HardwareLocation {
   description: string | null;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface ServiceClassification {
   id: string;
   slug: string;
@@ -177,6 +183,7 @@ export interface Service {
   payment_method: PaymentMethod | null;
   service_status: ServiceStatus | null;
   service_classification: ServiceClassification | null;
+  tags: Tag[];
   created_at: string;
   updated_at: string;
 }

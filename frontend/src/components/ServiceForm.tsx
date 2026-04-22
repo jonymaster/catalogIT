@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { useToast } from "../context/useToast";
 import { formatBillingSchedule } from "../service/serviceBilling";
 import type { ServiceDraft, ServiceValidationErrors } from "../service/serviceDetailContext";
 import { validateDraft } from "../service/serviceDetailContext";
+import { TagPicker } from "./TagPicker";
 import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
 import { Button } from "./ui/Button";
 import type {
@@ -58,13 +59,13 @@ function toDraft(s?: Service): ServiceDraft {
     classification_id: s?.classification_id ?? "",
     billing_schedule: s?.billing_schedule ?? "",
     renewal_date: s?.renewal_date ?? "",
-    yearly_cost: s?.yearly_cost != null ? String(s.yearly_cost) : "",
     criticality: s?.criticality ?? "",
     total_seats: s?.total_seats != null ? String(s.total_seats) : "",
     sso_integrated: s?.sso_integrated ?? false,
     scim_enabled: s?.scim_enabled ?? false,
     nonprofit_pricing: s?.nonprofit_pricing ?? false,
     owner_ids: s?.owners.map((o) => o.id) ?? [],
+    tags: s?.tags ?? [],
   };
 }
 
@@ -267,6 +268,7 @@ export function ServiceForm({ initial }: Props) {
       nonprofit_pricing: draft.nonprofit_pricing,
       renewal_reminders_enabled: true,
       renewal_offsets_days: null,
+      tag_ids: draft.tags.map((tag) => tag.id),
     };
 
     try {
@@ -500,15 +502,22 @@ export function ServiceForm({ initial }: Props) {
               <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
                 Yearly Cost
               </label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={draft.yearly_cost}
-                onChange={(e) => set("yearly_cost", e.target.value)}
-                placeholder="0"
-                className={fieldClass(Boolean(errors.yearly_cost)) + " mt-1"}
-              />
+              {isEdit && initial ? (
+                <p className="mt-1">
+                  <Link
+                    to={`/services/${initial.id}/costs`}
+                    className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+                  >
+                    {initial.yearly_cost != null
+                      ? `$${Number(initial.yearly_cost).toLocaleString()}`
+                      : "Costs page"}
+                  </Link>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-fg-3">
+                  After you create this service, add fiscal amounts on its Costs tab.
+                </p>
+              )}
             </div>
 
             <div>
@@ -535,6 +544,14 @@ export function ServiceForm({ initial }: Props) {
               value={draft.owner_ids}
               onChange={(ids) => set("owner_ids", ids)}
               seedUsers={initial?.owners}
+            />
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-fg">Tags</h2>
+            <TagPicker
+              value={draft.tags}
+              onChange={(tags) => set("tags", tags)}
             />
           </section>
 

@@ -10,8 +10,11 @@ from app.schemas.cost_center import CostCenterRead
 from app.schemas.payment_method import PaymentMethodRead
 from app.schemas.service_classification import ServiceClassificationRead
 from app.schemas.service_status import ServiceStatusRead
+from app.schemas.tag import TagRead
 from app.schemas.user import UserRead
 from app.schemas.vendor import VendorRead
+
+MAX_TAGS_PER_SERVICE = 5
 
 
 class ServiceCreate(BaseModel):
@@ -39,6 +42,7 @@ class ServiceCreate(BaseModel):
     renewal_offsets_days: list[int] | None = None
     total_seats: int | None = None
     assignee_ids: list[uuid.UUID] = []
+    tag_ids: list[uuid.UUID] = []
 
     @field_validator("total_seats")
     @classmethod
@@ -46,6 +50,22 @@ class ServiceCreate(BaseModel):
         if v is not None and v < 1:
             raise ValueError("total_seats must be at least 1 when set")
         return v
+
+    @field_validator("tag_ids")
+    @classmethod
+    def tag_ids_within_limit(cls, v: list[uuid.UUID]) -> list[uuid.UUID]:
+        if len(v) > MAX_TAGS_PER_SERVICE:
+            raise ValueError(
+                f"A service can have at most {MAX_TAGS_PER_SERVICE} tags"
+            )
+        # Deduplicate while preserving order.
+        seen: set[uuid.UUID] = set()
+        deduped: list[uuid.UUID] = []
+        for tid in v:
+            if tid not in seen:
+                seen.add(tid)
+                deduped.append(tid)
+        return deduped
 
 
 class ServiceUpdate(BaseModel):
@@ -74,6 +94,7 @@ class ServiceUpdate(BaseModel):
     renewal_offsets_days: list[int] | None = None
     total_seats: int | None = None
     assignee_ids: list[uuid.UUID] | None = None
+    tag_ids: list[uuid.UUID] | None = None
 
     @field_validator("total_seats")
     @classmethod
@@ -81,6 +102,25 @@ class ServiceUpdate(BaseModel):
         if v is not None and v < 1:
             raise ValueError("total_seats must be at least 1 when set")
         return v
+
+    @field_validator("tag_ids")
+    @classmethod
+    def tag_ids_within_limit(
+        cls, v: list[uuid.UUID] | None
+    ) -> list[uuid.UUID] | None:
+        if v is None:
+            return None
+        if len(v) > MAX_TAGS_PER_SERVICE:
+            raise ValueError(
+                f"A service can have at most {MAX_TAGS_PER_SERVICE} tags"
+            )
+        seen: set[uuid.UUID] = set()
+        deduped: list[uuid.UUID] = []
+        for tid in v:
+            if tid not in seen:
+                seen.add(tid)
+                deduped.append(tid)
+        return deduped
 
 
 class ServiceRead(BaseModel):
@@ -118,6 +158,7 @@ class ServiceRead(BaseModel):
     payment_method: PaymentMethodRead | None = None
     service_status: ServiceStatusRead | None = None
     service_classification: ServiceClassificationRead | None = None
+    tags: list[TagRead] = []
     created_at: datetime
     updated_at: datetime
 

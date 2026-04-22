@@ -20,6 +20,7 @@ import type {
   UserPreferences,
   Vendor,
 } from "../types/models";
+import { TagPicker } from "../components/TagPicker";
 import { UserDirectoryCheckboxPicker } from "../components/UserDirectoryCheckboxPicker";
 import { formatDateOnly } from "../utils/formatting";
 import type {
@@ -356,22 +357,25 @@ function LeftColumn({
 
         <Row
           label="Yearly Cost"
-          error={editing ? errors.yearly_cost : undefined}
         >
           {editing ? (
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={draft.yearly_cost}
-              onChange={(e) => setField("yearly_cost", e.target.value)}
-              placeholder="0"
-              className={fieldClass(Boolean(errors.yearly_cost))}
-            />
-          ) : service.yearly_cost != null ? (
-            `$${Number(service.yearly_cost).toLocaleString()}`
+            <Link
+              to={`/services/${service.id}/costs`}
+              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {service.yearly_cost != null
+                ? `$${Number(service.yearly_cost).toLocaleString()}`
+                : "Costs page"}
+            </Link>
           ) : (
-            <span className="text-fg-4">—</span>
+            <Link
+              to={`/services/${service.id}/costs`}
+              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {service.yearly_cost != null
+                ? `$${Number(service.yearly_cost).toLocaleString()}`
+                : "Costs page"}
+            </Link>
           )}
         </Row>
 
@@ -439,6 +443,28 @@ function RightColumn({
             onChange={(ids) => setField("owner_ids", ids)}
             seedUsers={service.owners}
           />
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-3 text-base font-semibold text-fg">Tags</h2>
+        {editing ? (
+          <TagPicker
+            value={draft.tags}
+            onChange={(tags) => setField("tags", tags)}
+          />
+        ) : service.tags.length === 0 ? (
+          <p className="text-sm text-fg-4">No tags.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {service.tags.map((tag) => (
+              <ColoredReferenceBadge
+                key={tag.id}
+                label={tag.name}
+                color={tag.color}
+              />
+            ))}
+          </div>
         )}
       </section>
 

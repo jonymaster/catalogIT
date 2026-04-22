@@ -1,4 +1,6 @@
-import type { Service } from "../types/models";
+import type { Service, Tag } from "../types/models";
+
+export const MAX_TAGS_PER_SERVICE = 5;
 
 export interface ServiceDraft {
   name: string;
@@ -13,13 +15,13 @@ export interface ServiceDraft {
   classification_id: string;
   billing_schedule: string;
   renewal_date: string;
-  yearly_cost: string;
   criticality: string;
   total_seats: string;
   sso_integrated: boolean;
   scim_enabled: boolean;
   nonprofit_pricing: boolean;
   owner_ids: string[];
+  tags: Tag[];
 }
 
 export type ServiceValidationErrors = Partial<
@@ -55,24 +57,19 @@ export function toDraft(s: Service): ServiceDraft {
     classification_id: s.classification_id ?? "",
     billing_schedule: s.billing_schedule ?? "",
     renewal_date: s.renewal_date ?? "",
-    yearly_cost: s.yearly_cost != null ? String(s.yearly_cost) : "",
     criticality: s.criticality ?? "",
     total_seats: s.total_seats != null ? String(s.total_seats) : "",
     sso_integrated: s.sso_integrated,
     scim_enabled: s.scim_enabled ?? false,
     nonprofit_pricing: s.nonprofit_pricing,
     owner_ids: s.owners.map((o) => o.id),
+    tags: s.tags ?? [],
   };
 }
 
 export function validateDraft(draft: ServiceDraft): ServiceValidationErrors {
   const errs: ServiceValidationErrors = {};
   if (!draft.name.trim()) errs.name = "Required";
-  if (draft.yearly_cost.trim() !== "") {
-    const n = Number(draft.yearly_cost);
-    if (Number.isNaN(n) || n < 0)
-      errs.yearly_cost = "Must be a non-negative number";
-  }
   if (draft.total_seats.trim() !== "") {
     const n = Number(draft.total_seats);
     if (!Number.isInteger(n) || n < 1)
