@@ -30,6 +30,7 @@ import {
 } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import {
   toDraft,
   validateDraft,
@@ -40,12 +41,15 @@ import {
 import type { Service } from "../types/models";
 
 type ExtraTab = "activity" | null;
+const FLASH_TOAST_KEY = "catalogit:flash-toast";
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
-  const { canEdit } = useAuth();
+  const { canEdit, user } = useAuth();
+  const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const isAdmin = user?.role === "admin";
 
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +59,23 @@ export function ServiceDetail() {
   const [errors, setErrors] = useState<ServiceValidationErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<"archive" | "unarchive" | "delete" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [extraTab, setExtraTab] = useState<ExtraTab>(null);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(FLASH_TOAST_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { type?: "success" | "error"; text?: string };
+      if (parsed.type && parsed.text) {
+        showToast({ type: parsed.type, text: parsed.text });
+      }
+      sessionStorage.removeItem(FLASH_TOAST_KEY);
+    } catch {
+      // Ignore malformed or unavailable storage.
+    }
+  }, [showToast]);
 
   useEffect(() => {
     if (!id) {
@@ -160,6 +180,7 @@ export function ServiceDetail() {
       setService(res.data);
       setDraft(toDraft(res.data));
       setEditingState(false);
+      showToast({ type: "success", text: "Service updated." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save service";
       setSaveError(msg);
@@ -168,8 +189,73 @@ export function ServiceDetail() {
     }
   }
 
-  // Leave edit mode if the route moves off the overview tab. The check mirrors
-  // React's new guidance to only setState when the external value genuinely changed.
+  function getActionErrorMessage(err: unknown): string {
+    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return "Action failed. Please try again.";
+  }
+
+  async function handleArchive() {
+    if (!service) return;
+    const confirmed = window.confirm(
+      `Archive "${service.name}"? It will move to the Archived services view.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("archive");
+    setActionError(null);
+    try {
+      const res = await client.post<Service>(`/api/services/${service.id}/archive`);
+      setService(res.data);
+      setDraft(toDraft(res.data));
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleUnarchive() {
+    if (!service) return;
+    const confirmed = window.confirm(
+      `Unarchive "${service.name}"? It will return to Active services.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("unarchive");
+    setActionError(null);
+    try {
+      const res = await client.post<Service>(`/api/services/${service.id}/unarchive`);
+      setService(res.data);
+      setDraft(toDraft(res.data));
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!service) return;
+    const confirmed = window.confirm(
+      `Delete "${service.name}" permanently? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("delete");
+    setActionError(null);
+    try {
+      await client.delete(`/api/services/${service.id}`);
+      navigate("/services");
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   const pathname = location.pathname;
   const lastPathRef = useRef(pathname);
   if (lastPathRef.current !== pathname) {
@@ -249,6 +335,11 @@ export function ServiceDetail() {
             <Monogram name={displayName} seed={service.id} size={40} />
           </div>
           <div className="min-w-0 flex-1">
+            {!service.is_active && (
+              <div className="mb-2 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                Archived
+              </div>
+            )}
             {editing ? (
               <div>
                 <input
@@ -328,13 +419,34 @@ export function ServiceDetail() {
                 </button>
               </>
             )}
-            {!editing && <KebabMenu />}
+            {!editing && (
+              <KebabMenu
+                canEdit={canEdit}
+                canDelete={isAdmin}
+                isArchived={!service.is_active}
+                busyAction={actionBusy}
+                onArchive={() => {
+                  void handleArchive();
+                }}
+                onUnarchive={() => {
+                  void handleUnarchive();
+                }}
+                onDelete={() => {
+                  void handleDelete();
+                }}
+              />
+            )}
           </div>
         </div>
 
         {saveError && editing && (
           <div className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
             {saveError}
+          </div>
+        )}
+        {actionError && !editing && (
+          <div className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+            {actionError}
           </div>
         )}
 
@@ -442,8 +554,36 @@ function TabButton({ label, active, onClick }: TabButtonProps) {
   );
 }
 
-function KebabMenu() {
+interface KebabMenuProps {
+  canEdit: boolean;
+  canDelete: boolean;
+  isArchived: boolean;
+  busyAction: "archive" | "unarchive" | "delete" | null;
+  onArchive: () => void;
+  onUnarchive: () => void;
+  onDelete: () => void;
+}
+
+function KebabMenu({
+  canEdit,
+  canDelete,
+  isArchived,
+  busyAction,
+  onArchive,
+  onUnarchive,
+  onDelete,
+}: KebabMenuProps) {
   const [open, setOpen] = useState(false);
+  const isBusy = busyAction !== null;
+
+  function runAndClose(action: () => void) {
+    action();
+    setOpen(false);
+  }
+
+  const archiveLabel = isArchived ? "Unarchive" : "Archive";
+  const archiveBusy = busyAction === "archive" || busyAction === "unarchive";
+  const deleteDisabled = !isArchived || !canDelete || isBusy;
   return (
     <div className="relative">
       <button
@@ -451,6 +591,7 @@ function KebabMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
+        disabled={isBusy}
         className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-fg-2 transition-colors hover:bg-surface-2"
       >
         <span className="sr-only">More actions</span>
@@ -478,11 +619,27 @@ function KebabMenu() {
             className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-md"
           >
             <MenuItem label="Duplicate" onClick={() => setOpen(false)} />
-            <MenuItem label="Archive" onClick={() => setOpen(false)} />
+            {canEdit && (
+              <MenuItem
+                label={archiveBusy ? `${archiveLabel}...` : archiveLabel}
+                disabled={isBusy}
+                onClick={() =>
+                  runAndClose(isArchived ? onUnarchive : onArchive)
+                }
+              />
+            )}
             <MenuItem
               label="Delete"
               variant="danger"
-              onClick={() => setOpen(false)}
+              disabled={deleteDisabled}
+              title={
+                !isArchived
+                  ? "Archive service before deleting"
+                  : !canDelete
+                    ? "Only admins can delete services"
+                    : undefined
+              }
+              onClick={() => runAndClose(onDelete)}
             />
           </div>
         </>
@@ -495,17 +652,23 @@ function MenuItem({
   label,
   onClick,
   variant,
+  disabled,
+  title,
 }: {
   label: string;
   onClick: () => void;
   variant?: "danger";
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
+      title={title}
+      disabled={disabled}
       onClick={onClick}
-      className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors hover:bg-surface-2 ${
+      className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 ${
         variant === "danger" ? "text-danger" : "text-fg-2"
       }`}
     >

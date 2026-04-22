@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import client from "../api/client";
 import { Badge } from "../components/Badge";
 import { PageTransition } from "../components/PageTransition";
@@ -40,7 +40,6 @@ function userListFullName(u: User): string {
 }
 
 export function Users() {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -89,7 +88,9 @@ export function Users() {
         render: (user) => (
           <div className="flex min-w-0 items-center gap-2.5">
             <Monogram name={userMonogramName(user)} seed={user.id} size={26} />
-            <span className="min-w-0 truncate text-fg">{userListFullName(user)}</span>
+            <Link to={`/users/${user.id}`} className="hlink min-w-0 truncate text-fg">
+              {userListFullName(user)}
+            </Link>
           </div>
         ),
       },
@@ -389,7 +390,6 @@ export function Users() {
             data={filtered}
             striped
             primaryColumnKey="name"
-            onRowClick={(u) => navigate(`/users/${u.id}`)}
           />
         </>
       )}
