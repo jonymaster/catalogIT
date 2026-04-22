@@ -498,11 +498,11 @@ export function ServiceForm({ initial }: Props) {
               />
             </div>
 
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
-                Yearly Cost
-              </label>
-              {isEdit && initial ? (
+            {isEdit && initial && (
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+                  Yearly Cost
+                </label>
                 <p className="mt-1">
                   <Link
                     to={`/services/${initial.id}/costs`}
@@ -513,12 +513,8 @@ export function ServiceForm({ initial }: Props) {
                       : "Costs page"}
                   </Link>
                 </p>
-              ) : (
-                <p className="mt-1 text-sm text-fg-3">
-                  After you create this service, add fiscal amounts on its Costs tab.
-                </p>
-              )}
-            </div>
+              </div>
+            )}
 
             <div>
               <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
