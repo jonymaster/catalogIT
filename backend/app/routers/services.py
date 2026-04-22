@@ -12,9 +12,10 @@ from app.dependencies.db import get_audited_db
 from app.models.service import Service
 from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
+from app.models.tag import Tag
 from app.models.user import User
 from app.routers.attachments import delete_entity_attachments
-from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
+from app.schemas.service import MAX_TAGS_PER_SERVICE, ServiceCreate, ServiceRead, ServiceUpdate
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -72,6 +73,31 @@ async def _get_classification(
             detail="Service classification not found",
         )
     return row
+
+
+async def _resolve_tags(
+    db: AsyncSession,
+    tag_ids: list[uuid.UUID],
+) -> list[Tag]:
+    if not tag_ids:
+        return []
+    if len(tag_ids) > MAX_TAGS_PER_SERVICE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A service can have at most {MAX_TAGS_PER_SERVICE} tags",
+        )
+    result = await db.execute(select(Tag).where(Tag.id.in_(tag_ids)))
+    tags = list(result.scalars().all())
+    found_ids = {tag.id for tag in tags}
+    missing = [str(tid) for tid in tag_ids if tid not in found_ids]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tag(s) not found: {', '.join(missing)}",
+        )
+    # Preserve the order the caller sent.
+    by_id = {tag.id: tag for tag in tags}
+    return [by_id[tid] for tid in tag_ids]
 
 
 async def _resolve_service_status(
@@ -137,6 +163,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         status_name=body.status,
     )
     classification = await _get_classification(db, body.classification_id)
+    tags = await _resolve_tags(db, body.tag_ids)
 
     service = Service(
         name=body.name,
@@ -162,6 +189,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         nonprofit_pricing=body.nonprofit_pricing,
         renewal_reminders_enabled=body.renewal_reminders_enabled,
         renewal_offsets_days=body.renewal_offsets_days,
+        tags=tags,
     )
     db.add(service)
     await db.flush()
@@ -194,6 +222,8 @@ async def update_service(
 
     owner_ids = update_data.pop("owner_ids", None)
     assignee_ids = update_data.pop("assignee_ids", None)
+    tag_ids_provided = "tag_ids" in update_data
+    tag_ids = update_data.pop("tag_ids", None)
     classification_id = (
         update_data.pop("classification_id", None) if "classification_id" in update_data else ...
     )
@@ -241,6 +271,9 @@ async def update_service(
             service.status = status_name
             matched_status = await _find_service_status_by_name(status_name, db)
             service.service_status_id = matched_status.id if matched_status else None
+
+    if tag_ids_provided:
+        service.tags = await _resolve_tags(db, tag_ids or [])
 
     for field, value in update_data.items():
         setattr(service, field, value)

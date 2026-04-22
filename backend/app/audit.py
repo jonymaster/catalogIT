@@ -40,6 +40,7 @@ AUDITED_TABLES: frozenset[str] = frozenset(
         "hardware_statuses",
         "hardware_locations",
         "service_classifications",
+        "tags",
         "contracts",
         "cost_records",
         "attachments",

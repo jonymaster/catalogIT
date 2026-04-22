@@ -43,6 +43,13 @@ interface ServiceColumnDefinition {
   filterType: FilterType;
   filterPlaceholder?: string;
   getFilterValue: (service: Service) => string;
+  /**
+   * For "multi-valued" columns (e.g. tags) a service carries several labels at
+   * once. When provided, the list filter treats a service as a match if ANY of
+   * the labels intersects with the selected filter values. When omitted, the
+   * standard single-value `getFilterValue` equality is used.
+   */
+  getFilterValues?: (service: Service) => string[];
   getSortValue: (service: Service) => string | number | boolean | null;
   getFilterOptions?: (services: Service[]) => string[];
   render?: (service: Service) => React.ReactNode;
@@ -376,6 +383,47 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     render: (service) => service.vendor?.name ?? "--",
   },
   {
+    key: "tags",
+    label: "Tags",
+    filterType: "select",
+    getFilterValue: (service) =>
+      service.tags.map((tag) => tag.name).join(", "),
+    getFilterValues: (service) => service.tags.map((tag) => tag.name),
+    getSortValue: (service) =>
+      service.tags.map((tag) => tag.name).join(", ").toLowerCase(),
+    getFilterOptions: (services) =>
+      getUniqueOptions(services.flatMap((service) => service.tags.map((tag) => tag.name))),
+    render: (service) => {
+      if (!service.tags?.length) {
+        return <span className="text-fg-4">—</span>;
+      }
+      const visible = service.tags.slice(0, 3);
+      const extra = service.tags.length - visible.length;
+      return (
+        <div className="flex flex-wrap items-center gap-1">
+          {visible.map((tag) => (
+            <ColoredReferenceBadge
+              key={tag.id}
+              label={tag.name}
+              color={tag.color}
+            />
+          ))}
+          {extra > 0 && (
+            <span
+              className="text-[11px] text-fg-3"
+              title={service.tags
+                .slice(3)
+                .map((tag) => tag.name)
+                .join(", ")}
+            >
+              +{extra} more
+            </span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
     key: "owners",
     label: "Owners",
     filterType: "text",
@@ -491,6 +539,24 @@ function ServiceGalleryCard({
         {service.service_classification && (
           <ClassificationBadge classification={service.service_classification} />
         )}
+        {service.tags?.slice(0, 3).map((tag) => (
+          <ColoredReferenceBadge
+            key={tag.id}
+            label={tag.name}
+            color={tag.color}
+          />
+        ))}
+        {(service.tags?.length ?? 0) > 3 && (
+          <span
+            className="text-[11px] text-fg-3"
+            title={service.tags
+              .slice(3)
+              .map((tag) => tag.name)
+              .join(", ")}
+          >
+            +{service.tags.length - 3}
+          </span>
+        )}
       </div>
       <div className="mt-auto flex items-center justify-between border-t border-border pt-2.5 text-[12px] text-fg-3">
         <span className="inline-flex items-center gap-1.5">
@@ -603,6 +669,7 @@ export function Services() {
         (service.payment_method?.name ?? "").toLowerCase().includes(q) ||
         service.billing_schedule.toLowerCase().includes(q) ||
         (service.vendor?.name ?? "").toLowerCase().includes(q) ||
+        service.tags.some((tag) => tag.name.toLowerCase().includes(q)) ||
         service.owners.some(
           (owner) =>
             owner.first_name.toLowerCase().includes(q) ||
@@ -620,6 +687,11 @@ export function Services() {
           const values = Array.isArray(selected) ? selected : [];
           if (values.length === 0) {
             return true;
+          }
+          if (column.getFilterValues) {
+            // Multi-valued column (e.g. tags): ANY-of semantics.
+            const serviceValues = column.getFilterValues(service);
+            return serviceValues.some((entry) => values.includes(entry));
           }
           return values.includes(cellValue);
         }

@@ -26,6 +26,13 @@ service_assignments = Table(
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
 
+service_tags = Table(
+    "service_tags",
+    Base.metadata,
+    Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Service(Base):
     __tablename__ = "services"
@@ -97,6 +104,11 @@ class Service(Base):
     assignees: Mapped[list["User"]] = relationship(  # noqa: F821
         secondary=service_assignments,
         lazy="selectin",
+    )
+    tags: Mapped[list["Tag"]] = relationship(  # noqa: F821
+        secondary=service_tags,
+        lazy="selectin",
+        order_by="Tag.name",
     )
     vendor: Mapped["Vendor | None"] = relationship(lazy="selectin")  # noqa: F821
     category_rel: Mapped["Category | None"] = relationship(lazy="selectin")  # noqa: F821

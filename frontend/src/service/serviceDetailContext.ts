@@ -1,4 +1,6 @@
-import type { Service } from "../types/models";
+import type { Service, Tag } from "../types/models";
+
+export const MAX_TAGS_PER_SERVICE = 5;
 
 export interface ServiceDraft {
   name: string;
@@ -20,6 +22,7 @@ export interface ServiceDraft {
   scim_enabled: boolean;
   nonprofit_pricing: boolean;
   owner_ids: string[];
+  tags: Tag[];
 }
 
 export type ServiceValidationErrors = Partial<
@@ -62,6 +65,7 @@ export function toDraft(s: Service): ServiceDraft {
     scim_enabled: s.scim_enabled ?? false,
     nonprofit_pricing: s.nonprofit_pricing,
     owner_ids: s.owners.map((o) => o.id),
+    tags: s.tags ?? [],
   };
 }
 

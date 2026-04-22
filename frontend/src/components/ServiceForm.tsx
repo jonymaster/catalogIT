@@ -5,6 +5,7 @@ import { useToast } from "../context/useToast";
 import { formatBillingSchedule } from "../service/serviceBilling";
 import type { ServiceDraft, ServiceValidationErrors } from "../service/serviceDetailContext";
 import { validateDraft } from "../service/serviceDetailContext";
+import { TagPicker } from "./TagPicker";
 import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
 import { Button } from "./ui/Button";
 import type {
@@ -65,6 +66,7 @@ function toDraft(s?: Service): ServiceDraft {
     scim_enabled: s?.scim_enabled ?? false,
     nonprofit_pricing: s?.nonprofit_pricing ?? false,
     owner_ids: s?.owners.map((o) => o.id) ?? [],
+    tags: s?.tags ?? [],
   };
 }
 
@@ -267,6 +269,7 @@ export function ServiceForm({ initial }: Props) {
       nonprofit_pricing: draft.nonprofit_pricing,
       renewal_reminders_enabled: true,
       renewal_offsets_days: null,
+      tag_ids: draft.tags.map((tag) => tag.id),
     };
 
     try {
@@ -535,6 +538,14 @@ export function ServiceForm({ initial }: Props) {
               value={draft.owner_ids}
               onChange={(ids) => set("owner_ids", ids)}
               seedUsers={initial?.owners}
+            />
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="mb-3 text-base font-semibold text-fg">Tags</h2>
+            <TagPicker
+              value={draft.tags}
+              onChange={(tags) => set("tags", tags)}
             />
           </section>
 

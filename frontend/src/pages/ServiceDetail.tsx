@@ -171,6 +171,7 @@ export function ServiceDetail() {
       scim_enabled: draft.scim_enabled,
       nonprofit_pricing: draft.nonprofit_pricing,
       owner_ids: draft.owner_ids,
+      tag_ids: draft.tags.map((tag) => tag.id),
     };
     try {
       const res = await client.put<Service>(
@@ -383,6 +384,13 @@ export function ServiceDetail() {
                   classification={service.service_classification}
                 />
               )}
+              {service.tags?.map((tag) => (
+                <ColoredReferenceBadge
+                  key={tag.id}
+                  label={tag.name}
+                  color={tag.color}
+                />
+              ))}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">

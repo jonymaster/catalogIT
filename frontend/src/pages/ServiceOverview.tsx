@@ -20,6 +20,7 @@ import type {
   UserPreferences,
   Vendor,
 } from "../types/models";
+import { TagPicker } from "../components/TagPicker";
 import { UserDirectoryCheckboxPicker } from "../components/UserDirectoryCheckboxPicker";
 import { formatDateOnly } from "../utils/formatting";
 import type {
@@ -439,6 +440,28 @@ function RightColumn({
             onChange={(ids) => setField("owner_ids", ids)}
             seedUsers={service.owners}
           />
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-3 text-base font-semibold text-fg">Tags</h2>
+        {editing ? (
+          <TagPicker
+            value={draft.tags}
+            onChange={(tags) => setField("tags", tags)}
+          />
+        ) : service.tags.length === 0 ? (
+          <p className="text-sm text-fg-4">No tags.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {service.tags.map((tag) => (
+              <ColoredReferenceBadge
+                key={tag.id}
+                label={tag.name}
+                color={tag.color}
+              />
+            ))}
+          </div>
         )}
       </section>
 

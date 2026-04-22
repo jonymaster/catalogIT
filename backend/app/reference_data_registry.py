@@ -263,6 +263,36 @@ REFERENCE_DATA_RESOURCES: dict[str, ReferenceResourceDefinition] = {
             ),
         ),
     ),
+    "tags": ReferenceResourceDefinition(
+        key="tags",
+        label="Tag",
+        plural_label="Tags",
+        description=(
+            "Free-form labels for grouping and filtering services. "
+            "Editors can create tags inline when editing a service; "
+            "admins manage the full library here (max 200 tags, 5 per service)."
+        ),
+        api_path="/api/tags/",
+        settings_path="/settings/reference-data/tags",
+        search_fields=("name",),
+        fields=(
+            ReferenceFieldDefinition(
+                key="name",
+                label="Name",
+                required=True,
+                placeholder="e.g. customer-support, billing, internal",
+                help_text="Short label (max 50 chars, no commas).",
+            ),
+            ReferenceFieldDefinition(
+                key="color",
+                label="Badge color",
+                input_type="badge_preset",
+                required=False,
+                show_in_list=True,
+                help_text="Preset chip color for service lists (readable in light and dark mode). Random when created.",
+            ),
+        ),
+    ),
     "service-classifications": ReferenceResourceDefinition(
         key="service-classifications",
         label="Service Classification",
