@@ -148,12 +148,16 @@ export interface ServiceHistoryEntry {
   created_at: string;
 }
 
+export type RenewalConfig =
+  | { type: "annual"; month: number; day: number }
+  | { type: "monthly"; day: number };
+
 export interface Service {
   id: string;
   name: string;
   description: string | null;
   status: string;
-  billing_schedule: string;
+  renewal_config: RenewalConfig | null;
   renewal_date: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;
@@ -161,6 +165,7 @@ export interface Service {
   notes: string | null;
   owners: User[];
   assignees: User[];
+  notification_recipients: User[];
   total_seats: number | null;
   // Normalized fields
   vendor_id: string | null;

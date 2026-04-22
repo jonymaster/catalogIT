@@ -2,13 +2,26 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, case, func, select
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from app.database import Base
 from app.models.cost_record import CostRecord
+
+if TYPE_CHECKING:
+    from app.models.category import Category
+    from app.models.contract import Contract
+    from app.models.cost_center import CostCenter
+    from app.models.payment_method import PaymentMethod
+    from app.models.service_classification import ServiceClassification
+    from app.models.service_history import ServiceHistoryEntry
+    from app.models.service_status import ServiceStatus
+    from app.models.tag import Tag
+    from app.models.user import User
+    from app.models.vendor import Vendor
 
 service_owners = Table(
     "service_owners",
@@ -31,6 +44,13 @@ service_tags = Table(
     Base.metadata,
     Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
     Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
+service_notification_recipients = Table(
+    "service_notification_recipients",
+    Base.metadata,
+    Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -108,7 +128,7 @@ class Service(Base):
     contract_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("contracts.id", ondelete="SET NULL"), nullable=True
     )
-    billing_schedule: Mapped[str] = mapped_column(String(100), default="")
+    renewal_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     renewal_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     renewal_offsets_days: Mapped[list[int] | None] = mapped_column(
@@ -140,6 +160,10 @@ class Service(Base):
         secondary=service_tags,
         lazy="selectin",
         order_by="Tag.name",
+    )
+    notification_recipients: Mapped[list["User"]] = relationship(  # noqa: F821
+        secondary=service_notification_recipients,
+        lazy="selectin",
     )
     vendor: Mapped["Vendor | None"] = relationship(lazy="selectin")  # noqa: F821
     category_rel: Mapped["Category | None"] = relationship(lazy="selectin")  # noqa: F821

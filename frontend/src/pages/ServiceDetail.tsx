@@ -160,8 +160,7 @@ export function ServiceDetail() {
       payment_method_id: draft.payment_method_id || null,
       service_status_id: draft.service_status_id || null,
       classification_id: draft.classification_id || null,
-      billing_schedule: draft.billing_schedule,
-      renewal_date: draft.renewal_date || null,
+      renewal_config: draft.renewal_config,
       criticality: draft.criticality || null,
       total_seats:
         draft.total_seats.trim() === "" ? null : Number(draft.total_seats),
@@ -486,6 +485,13 @@ export function ServiceDetail() {
               label="Attachments"
               active={location.pathname.endsWith("/attachments")}
               onClick={() => openRoutedTab(`/services/${id}/attachments`)}
+            />
+            <TabLink
+              to="notifications"
+              end={false}
+              label="Notifications"
+              active={location.pathname.endsWith("/notifications")}
+              onClick={() => openRoutedTab(`/services/${id}/notifications`)}
             />
             <TabButton
               label="Activity"

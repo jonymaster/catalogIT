@@ -180,7 +180,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "description": s.description,
             "status": s.status,
             "service_type": slug,
-            "billing_schedule": s.billing_schedule or "",
+            "renewal_config": s.renewal_config,
             "vendor_id": str(s.vendor_id) if s.vendor_id else None,
             "category_id": str(s.category_id) if s.category_id else None,
             "payment_method_id": str(s.payment_method_id) if s.payment_method_id else None,

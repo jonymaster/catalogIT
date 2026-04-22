@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -14,8 +14,15 @@ from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
 from app.models.tag import Tag
 from app.models.user import User
+from app.notifications.renewal_schedule import compute_next_renewal
 from app.routers.attachments import delete_entity_attachments
-from app.schemas.service import MAX_TAGS_PER_SERVICE, ServiceCreate, ServiceRead, ServiceUpdate
+from app.schemas.service import (
+    MAX_TAGS_PER_SERVICE,
+    RenewalConfig,
+    ServiceCreate,
+    ServiceRead,
+    ServiceUpdate,
+)
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -73,6 +80,31 @@ async def _get_classification(
             detail="Service classification not found",
         )
     return row
+
+
+def _renewal_config_dict(cfg: RenewalConfig | None) -> dict | None:
+    if cfg is None:
+        return None
+    return cfg.model_dump(exclude_none=True)
+
+
+async def _resolve_notification_recipients(
+    db: AsyncSession,
+    user_ids: list[uuid.UUID],
+) -> list[User]:
+    if not user_ids:
+        return []
+    result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users = list(result.scalars().all())
+    found = {u.id for u in users}
+    missing = [str(uid) for uid in user_ids if uid not in found]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User(s) not found: {', '.join(missing)}",
+        )
+    by_id = {u.id: u for u in users}
+    return [by_id[uid] for uid in user_ids]
 
 
 async def _resolve_tags(
@@ -164,18 +196,27 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
     )
     classification = await _get_classification(db, body.classification_id)
     tags = await _resolve_tags(db, body.tag_ids)
+    recipients = await _resolve_notification_recipients(
+        db, body.notification_recipient_ids
+    )
+
+    cfg_dict = _renewal_config_dict(body.renewal_config)
+    next_renewal = (
+        compute_next_renewal(cfg_dict, date.today()) if cfg_dict else None
+    )
 
     service = Service(
         name=body.name,
         description=body.description,
         status=service_status.name if service_status else body.status,
-        billing_schedule=body.billing_schedule,
-        renewal_date=body.renewal_date,
+        renewal_config=cfg_dict,
+        renewal_date=next_renewal,
         sso_integrated=body.sso_integrated,
         point_of_contact=body.point_of_contact,
         notes=body.notes,
         owners=owners,
         assignees=assignees,
+        notification_recipients=recipients,
         total_seats=body.total_seats,
         vendor_id=body.vendor_id,
         category_id=body.category_id,
@@ -219,6 +260,21 @@ async def update_service(
             service.renewal_offsets_days = None
         else:
             service.renewal_offsets_days = ro
+
+    if "renewal_config" in update_data:
+        raw_cfg = update_data.pop("renewal_config")
+        cfg_dict = (
+            RenewalConfig.model_validate(raw_cfg).model_dump(exclude_none=True)
+            if raw_cfg is not None
+            else None
+        )
+        service.renewal_config = cfg_dict
+        service.renewal_date = (
+            compute_next_renewal(cfg_dict, date.today()) if cfg_dict else None
+        )
+
+    recipient_ids_provided = "notification_recipient_ids" in update_data
+    recipient_ids = update_data.pop("notification_recipient_ids", None)
 
     owner_ids = update_data.pop("owner_ids", None)
     assignee_ids = update_data.pop("assignee_ids", None)
@@ -274,6 +330,11 @@ async def update_service(
 
     if tag_ids_provided:
         service.tags = await _resolve_tags(db, tag_ids or [])
+
+    if recipient_ids_provided:
+        service.notification_recipients = await _resolve_notification_recipients(
+            db, recipient_ids or []
+        )
 
     for field, value in update_data.items():
         setattr(service, field, value)

@@ -1,4 +1,4 @@
-import type { Service, Tag } from "../types/models";
+import type { RenewalConfig, Service, Tag } from "../types/models";
 
 export const MAX_TAGS_PER_SERVICE = 5;
 
@@ -13,8 +13,7 @@ export interface ServiceDraft {
   payment_method_id: string;
   service_status_id: string;
   classification_id: string;
-  billing_schedule: string;
-  renewal_date: string;
+  renewal_config: RenewalConfig | null;
   criticality: string;
   total_seats: string;
   sso_integrated: boolean;
@@ -55,8 +54,7 @@ export function toDraft(s: Service): ServiceDraft {
     payment_method_id: s.payment_method_id ?? "",
     service_status_id: s.service_status_id ?? "",
     classification_id: s.classification_id ?? "",
-    billing_schedule: s.billing_schedule ?? "",
-    renewal_date: s.renewal_date ?? "",
+    renewal_config: s.renewal_config ?? null,
     criticality: s.criticality ?? "",
     total_seats: s.total_seats != null ? String(s.total_seats) : "",
     sso_integrated: s.sso_integrated,
@@ -75,9 +73,16 @@ export function validateDraft(draft: ServiceDraft): ServiceValidationErrors {
     if (!Number.isInteger(n) || n < 1)
       errs.total_seats = "Must be a positive integer";
   }
-  if (draft.renewal_date.trim() !== "") {
-    const d = new Date(draft.renewal_date);
-    if (Number.isNaN(d.getTime())) errs.renewal_date = "Invalid date";
+  const cfg = draft.renewal_config;
+  if (cfg) {
+    if (!Number.isInteger(cfg.day) || cfg.day < 1 || cfg.day > 31) {
+      errs.renewal_config = "Day must be between 1 and 31";
+    } else if (
+      cfg.type === "annual" &&
+      (!Number.isInteger(cfg.month) || cfg.month < 1 || cfg.month > 12)
+    ) {
+      errs.renewal_config = "Month must be between 1 and 12";
+    }
   }
   return errs;
 }

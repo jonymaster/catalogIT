@@ -24,11 +24,6 @@ interface CalendarEvent {
   occurrence: Date;
 }
 
-function parseDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day, 12);
-}
-
 function sameDay(left: Date, right: Date) {
   return (
     left.getFullYear() === right.getFullYear() &&
@@ -71,62 +66,28 @@ function shiftMonth(value: Date, months: number) {
 }
 
 function occurrenceForMonth(service: Service, displayMonth: Date) {
-  if (!service.renewal_date) {
-    return null;
-  }
+  const config = service.renewal_config;
+  if (!config) return null;
 
-  const activation = parseDate(service.renewal_date);
-  const schedule = service.billing_schedule.trim().toLowerCase();
   const lastDay = monthEnd(displayMonth).getDate();
-  const day = Math.min(activation.getDate(), lastDay);
-  const candidate = new Date(
-    displayMonth.getFullYear(),
-    displayMonth.getMonth(),
-    day,
-    12,
-  );
+  const day = Math.min(config.day, lastDay);
 
-  if (candidate < activation) {
-    return null;
+  if (config.type === "monthly") {
+    return new Date(
+      displayMonth.getFullYear(),
+      displayMonth.getMonth(),
+      day,
+      12,
+    );
   }
 
-  if (schedule === "monthly") {
-    return candidate;
-  }
-
-  if (
-    schedule === "annually" &&
-    activation.getMonth() === displayMonth.getMonth()
-  ) {
-    return candidate;
-  }
-
-  return null;
-}
-
-function isSupportedSchedule(service: Service) {
-  const schedule = service.billing_schedule.trim().toLowerCase();
-  return schedule === "monthly" || schedule === "annually";
-}
-
-function isExplicitlyUnscheduled(service: Service) {
-  const schedule = service.billing_schedule.trim().toLowerCase();
-  return schedule === "na" || schedule === "on_demand";
-}
-
-function getUnscheduledReason(service: Service) {
-  if (isExplicitlyUnscheduled(service)) {
-    return null;
-  }
-
-  if (!service.renewal_date) {
-    return "Missing renewal date";
-  }
-
-  if (!isSupportedSchedule(service)) {
-    return service.billing_schedule
-      ? `Unsupported billing schedule: ${service.billing_schedule}`
-      : "Missing billing schedule";
+  if (config.type === "annual" && config.month === displayMonth.getMonth() + 1) {
+    return new Date(
+      displayMonth.getFullYear(),
+      displayMonth.getMonth(),
+      day,
+      12,
+    );
   }
 
   return null;
@@ -246,7 +207,7 @@ export function Calendar() {
 
   const unscheduledCount = useMemo(() => {
     return services.reduce(
-      (acc, service) => (getUnscheduledReason(service) ? acc + 1 : acc),
+      (acc, service) => (service.renewal_config ? acc : acc + 1),
       0,
     );
   }, [services]);
