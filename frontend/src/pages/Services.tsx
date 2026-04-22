@@ -30,9 +30,15 @@ import { formatMoneyFull } from "../components/ui/money-format";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
+import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import { formatBillingSchedule } from "../service/serviceBilling";
 import type { Service, User, UserPreferences } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
+import {
+  combinedActualEstimatedByYear,
+  totalByYear,
+  visualAmountForRecordTypeAndYear,
+} from "../utils/dashboardCostAggregates";
 import { formatDateOnly } from "../utils/formatting";
 
 type FilterType = "text" | "select";
@@ -599,6 +605,7 @@ export function Services() {
   );
   const { canEdit, preferences } = useAuth();
   const { showToast } = useToast();
+  const { records, fiscalYears } = useDashboardCostData();
 
   useEffect(() => {
     try {
@@ -783,12 +790,29 @@ export function Services() {
       const label = (service.service_status?.name ?? service.status ?? "").toLowerCase();
       return service.is_active && (label === "" || label === "active" || label === "contract");
     }).length;
-    const annualTotal = services.reduce(
-      (sum, service) => sum + (service.yearly_cost ?? 0),
-      0,
+    const currentYear = new Date().getFullYear();
+    const dashYear =
+      fiscalYears.length === 0
+        ? currentYear
+        : fiscalYears.includes(currentYear)
+          ? currentYear
+          : fiscalYears[fiscalYears.length - 1];
+    const actualRecords = records.filter((record) => record.record_type === "actual");
+    const actualByYear = totalByYear(actualRecords, fiscalYears);
+    const combinedByYear = combinedActualEstimatedByYear(
+      records,
+      fiscalYears,
+      currentYear,
+    );
+    const annualTotal = visualAmountForRecordTypeAndYear(
+      "actual",
+      dashYear,
+      actualByYear[dashYear] ?? 0,
+      combinedByYear[dashYear] ?? 0,
+      currentYear,
     );
     return { activeCount, annualTotal };
-  }, [services]);
+  }, [fiscalYears, records, services]);
 
   const clearAllFilters = useCallback(() => {
     setSearch("");
