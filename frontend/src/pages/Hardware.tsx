@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import { ArrowDownTrayIcon, PlusIcon } from "../components/Icons";
@@ -39,6 +39,15 @@ interface SortState {
   key: string | null;
   direction: SortDirection | null;
 }
+
+interface HardwareListState {
+  view: "active" | "archived";
+  search: string;
+  filters: HardwareFilters;
+  sortState: SortState;
+}
+
+const LIST_STATE_STORAGE_KEY = "catalogit:hardware:list-state";
 
 function getAssigneeName(laptop: Laptop) {
   return laptop.assigned_to
@@ -95,7 +104,9 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     render: (laptop) => (
       <div className="flex min-w-0 items-center gap-2.5">
         <OsIcon operatingSystem={laptop.operating_system} />
-        <span className="truncate text-fg">{laptop.serial_number}</span>
+        <Link to={`/hardware/${laptop.id}`} className="hlink truncate text-fg">
+          {laptop.serial_number}
+        </Link>
       </div>
     ),
   },
@@ -200,6 +211,62 @@ const columnDefinitions: HardwareColumnDefinition[] = [
 
 const ALL_COLUMN_KEYS = columnDefinitions.map((column) => column.key);
 
+function createDefaultFilters(): HardwareFilters {
+  return Object.fromEntries(
+    columnDefinitions.map((column) => [
+      column.key,
+      column.filterType === "select" ? [] : "",
+    ]),
+  ) as HardwareFilters;
+}
+
+function loadListState(): HardwareListState | null {
+  try {
+    const raw = sessionStorage.getItem(LIST_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<HardwareListState>;
+    const defaultFilters = createDefaultFilters();
+    const normalizedFilters: HardwareFilters = { ...defaultFilters };
+    const keys = new Set(columnDefinitions.map((column) => column.key));
+    const parsedFilters = parsed.filters ?? {};
+
+    for (const column of columnDefinitions) {
+      const value = parsedFilters[column.key];
+      if (column.filterType === "select") {
+        normalizedFilters[column.key] = Array.isArray(value)
+          ? value.filter((entry): entry is string => typeof entry === "string")
+          : [];
+      } else {
+        normalizedFilters[column.key] = typeof value === "string" ? value : "";
+      }
+    }
+
+    const normalizedSortState: SortState =
+      parsed.sortState &&
+      typeof parsed.sortState === "object" &&
+      ((parsed.sortState.direction === "asc" ||
+        parsed.sortState.direction === "desc" ||
+        parsed.sortState.direction === null) &&
+        ((typeof parsed.sortState.key === "string" &&
+          keys.has(parsed.sortState.key)) ||
+          parsed.sortState.key === null))
+        ? {
+            key: parsed.sortState.key,
+            direction: parsed.sortState.direction,
+          }
+        : { key: null, direction: null };
+
+    return {
+      view: parsed.view === "archived" ? "archived" : "active",
+      search: typeof parsed.search === "string" ? parsed.search : "",
+      filters: normalizedFilters,
+      sortState: normalizedSortState,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function todayFilenameDate(): string {
   const d = new Date();
   const y = d.getFullYear();
@@ -209,28 +276,24 @@ function todayFilenameDate(): string {
 }
 
 export function Hardware() {
+  const persistedState = useMemo(() => loadListState(), []);
   const [laptops, setLaptops] = useState<Laptop[]>([]);
-  const [view, setView] = useState<"active" | "archived">("active");
-  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<HardwareFilters>(() =>
-    Object.fromEntries(
-      columnDefinitions.map((column) => [
-        column.key,
-        column.filterType === "select" ? [] : "",
-      ]),
-    ) as HardwareFilters,
+  const [view, setView] = useState<"active" | "archived">(
+    persistedState?.view ?? "active",
   );
-  const [sortState, setSortState] = useState<SortState>({
-    key: null,
-    direction: null,
-  });
+  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
+  const [search, setSearch] = useState(persistedState?.search ?? "");
+  const [filters, setFilters] = useState<HardwareFilters>(
+    persistedState?.filters ?? createDefaultFilters(),
+  );
+  const [sortState, setSortState] = useState<SortState>(
+    persistedState?.sortState ?? { key: null, direction: null },
+  );
   const [visibleKeys, setVisibleKeys] = useColumnPrefs(
     "catalogit:hardware:columns:v2",
     ALL_COLUMN_KEYS,
   );
   const { canEdit } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -250,6 +313,17 @@ export function Hardware() {
       cancelled = true;
     };
   }, [view]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        LIST_STATE_STORAGE_KEY,
+        JSON.stringify({ view, search, filters, sortState } satisfies HardwareListState),
+      );
+    } catch {
+      // Ignore unavailable storage.
+    }
+  }, [filters, search, sortState, view]);
 
   const loading = loadedView !== view;
 
@@ -333,6 +407,21 @@ export function Hardware() {
       buildCsv(headers, rows),
     );
   }, [filtered, visibleKeys]);
+
+  const hasActiveFilters = useMemo(() => {
+    if (search.trim()) {
+      return true;
+    }
+    return Object.values(filters).some((value) =>
+      Array.isArray(value) ? value.length > 0 : value.trim(),
+    );
+  }, [filters, search]);
+
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    setFilters(createDefaultFilters());
+    setSortState({ key: null, direction: null });
+  }, []);
 
   const columns = useMemo<Column<Laptop>[]>(() => {
     return columnDefinitions.map((column) => {
@@ -471,14 +560,37 @@ export function Hardware() {
         </div>
       ) : (
         <>
-          <div className="mb-4 flex items-center gap-3">
-            <div className="max-w-sm flex-1">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="min-w-[220px] max-w-sm flex-1">
               <SearchInput
                 value={search}
                 onChange={setSearch}
                 placeholder="Search hardware..."
               />
             </div>
+            <div className="flex-1" />
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="rounded-md px-2 py-1 text-[12px] text-fg-3 hover:bg-surface-2 hover:text-fg-2"
+              >
+                Clear all filters
+              </button>
+            )}
+            <p className="whitespace-nowrap text-[13px] text-fg-3">
+              {hasActiveFilters ? (
+                <>
+                  <span className="font-medium text-fg">{filtered.length}</span>
+                  <span className="text-fg-3"> / {laptops.length} </span>
+                  {laptops.length === 1 ? "laptop" : "laptops"}
+                </>
+              ) : (
+                <>
+                  {laptops.length} {laptops.length === 1 ? "laptop" : "laptops"}
+                </>
+              )}
+            </p>
             <ColumnSelector
               columns={columns}
               visibleKeys={visibleKeys}
@@ -491,7 +603,6 @@ export function Hardware() {
             visibleKeys={visibleKeys}
             striped
             primaryColumnKey="serial_number"
-            onRowClick={(l) => navigate(`/hardware/${l.id}`)}
           />
         </>
       )}

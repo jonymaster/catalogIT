@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import {
@@ -21,7 +21,6 @@ import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
-import { MultiSelectFacet } from "../components/ui/MultiSelectFacet";
 import { Monogram } from "../components/ui/Monogram";
 import { Avatar, AvatarStack } from "../components/ui/Avatar";
 import { Days } from "../components/ui/Days";
@@ -29,6 +28,7 @@ import { Money } from "../components/ui/Money";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { formatMoneyFull } from "../components/ui/money-format";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { formatBillingSchedule } from "../service/serviceBilling";
 import type { Service, User, UserPreferences } from "../types/models";
@@ -62,12 +62,16 @@ interface HoveredDescriptionState {
   top: number;
 }
 
-interface FacetOption {
-  value: string;
-  label: string;
-}
-
 const VIEW_STORAGE_KEY = "catalogit:services:view";
+const FLASH_TOAST_KEY = "catalogit:flash-toast";
+const LIST_STATE_STORAGE_KEY = "catalogit:services:list-state";
+
+interface ServicesListState {
+  view: "active" | "archived";
+  search: string;
+  filters: ServiceFilters;
+  sortState: SortState;
+}
 
 function loadViewPref(): ViewMode {
   try {
@@ -77,6 +81,60 @@ function loadViewPref(): ViewMode {
     /* ignore */
   }
   return "table";
+}
+
+function createDefaultFilters(): ServiceFilters {
+  return Object.fromEntries(
+    columnDefinitions.map((column) => [
+      column.key,
+      column.filterType === "select" ? [] : "",
+    ]),
+  ) as ServiceFilters;
+}
+
+function loadListState(): ServicesListState | null {
+  try {
+    const raw = sessionStorage.getItem(LIST_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ServicesListState>;
+    const defaultFilters = createDefaultFilters();
+    const normalizedFilters: ServiceFilters = { ...defaultFilters };
+    const keys = new Set(columnDefinitions.map((column) => column.key));
+    const parsedFilters = parsed.filters ?? {};
+    for (const column of columnDefinitions) {
+      const value = parsedFilters[column.key];
+      if (column.filterType === "select") {
+        normalizedFilters[column.key] = Array.isArray(value)
+          ? value.filter((entry): entry is string => typeof entry === "string")
+          : [];
+      } else {
+        normalizedFilters[column.key] = typeof value === "string" ? value : "";
+      }
+    }
+    const normalizedSortState: SortState =
+      parsed.sortState &&
+      typeof parsed.sortState === "object" &&
+      ((parsed.sortState.direction === "asc" ||
+        parsed.sortState.direction === "desc" ||
+        parsed.sortState.direction === null) &&
+        ((typeof parsed.sortState.key === "string" &&
+          keys.has(parsed.sortState.key)) ||
+          parsed.sortState.key === null))
+        ? {
+            key: parsed.sortState.key,
+            direction: parsed.sortState.direction,
+          }
+        : { key: null, direction: null };
+
+    return {
+      view: parsed.view === "archived" ? "archived" : "active",
+      search: typeof parsed.search === "string" ? parsed.search : "",
+      filters: normalizedFilters,
+      sortState: normalizedSortState,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function getOwnerNames(service: Service) {
@@ -376,7 +434,6 @@ function getServiceExportValue(
 interface GalleryCardProps {
   service: Service;
   preferences: UserPreferences | null;
-  onOpen: (service: Service) => void;
   showDescriptionTooltip: (
     event: React.SyntheticEvent<HTMLElement>,
     description: string,
@@ -387,16 +444,14 @@ interface GalleryCardProps {
 function ServiceGalleryCard({
   service,
   preferences,
-  onOpen,
   showDescriptionTooltip,
   hideDescriptionTooltip,
 }: GalleryCardProps) {
   const renewalIso = service.renewal_date;
   const renewalLabel = formatDateOnly(renewalIso, preferences);
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(service)}
+    <Link
+      to={`/services/${service.id}`}
       className="interactive-record flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-border-strong hover:shadow-md"
     >
       <div className="flex items-start gap-3">
@@ -450,29 +505,26 @@ function ServiceGalleryCard({
         </span>
         <Money value={service.yearly_cost} className="text-fg-2 font-medium" />
       </div>
-    </button>
+    </Link>
   );
 }
 
 export function Services() {
+  const persistedState = useMemo(() => loadListState(), []);
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [view, setView] = useState<"active" | "archived">("active");
+  const [view, setView] = useState<"active" | "archived">(
+    persistedState?.view ?? "active",
+  );
   const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewPref());
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ServiceFilters>(() =>
-    Object.fromEntries(
-      columnDefinitions.map((column) => [
-        column.key,
-        column.filterType === "select" ? [] : "",
-      ]),
-    ) as ServiceFilters,
+  const [search, setSearch] = useState(persistedState?.search ?? "");
+  const [filters, setFilters] = useState<ServiceFilters>(
+    persistedState?.filters ?? createDefaultFilters(),
   );
-  const [sortState, setSortState] = useState<SortState>({
-    key: null,
-    direction: null,
-  });
+  const [sortState, setSortState] = useState<SortState>(
+    persistedState?.sortState ?? { key: null, direction: null },
+  );
   const [hoveredDescription, setHoveredDescription] =
     useState<HoveredDescriptionState | null>(null);
   const [visibleKeys, setVisibleKeys] = useColumnPrefs(
@@ -480,7 +532,21 @@ export function Services() {
     ALL_COLUMN_KEYS,
   );
   const { canEdit, preferences } = useAuth();
-  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(FLASH_TOAST_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { type?: "success" | "error"; text?: string };
+      if (parsed.type && parsed.text) {
+        showToast({ type: parsed.type, text: parsed.text });
+      }
+      sessionStorage.removeItem(FLASH_TOAST_KEY);
+    } catch {
+      // Ignore malformed or unavailable storage.
+    }
+  }, [showToast]);
 
   useEffect(() => {
     try {
@@ -489,6 +555,17 @@ export function Services() {
       /* ignore */
     }
   }, [viewMode]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        LIST_STATE_STORAGE_KEY,
+        JSON.stringify({ view, search, filters, sortState } satisfies ServicesListState),
+      );
+    } catch {
+      // Ignore unavailable storage.
+    }
+  }, [filters, search, sortState, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -641,53 +718,11 @@ export function Services() {
     return { activeCount, annualTotal };
   }, [services]);
 
-  const facetOptions = useMemo(() => {
-    const statusMap = new Map<string, FacetOption>();
-    const categoryMap = new Map<string, FacetOption>();
-    const classificationMap = new Map<string, FacetOption>();
-    for (const service of services) {
-      const status = service.service_status?.name ?? service.status;
-      if (status) statusMap.set(status, { value: status, label: status });
-      const category = service.category_rel?.name;
-      if (category) categoryMap.set(category, { value: category, label: category });
-      const classification = service.service_classification?.name;
-      if (classification)
-        classificationMap.set(classification, {
-          value: classification,
-          label: classification,
-        });
-    }
-    const sortByLabel = (a: FacetOption, b: FacetOption) =>
-      a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
-    return {
-      status: Array.from(statusMap.values()).sort(sortByLabel),
-      category: Array.from(categoryMap.values()).sort(sortByLabel),
-      classification: Array.from(classificationMap.values()).sort(sortByLabel),
-    };
-  }, [services]);
-
-  const setFacet = useCallback(
-    (key: "status" | "spending_category" | "classification", values: string[]) => {
-      setFilters((current) => ({ ...current, [key]: values }));
-    },
-    [],
-  );
-
-  const clearFacets = useCallback(() => {
-    setFilters((current) => ({
-      ...current,
-      status: [],
-      spending_category: [],
-      classification: [],
-    }));
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    setFilters(createDefaultFilters());
+    setSortState({ key: null, direction: null });
   }, []);
-
-  const activeFacetCount =
-    (Array.isArray(filters.status) ? filters.status.length : 0) +
-    (Array.isArray(filters.spending_category)
-      ? filters.spending_category.length
-      : 0) +
-    (Array.isArray(filters.classification) ? filters.classification.length : 0);
 
   const columns = useMemo<Column<Service>[]>(() => {
     return columnDefinitions.map((column) => {
@@ -719,8 +754,13 @@ export function Services() {
                     <Monogram name={service.name} seed={service.id} size={26} />
                   </span>
                   <div className="min-w-0">
-                    <div className="truncate text-fg">
+                    <div className="truncate">
+                      <Link
+                        to={`/services/${service.id}`}
+                        className="hlink text-fg"
+                      >
                       {service.name}
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -898,42 +938,16 @@ export function Services() {
                   placeholder="Search services..."
                 />
               </div>
-              <MultiSelectFacet
-                label="Status"
-                options={facetOptions.status}
-                values={Array.isArray(filters.status) ? filters.status : []}
-                onChange={(values) => setFacet("status", values)}
-              />
-              <MultiSelectFacet
-                label="Category"
-                options={facetOptions.category}
-                values={
-                  Array.isArray(filters.spending_category)
-                    ? filters.spending_category
-                    : []
-                }
-                onChange={(values) => setFacet("spending_category", values)}
-              />
-              <MultiSelectFacet
-                label="Type"
-                options={facetOptions.classification}
-                values={
-                  Array.isArray(filters.classification)
-                    ? filters.classification
-                    : []
-                }
-                onChange={(values) => setFacet("classification", values)}
-              />
-              {activeFacetCount > 0 && (
+              <div className="flex-1" />
+              {hasActiveFilters && (
                 <button
                   type="button"
-                  onClick={clearFacets}
+                  onClick={clearAllFilters}
                   className="rounded-md px-2 py-1 text-[12px] text-fg-3 hover:bg-surface-2 hover:text-fg-2"
                 >
-                  Clear
+                  Clear all filters
                 </button>
               )}
-              <div className="flex-1" />
               <p className="whitespace-nowrap text-[13px] text-fg-3">
                 {hasActiveFilters ? (
                   <>
@@ -963,7 +977,6 @@ export function Services() {
                 visibleKeys={visibleKeys}
                 striped
                 primaryColumnKey="name"
-                onRowClick={(s) => navigate(`/services/${s.id}`)}
               />
             ) : filtered.length === 0 ? (
               <div className="rounded-lg border border-border bg-surface py-12 text-center text-[13px] text-fg-3">
@@ -976,7 +989,6 @@ export function Services() {
                     key={service.id}
                     service={service}
                     preferences={preferences}
-                    onOpen={(s) => navigate(`/services/${s.id}`)}
                     showDescriptionTooltip={showDescriptionTooltip}
                     hideDescriptionTooltip={hideDescriptionTooltip}
                   />

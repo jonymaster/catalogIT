@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  type ReactNode,
   useRef,
   useState,
 } from "react";
@@ -16,7 +17,11 @@ import client from "../api/client";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { PageTransition } from "../components/PageTransition";
 import { DetailPageSkeleton } from "../components/Skeleton";
-import { PencilSquareIcon, XMarkIcon } from "../components/Icons";
+import {
+  ChevronRightIcon,
+  PencilSquareIcon,
+  XMarkIcon,
+} from "../components/Icons";
 import { useAuth } from "../context/useAuth";
 import {
   draftFromLaptopAndCostStrings,
@@ -35,7 +40,8 @@ export function LaptopDetail() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { canEdit } = useAuth();
+  const { canEdit, user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const [laptop, setLaptop] = useState<Laptop | null>(null);
   const [draft, setDraft] = useState<LaptopDraft | null>(null);
@@ -43,6 +49,10 @@ export function LaptopDetail() {
   const [errors, setErrors] = useState<LaptopValidationErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<
+    "archive" | "unarchive" | "delete" | null
+  >(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [costLoading, setCostLoading] = useState(true);
   const [purchaseYear, setPurchaseYear] = useState("");
@@ -201,20 +211,71 @@ export function LaptopDetail() {
     }
   }
 
-  async function handleArchiveToggle() {
+  function getActionErrorMessage(err: unknown): string {
+    const detail = (err as { response?: { data?: { detail?: string } } })
+      ?.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return "Action failed. Please try again.";
+  }
+
+  async function handleArchive() {
     if (!id || !laptop) return;
-    setSaveError(null);
-    const endpoint = laptop.is_active
-      ? `/api/laptops/${id}/archive`
-      : `/api/laptops/${id}/unarchive`;
+    const confirmed = window.confirm(
+      `Archive "${laptop.model_name}"? It will move to Archived hardware.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("archive");
+    setActionError(null);
     try {
-      await client.post<Laptop>(endpoint);
+      await client.post<Laptop>(`/api/laptops/${id}/archive`);
       await reloadAll();
       setEditingState(false);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to update archive state";
-      setSaveError(msg);
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleUnarchive() {
+    if (!id || !laptop) return;
+    const confirmed = window.confirm(
+      `Unarchive "${laptop.model_name}"? It will return to Active hardware.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("unarchive");
+    setActionError(null);
+    try {
+      await client.post<Laptop>(`/api/laptops/${id}/unarchive`);
+      await reloadAll();
+      setEditingState(false);
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!id || !laptop) return;
+    const confirmed = window.confirm(
+      `Delete "${laptop.model_name}" permanently? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("delete");
+    setActionError(null);
+    try {
+      await client.delete(`/api/laptops/${id}`);
+      navigate("/hardware");
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
     }
   }
 
@@ -259,18 +320,21 @@ export function LaptopDetail() {
   /** No `w-full` — that forces a line break after the `S/N:` label in a flex row. */
   const headerSerialEditCls =
     "min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm tabular-nums leading-tight text-gray-500 outline-none focus-visible:rounded-sm focus-visible:shadow-[inset_0_0_0_1px_theme(colors.blue.500)] dark:text-gray-400";
+  const displayName = editing ? draft.model_name : laptop.model_name;
 
   return (
     <PageTransition>
       <div className="space-y-6">
+        <div className="flex items-center gap-1.5 text-xs text-fg-3">
+          <Link to="/hardware" className="hlink">
+            Hardware
+          </Link>
+          <ChevronRightIcon className="h-3 w-3" />
+          <span className="text-fg-2">{displayName}</span>
+        </div>
+
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <Link
-              to="/hardware"
-              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            >
-              &larr; Back to Hardware
-            </Link>
             {editing && laptop.is_active ? (
               <>
                 <div className={headerTitleStackCls}>
@@ -329,22 +393,6 @@ export function LaptopDetail() {
             )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            {canEdit && (
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => {
-                  void handleArchiveToggle();
-                }}
-                className={
-                  laptop.is_active
-                    ? "rounded-md border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/40"
-                    : "rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-gray-800"
-                }
-              >
-                {laptop.is_active ? "Archive" : "Unarchive"}
-              </button>
-            )}
             {canEdit && !editing && (
               <button
                 type="button"
@@ -354,6 +402,23 @@ export function LaptopDetail() {
                 <PencilSquareIcon className="h-4 w-4" />
                 Edit
               </button>
+            )}
+            {!editing && (
+              <KebabMenu
+                canEdit={canEdit}
+                canDelete={isAdmin}
+                isArchived={!laptop.is_active}
+                busyAction={actionBusy}
+                onArchive={() => {
+                  void handleArchive();
+                }}
+                onUnarchive={() => {
+                  void handleUnarchive();
+                }}
+                onDelete={() => {
+                  void handleDelete();
+                }}
+              />
             )}
             {canEdit && editing && (
               <>
@@ -384,6 +449,11 @@ export function LaptopDetail() {
         {saveError && (
           <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
             {saveError}
+          </div>
+        )}
+        {actionError && !editing && (
+          <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+            {actionError}
           </div>
         )}
 
@@ -434,19 +504,151 @@ export function LaptopDetail() {
         </div>
 
         {extraTab === "activity" ? (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
-              Activity
-            </h2>
+          <Panel title="Activity">
             <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
               Recent changes to this laptop.
             </p>
             <AuditTimeline tableName="laptops" recordId={laptop.id} perPage={20} />
-          </div>
+          </Panel>
         ) : (
           <Outlet context={outletContext} />
         )}
       </div>
     </PageTransition>
+  );
+}
+
+interface KebabMenuProps {
+  canEdit: boolean;
+  canDelete: boolean;
+  isArchived: boolean;
+  busyAction: "archive" | "unarchive" | "delete" | null;
+  onArchive: () => void;
+  onUnarchive: () => void;
+  onDelete: () => void;
+}
+
+function KebabMenu({
+  canEdit,
+  canDelete,
+  isArchived,
+  busyAction,
+  onArchive,
+  onUnarchive,
+  onDelete,
+}: KebabMenuProps) {
+  const [open, setOpen] = useState(false);
+  const isBusy = busyAction !== null;
+
+  function runAndClose(action: () => void) {
+    action();
+    setOpen(false);
+  }
+
+  const archiveLabel = isArchived ? "Unarchive" : "Archive";
+  const archiveBusy = busyAction === "archive" || busyAction === "unarchive";
+  const deleteDisabled = !isArchived || !canDelete || isBusy;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={isBusy}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-fg-2 transition-colors hover:bg-surface-2"
+      >
+        <span className="sr-only">More actions</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <circle cx="12" cy="5" r="1.75" />
+          <circle cx="12" cy="12" r="1.75" />
+          <circle cx="12" cy="19" r="1.75" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="menu"
+            className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-md"
+          >
+            <MenuItem label="Duplicate" onClick={() => setOpen(false)} />
+            {canEdit && (
+              <MenuItem
+                label={archiveBusy ? `${archiveLabel}...` : archiveLabel}
+                disabled={isBusy}
+                onClick={() =>
+                  runAndClose(isArchived ? onUnarchive : onArchive)
+                }
+              />
+            )}
+            <MenuItem
+              label="Delete"
+              variant="danger"
+              disabled={deleteDisabled}
+              title={
+                !isArchived
+                  ? "Archive hardware before deleting"
+                  : !canDelete
+                    ? "Only admins can delete hardware"
+                    : undefined
+              }
+              onClick={() => runAndClose(onDelete)}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({
+  label,
+  onClick,
+  variant,
+  disabled,
+  title,
+}: {
+  label: string;
+  onClick: () => void;
+  variant?: "danger";
+  disabled?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+        variant === "danger" ? "text-danger" : "text-fg-2"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+      <h2 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
+        {title}
+      </h2>
+      {children}
+    </div>
   );
 }

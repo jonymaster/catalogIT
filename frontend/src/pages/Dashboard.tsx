@@ -33,6 +33,7 @@ const WIDGET_STORAGE_KEY = "catalogit:dashboard:widgets";
 
 type WidgetId =
   | "kpis"
+  | "service-counters"
   | "spend-trend"
   | "spend-by-year"
   | "renewal-risk"
@@ -75,6 +76,18 @@ interface WidgetDef {
   render: (ctx: WidgetCtx) => React.ReactNode;
   adminOnly?: boolean;
   requiresFinancial?: boolean;
+}
+
+const SERVICES_LIST_STATE_STORAGE_KEY = "catalogit:services:list-state";
+
+interface ServicesListState {
+  view: "active" | "archived";
+  search: string;
+  filters: Record<string, string | string[]>;
+  sortState: {
+    key: string | null;
+    direction: "asc" | "desc" | null;
+  };
 }
 
 function greetingForNow(email?: string | null): string {
@@ -295,6 +308,138 @@ function KpiStrip({ ctx }: { ctx: WidgetCtx }) {
         />
       )}
  
+    </div>
+  );
+}
+
+function ServiceCounterCard({
+  label,
+  value,
+  first,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  first?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-w-0 flex-1 px-4 py-3 text-left transition-colors hover:bg-surface-2/60 ${
+        first ? "" : "border-l border-border"
+      }`}
+    >
+      <div
+        className="mb-1 text-[11px] font-semibold uppercase text-fg-3"
+        style={{ letterSpacing: "0.06em" }}
+      >
+        {label}
+      </div>
+      <div
+        className="tnum text-fg"
+        style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}
+      >
+        {value}
+      </div>
+    </button>
+  );
+}
+
+function ServiceCountersWidget({ services }: { services: Service[] }) {
+  const navigate = useNavigate();
+  const activeServices = useMemo(
+    () => services.filter((service) => !service.is_archived),
+    [services],
+  );
+  const resolveStatusLabel = useCallback(
+    (target: string): string => {
+      const normalizedTarget = target.trim().toLowerCase();
+      const match = activeServices.find(
+        (service) =>
+          (service.service_status?.name ?? service.status ?? "").trim().toLowerCase() ===
+          normalizedTarget,
+      );
+      return match ? (match.service_status?.name ?? match.status ?? target) : target;
+    },
+    [activeServices],
+  );
+
+  const counters = useMemo(
+    () => ({
+      unassignedOwners: activeServices.filter((service) => service.owners.length === 0).length,
+      activeNonprofit: activeServices.filter((service) => service.nonprofit_pricing).length,
+      underReview: activeServices.filter(
+        (service) => (service.service_status?.name ?? service.status ?? "").toLowerCase() === "under review",
+      ).length,
+      cancelling: activeServices.filter(
+        (service) => (service.service_status?.name ?? service.status ?? "").toLowerCase() === "cancelling",
+      ).length,
+    }),
+    [activeServices],
+  );
+
+  const openFilteredServices = useCallback(
+    (filters: ServicesListState["filters"]) => {
+      const nextState: ServicesListState = {
+        view: "active",
+        search: "",
+        filters,
+        sortState: { key: null, direction: null },
+      };
+      try {
+        sessionStorage.setItem(
+          SERVICES_LIST_STATE_STORAGE_KEY,
+          JSON.stringify(nextState),
+        );
+      } catch {
+        // ignore write failures and still navigate
+      }
+      navigate("/services");
+    },
+    [navigate],
+  );
+
+  return (
+    <div className="flex flex-wrap">
+      <ServiceCounterCard
+        first
+        label="No owner assigned"
+        value={counters.unassignedOwners}
+        onClick={() =>
+          openFilteredServices({
+            owners: "--",
+          })
+        }
+      />
+      <ServiceCounterCard
+        label="Active with non profit pricing"
+        value={counters.activeNonprofit}
+        onClick={() =>
+          openFilteredServices({
+            nonprofit_pricing: ["Yes"],
+          })
+        }
+      />
+      <ServiceCounterCard
+        label="Under review"
+        value={counters.underReview}
+        onClick={() =>
+          openFilteredServices({
+            status: [resolveStatusLabel("under review")],
+          })
+        }
+      />
+      <ServiceCounterCard
+        label="Cancelling"
+        value={counters.cancelling}
+        onClick={() =>
+          openFilteredServices({
+            status: [resolveStatusLabel("cancelling")],
+          })
+        }
+      />
     </div>
   );
 }
@@ -1037,6 +1182,12 @@ const WIDGETS: WidgetDef[] = [
     render: (ctx) => <KpiStrip ctx={ctx} />,
   },
   {
+    id: "service-counters",
+    title: "Service counters",
+    span: 12,
+    render: (ctx) => <ServiceCountersWidget services={ctx.services} />,
+  },
+  {
     id: "spend-trend",
     title: "Annualized spend trend",
     span: 6,
@@ -1105,6 +1256,7 @@ const WIDGETS: WidgetDef[] = [
 
 const DEFAULT_WIDGETS: WidgetId[] = [
   "kpis",
+  "service-counters",
   "spend-trend",
   "spend-by-year",
   "upcoming",

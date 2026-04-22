@@ -16,6 +16,7 @@ import type {
   PaymentMethod,
   Service,
   ServiceClassification,
+  ServiceStatus,
   UserPreferences,
   Vendor,
 } from "../types/models";
@@ -35,6 +36,7 @@ interface RefData {
   categories: Category[];
   costCenters: CostCenter[];
   paymentMethods: PaymentMethod[];
+  serviceStatuses: ServiceStatus[];
   classifications: ServiceClassification[];
 }
 
@@ -86,14 +88,16 @@ function useRefData(editing: boolean): RefData | null {
       client.get<Category[]>("/api/categories/"),
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
+      client.get<ServiceStatus[]>("/api/service-statuses/"),
       client.get<ServiceClassification[]>("/api/service-classifications/"),
-    ]).then(([v, c, cc, p, cl]) => {
+    ]).then(([v, c, cc, p, ss, cl]) => {
       if (cancelled) return;
       setData({
         vendors: v.data,
         categories: c.data,
         costCenters: cc.data,
         paymentMethods: p.data,
+        serviceStatuses: ss.data,
         classifications: cl.data,
       });
     });
@@ -127,6 +131,30 @@ function LeftColumn({
     <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
       <h2 className="mb-4 text-base font-semibold text-fg">General</h2>
       <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <Row label="Status">
+          {editing ? (
+            <select
+              value={draft.service_status_id}
+              onChange={(e) => setField("service_status_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.serviceStatuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+          ) : service.service_status ? (
+            <ColoredReferenceBadge
+              label={service.service_status.name}
+              color={service.service_status.color}
+            />
+          ) : (
+            <span className="text-fg-4">—</span>
+          )}
+        </Row>
+
         <div className="sm:col-span-2">
           <Row label="Description">
             {editing ? (
