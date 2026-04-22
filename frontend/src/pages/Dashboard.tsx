@@ -350,7 +350,7 @@ function ServiceCounterCard({
 function ServiceCountersWidget({ services }: { services: Service[] }) {
   const navigate = useNavigate();
   const activeServices = useMemo(
-    () => services.filter((service) => !service.is_archived),
+    () => services.filter((service) => service.is_active && !service.is_archived),
     [services],
   );
   const resolveStatusLabel = useCallback(
