@@ -162,8 +162,6 @@ export function ServiceDetail() {
       classification_id: draft.classification_id || null,
       billing_schedule: draft.billing_schedule,
       renewal_date: draft.renewal_date || null,
-      yearly_cost:
-        draft.yearly_cost.trim() === "" ? null : Number(draft.yearly_cost),
       criticality: draft.criticality || null,
       total_seats:
         draft.total_seats.trim() === "" ? null : Number(draft.total_seats),

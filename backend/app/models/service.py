@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, func, select
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, case, func, select
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
@@ -44,15 +44,46 @@ class Service(Base):
     status: Mapped[str] = mapped_column(String(50))
     sso_integrated: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    yearly_cost = column_property(
-        select(CostRecord.amount)
+    _latest_service_cost_year = (
+        select(func.max(CostRecord.fiscal_year))
         .where(
             CostRecord.service_id == id,
             CostRecord.laptop_id.is_(None),
         )
-        .order_by(CostRecord.fiscal_year.desc(), CostRecord.recorded_at.desc())
-        .limit(1)
+        .correlate_except(CostRecord)
         .scalar_subquery()
+    )
+    _latest_actual_amount = (
+        select(CostRecord.amount)
+        .where(
+            CostRecord.service_id == id,
+            CostRecord.laptop_id.is_(None),
+            CostRecord.fiscal_year == _latest_service_cost_year,
+            CostRecord.record_type == "actual",
+        )
+        .order_by(CostRecord.recorded_at.desc())
+        .limit(1)
+        .correlate_except(CostRecord)
+        .scalar_subquery()
+    )
+    _latest_estimated_amount = (
+        select(CostRecord.amount)
+        .where(
+            CostRecord.service_id == id,
+            CostRecord.laptop_id.is_(None),
+            CostRecord.fiscal_year == _latest_service_cost_year,
+            CostRecord.record_type == "estimated",
+        )
+        .order_by(CostRecord.recorded_at.desc())
+        .limit(1)
+        .correlate_except(CostRecord)
+        .scalar_subquery()
+    )
+    yearly_cost = column_property(
+        case(
+            (_latest_service_cost_year.is_(None), None),
+            else_=func.coalesce(_latest_actual_amount, 0) + func.coalesce(_latest_estimated_amount, 0),
+        )
     )
 
     # --- New normalized columns ---

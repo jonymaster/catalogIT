@@ -1,4 +1,4 @@
-"""Service yearly_cost is a read-only scalar from the latest service cost record."""
+"""Service yearly_cost is derived from latest-year actual + estimated."""
 
 from __future__ import annotations
 
@@ -22,3 +22,8 @@ class ServiceYearlyCostDerivedTest(unittest.TestCase):
         self.assertIn("fiscal_year", sql)
         self.assertIn("recorded_at", sql)
         self.assertIn("laptop_id", sql)
+        self.assertIn("record_type", sql)
+        self.assertIn("actual", sql)
+        self.assertIn("estimated", sql)
+        self.assertNotIn("budget", sql)
+        self.assertNotIn("from services where cost_records.service_id", sql)

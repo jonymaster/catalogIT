@@ -15,7 +15,6 @@ export interface ServiceDraft {
   classification_id: string;
   billing_schedule: string;
   renewal_date: string;
-  yearly_cost: string;
   criticality: string;
   total_seats: string;
   sso_integrated: boolean;
@@ -58,7 +57,6 @@ export function toDraft(s: Service): ServiceDraft {
     classification_id: s.classification_id ?? "",
     billing_schedule: s.billing_schedule ?? "",
     renewal_date: s.renewal_date ?? "",
-    yearly_cost: s.yearly_cost != null ? String(s.yearly_cost) : "",
     criticality: s.criticality ?? "",
     total_seats: s.total_seats != null ? String(s.total_seats) : "",
     sso_integrated: s.sso_integrated,
@@ -72,11 +70,6 @@ export function toDraft(s: Service): ServiceDraft {
 export function validateDraft(draft: ServiceDraft): ServiceValidationErrors {
   const errs: ServiceValidationErrors = {};
   if (!draft.name.trim()) errs.name = "Required";
-  if (draft.yearly_cost.trim() !== "") {
-    const n = Number(draft.yearly_cost);
-    if (Number.isNaN(n) || n < 0)
-      errs.yearly_cost = "Must be a non-negative number";
-  }
   if (draft.total_seats.trim() !== "") {
     const n = Number(draft.total_seats);
     if (!Number.isInteger(n) || n < 1)

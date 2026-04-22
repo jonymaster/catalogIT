@@ -357,22 +357,25 @@ function LeftColumn({
 
         <Row
           label="Yearly Cost"
-          error={editing ? errors.yearly_cost : undefined}
         >
           {editing ? (
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={draft.yearly_cost}
-              onChange={(e) => setField("yearly_cost", e.target.value)}
-              placeholder="0"
-              className={fieldClass(Boolean(errors.yearly_cost))}
-            />
-          ) : service.yearly_cost != null ? (
-            `$${Number(service.yearly_cost).toLocaleString()}`
+            <Link
+              to={`/services/${service.id}/costs`}
+              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {service.yearly_cost != null
+                ? `$${Number(service.yearly_cost).toLocaleString()}`
+                : "Costs page"}
+            </Link>
           ) : (
-            <span className="text-fg-4">—</span>
+            <Link
+              to={`/services/${service.id}/costs`}
+              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {service.yearly_cost != null
+                ? `$${Number(service.yearly_cost).toLocaleString()}`
+                : "Costs page"}
+            </Link>
           )}
         </Row>
 
