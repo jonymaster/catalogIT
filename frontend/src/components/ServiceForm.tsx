@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { useToast } from "../context/useToast";
-import { formatBillingSchedule } from "../service/serviceBilling";
 import type { ServiceDraft, ServiceValidationErrors } from "../service/serviceDetailContext";
 import { validateDraft } from "../service/serviceDetailContext";
+import { RenewalConfigField } from "./RenewalConfigField";
 import { TagPicker } from "./TagPicker";
 import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
 import { Button } from "./ui/Button";
@@ -41,7 +41,6 @@ interface RefData {
   classifications: ServiceClassification[];
 }
 
-const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
 const FLASH_TOAST_KEY = "catalogit:flash-toast";
 
@@ -57,8 +56,7 @@ function toDraft(s?: Service): ServiceDraft {
     payment_method_id: s?.payment_method_id ?? "",
     service_status_id: s?.service_status_id ?? "",
     classification_id: s?.classification_id ?? "",
-    billing_schedule: s?.billing_schedule ?? "",
-    renewal_date: s?.renewal_date ?? "",
+    renewal_config: s?.renewal_config ?? null,
     criticality: s?.criticality ?? "",
     total_seats: s?.total_seats != null ? String(s.total_seats) : "",
     sso_integrated: s?.sso_integrated ?? false,
@@ -247,8 +245,7 @@ export function ServiceForm({ initial }: Props) {
     const payload = {
       name: draft.name.trim(),
       description: draft.description.trim() || null,
-      billing_schedule: draft.billing_schedule,
-      renewal_date: draft.renewal_date || null,
+      renewal_config: draft.renewal_config,
       sso_integrated: draft.sso_integrated,
       point_of_contact: draft.point_of_contact.trim() || null,
       notes: draft.notes.trim() || null,
@@ -266,8 +263,6 @@ export function ServiceForm({ initial }: Props) {
       scim_enabled: draft.scim_enabled,
       criticality: draft.criticality || null,
       nonprofit_pricing: draft.nonprofit_pricing,
-      renewal_reminders_enabled: true,
-      renewal_offsets_days: null,
       tag_ids: draft.tags.map((tag) => tag.id),
     };
 
@@ -468,34 +463,17 @@ export function ServiceForm({ initial }: Props) {
               </select>
             </div>
 
-            <div>
+            <div className="sm:col-span-2">
               <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
-                Billing Schedule
+                Renewal
               </label>
-              <select
-                value={draft.billing_schedule}
-                onChange={(e) => set("billing_schedule", e.target.value)}
-                className={fieldClass(false) + " mt-1"}
-              >
-                <option value="">- None -</option>
-                {BILLING_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {formatBillingSchedule(o)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
-                Renewal Date
-              </label>
-              <input
-                type="date"
-                value={draft.renewal_date}
-                onChange={(e) => set("renewal_date", e.target.value)}
-                className={fieldClass(Boolean(errors.renewal_date)) + " mt-1"}
-              />
+              <div className="mt-1">
+                <RenewalConfigField
+                  value={draft.renewal_config}
+                  onChange={(cfg) => set("renewal_config", cfg)}
+                  error={errors.renewal_config}
+                />
+              </div>
             </div>
 
             {isEdit && initial && (

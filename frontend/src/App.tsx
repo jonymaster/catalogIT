@@ -16,6 +16,7 @@ import { ServiceOverview } from "./pages/ServiceOverview";
 import { ServiceCosts } from "./pages/ServiceCosts";
 import { ServiceAssignments } from "./pages/ServiceAssignments";
 import { ServiceAttachments } from "./pages/ServiceAttachments";
+import { ServiceNotifications } from "./pages/ServiceNotifications";
 import { CostRecordCreate } from "./pages/CostRecordCreate";
 import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
@@ -71,6 +72,7 @@ export default function App() {
                   <Route path="costs" element={<ServiceCosts />} />
                   <Route path="assignments" element={<ServiceAssignments />} />
                   <Route path="attachments" element={<ServiceAttachments />} />
+                  <Route path="notifications" element={<ServiceNotifications />} />
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />

@@ -27,9 +27,8 @@ from app.models.notification_global_settings import NotificationGlobalSettings
 from app.models.renewal_notification_sent import RenewalNotificationSent
 from app.models.service import Service
 from app.models.user import User
+from app.notifications.renewal_schedule import compute_next_renewal
 from app.schemas.notifications import RenewalDispatchResult
-
-BILLABLE_SCHEDULES = {"annually", "monthly"}
 
 logger = logging.getLogger(__name__)
 
@@ -138,16 +137,29 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
 
     q = (
         select(Service)
-        .where(Service.renewal_date.is_not(None))
+        .where(Service.renewal_config.is_not(None))
         .where(Service.renewal_reminders_enabled.is_(True))
         .where(Service.is_active.is_(True))
-        .options(selectinload(Service.owners))
+        .options(
+            selectinload(Service.owners),
+            selectinload(Service.notification_recipients),
+        )
     )
     services = (await session.execute(q)).scalars().all()
     result.examined_services = len(services)
 
     for service in services:
+        # Ensure renewal_date is the next upcoming occurrence. If it's missing
+        # or in the past, advance it from the renewal_config. Commit before the
+        # send loop so dedup keys are stable for this run.
+        if service.renewal_date is None or service.renewal_date < today:
+            next_renewal = compute_next_renewal(service.renewal_config, today)
+            if next_renewal is None:
+                continue
+            service.renewal_date = next_renewal
+            await session.flush()
         assert service.renewal_date is not None
+
         # If the service has a configured offsets list but it's empty/invalid,
         # treat it as "inherit global offsets" rather than "send nothing".
         service_offsets = (
@@ -159,19 +171,19 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
         if not offsets:
             continue
 
-        # Build deduplicated recipient set: owners + admins + extra recipients
+        # Build deduplicated recipient set:
+        #   owners + admins + global extras + per-service recipients
         recipients_by_id: dict[uuid.UUID, Any] = {}
         for owner in service.owners:
             if owner.is_active and owner.receive_renewal_notifications:
                 recipients_by_id[owner.id] = owner
 
-        # Admins and extra recipients get notified for services with
-        # billing_schedule in (annually, monthly) or renewal_date set
-        schedule = (service.billing_schedule or "").strip().lower()
-        if schedule in BILLABLE_SCHEDULES or service.renewal_date is not None:
-            for user in admin_users:
-                recipients_by_id.setdefault(user.id, user)
-            for user in extra_recipients:
+        for user in admin_users:
+            recipients_by_id.setdefault(user.id, user)
+        for user in extra_recipients:
+            recipients_by_id.setdefault(user.id, user)
+        for user in service.notification_recipients:
+            if user.is_active and user.receive_renewal_notifications:
                 recipients_by_id.setdefault(user.id, user)
 
         for days_before in offsets:

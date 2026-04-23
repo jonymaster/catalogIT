@@ -202,6 +202,7 @@ export function Users() {
   }
 
   return (
+    <>
     <PageTransition>
     <div>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -228,10 +229,32 @@ export function Users() {
         </div>
       </div>
 
+      {loading ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+      ) : (
+        <>
+          <div className="mb-4 max-w-sm">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search users..."
+            />
+          </div>
+          <DataTable
+            columns={columns}
+            data={filtered}
+            striped
+            primaryColumnKey="name"
+          />
+        </>
+      )}
+    </div>
+    </PageTransition>
+
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
           <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900"
+            className="my-auto max-h-[min(90vh,calc(100dvh-2rem))] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900"
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-user-title"
@@ -373,27 +396,6 @@ export function Users() {
           </div>
         </div>
       )}
-
-      {loading ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-      ) : (
-        <>
-          <div className="mb-4 max-w-sm">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Search users..."
-            />
-          </div>
-          <DataTable
-            columns={columns}
-            data={filtered}
-            striped
-            primaryColumnKey="name"
-          />
-        </>
-      )}
-    </div>
-    </PageTransition>
+    </>
   );
 }

@@ -43,7 +43,9 @@ export function PersonalSettings() {
     locale: null,
     timezone: null,
     theme: "light",
+    receive_renewal_notifications: true,
   });
+  const [savingNotifications, setSavingNotifications] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
     email: "",
@@ -72,6 +74,8 @@ export function PersonalSettings() {
       locale: preferences?.locale ?? null,
       timezone: preferences?.timezone ?? null,
       theme: preferences?.theme ?? "light",
+      receive_renewal_notifications:
+        preferences?.receive_renewal_notifications ?? true,
     });
   }, [preferences]);
 
@@ -102,6 +106,35 @@ export function PersonalSettings() {
       cancelled = true;
     };
   }, []);
+
+  async function handleNotificationToggle(next: boolean) {
+    setForm((current) => ({ ...current, receive_renewal_notifications: next }));
+    setSavingNotifications(true);
+    try {
+      const response = await client.patch<UserPreferences>(
+        "/api/me/preferences",
+        { receive_renewal_notifications: next },
+      );
+      setPreferences(response.data);
+      showToast({
+        type: "success",
+        text: next
+          ? "Renewal notifications enabled."
+          : "Renewal notifications disabled.",
+      });
+    } catch {
+      setForm((current) => ({
+        ...current,
+        receive_renewal_notifications: !next,
+      }));
+      showToast({
+        type: "error",
+        text: "Failed to update notification preference.",
+      });
+    } finally {
+      setSavingNotifications(false);
+    }
+  }
 
   async function handlePreferencesSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -341,6 +374,31 @@ export function PersonalSettings() {
           )}
         </>
       )}
+
+      <div className="space-y-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          Notifications
+        </h2>
+        <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+          <input
+            type="checkbox"
+            checked={form.receive_renewal_notifications}
+            disabled={savingNotifications}
+            onChange={(e) => void handleNotificationToggle(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+          />
+          <span>
+            <span className="block font-medium text-gray-900 dark:text-gray-100">
+              Receive renewal reminders
+            </span>
+            <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+              When disabled, you won&apos;t receive any renewal reminder emails,
+              Slack, or Telegram messages — even for services where you&apos;re
+              an owner or extra recipient. Changes apply immediately.
+            </span>
+          </span>
+        </label>
+      </div>
 
       <form
         onSubmit={handlePreferencesSubmit}

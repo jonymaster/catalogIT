@@ -111,6 +111,7 @@ class UserPreferencesRead(BaseModel):
     locale: str | None = None
     timezone: str | None = None
     theme: Literal["light", "dark"] = "light"
+    receive_renewal_notifications: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -119,6 +120,7 @@ class UserPreferencesUpdate(BaseModel):
     locale: str | None = None
     timezone: str | None = None
     theme: Literal["light", "dark"] | None = None
+    receive_renewal_notifications: bool | None = None
 
 
 def user_read_from_orm(user: UserOrm) -> UserRead:

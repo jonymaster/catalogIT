@@ -7,9 +7,10 @@ import {
   ColoredReferenceBadge,
   CriticalityBadge,
 } from "../components/Badge";
+import { RenewalConfigField } from "../components/RenewalConfigField";
 import { Avatar } from "../components/ui/Avatar";
 import { useAuth } from "../context/useAuth";
-import { formatBillingSchedule } from "../service/serviceBilling";
+import { formatRenewalConfig } from "../service/renewalConfig";
 import type {
   Category,
   CostCenter,
@@ -29,7 +30,6 @@ import type {
   ServiceValidationErrors,
 } from "../service/serviceDetailContext";
 
-const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
 
 interface RefData {
@@ -320,38 +320,25 @@ function LeftColumn({
           )}
         </Row>
 
-        <Row label="Billing Schedule">
-          {editing ? (
-            <select
-              value={draft.billing_schedule}
-              onChange={(e) => setField("billing_schedule", e.target.value)}
-              className={fieldClass(false)}
-            >
-              <option value="">— None —</option>
-              {BILLING_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {formatBillingSchedule(o)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            formatBillingSchedule(service.billing_schedule)
-          )}
-        </Row>
-
         <Row
-          label="Renewal Date"
-          error={editing ? errors.renewal_date : undefined}
+          label="Renewal"
+          error={editing ? errors.renewal_config : undefined}
         >
           {editing ? (
-            <input
-              type="date"
-              value={draft.renewal_date}
-              onChange={(e) => setField("renewal_date", e.target.value)}
-              className={fieldClass(Boolean(errors.renewal_date))}
+            <RenewalConfigField
+              value={draft.renewal_config}
+              onChange={(cfg) => setField("renewal_config", cfg)}
+              error={errors.renewal_config}
             />
           ) : (
-            formatDateOnly(service.renewal_date, preferences)
+            <div className="space-y-0.5">
+              <div>{formatRenewalConfig(service.renewal_config)}</div>
+              {service.renewal_date && (
+                <div className="text-xs text-fg-4">
+                  Next renewal: {formatDateOnly(service.renewal_date, preferences)}
+                </div>
+              )}
+            </div>
           )}
         </Row>
 

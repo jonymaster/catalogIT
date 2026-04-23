@@ -15,7 +15,7 @@ class ServiceYearlyCostDerivedTest(unittest.TestCase):
         stmt = select(Service.id, Service.yearly_cost)
         compiled = stmt.compile(
             dialect=postgresql.dialect(),
-            compile_kwargs={"literal_binds": False},
+            compile_kwargs={"literal_binds": True},
         )
         sql = str(compiled).lower()
         self.assertIn("cost_records", sql)

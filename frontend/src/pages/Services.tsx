@@ -31,7 +31,7 @@ import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
-import { formatBillingSchedule } from "../service/serviceBilling";
+import { formatRenewalConfig } from "../service/renewalConfig";
 import type { Service, User, UserPreferences } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 import {
@@ -338,23 +338,22 @@ const columnDefinitions: ServiceColumnDefinition[] = [
       ),
   },
   {
-    key: "billing_schedule",
-    label: "Billing Schedule",
+    key: "renewal",
+    label: "Renewal",
     filterType: "select",
-    getFilterValue: (service) =>
-      formatBillingSchedule(service.billing_schedule),
-    getSortValue: (service) => service.billing_schedule ?? "",
+    getFilterValue: (service) => formatRenewalConfig(service.renewal_config),
+    getSortValue: (service) => formatRenewalConfig(service.renewal_config),
     getFilterOptions: (services) =>
       getUniqueOptions(
-        services.map((service) => formatBillingSchedule(service.billing_schedule)),
+        services.map((service) => formatRenewalConfig(service.renewal_config)),
       ),
-    render: (service) => formatBillingSchedule(service.billing_schedule),
+    render: (service) => formatRenewalConfig(service.renewal_config),
   },
   {
     key: "renewal_date",
-    label: "Renewal Date",
+    label: "Next Renewal",
     filterType: "text",
-    filterPlaceholder: "Filter by renewal date...",
+    filterPlaceholder: "Filter by next renewal...",
     getFilterValue: (service) => service.renewal_date ?? "--",
     getSortValue: (service) => service.renewal_date ?? "",
   },
@@ -674,7 +673,7 @@ export function Services() {
           .includes(q) ||
         getServiceStatusLabel(service).toLowerCase().includes(q) ||
         (service.payment_method?.name ?? "").toLowerCase().includes(q) ||
-        service.billing_schedule.toLowerCase().includes(q) ||
+        formatRenewalConfig(service.renewal_config).toLowerCase().includes(q) ||
         (service.vendor?.name ?? "").toLowerCase().includes(q) ||
         service.tags.some((tag) => tag.name.toLowerCase().includes(q)) ||
         service.owners.some(

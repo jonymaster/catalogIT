@@ -200,7 +200,7 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
         "name",
         "description",
         "status",
-        "billing_schedule",
+        "renewal_config",
         "renewal_date",
         "yearly_cost",
         "sso_integrated",
@@ -234,7 +234,11 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
                 s.name,
                 s.description or "",
                 s.status,
-                s.billing_schedule,
+                (
+                    ";".join(f"{k}={v}" for k, v in sorted(s.renewal_config.items()))
+                    if isinstance(s.renewal_config, dict)
+                    else ""
+                ),
                 _fmt_date(s.renewal_date),
                 float(s.yearly_cost) if s.yearly_cost is not None else "",
                 s.sso_integrated,
