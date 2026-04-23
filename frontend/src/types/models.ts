@@ -41,6 +41,7 @@ export interface UserPreferences {
   locale: string | null;
   timezone: string | null;
   theme: "light" | "dark";
+  receive_renewal_notifications: boolean;
 }
 
 export interface Vendor {
