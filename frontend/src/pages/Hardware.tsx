@@ -296,7 +296,6 @@ export function Hardware() {
     ALL_COLUMN_KEYS,
   );
   const { canEdit } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;

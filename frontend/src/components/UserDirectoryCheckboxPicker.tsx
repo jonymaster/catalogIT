@@ -11,6 +11,7 @@ import { Avatar, AvatarStack } from "./ui/Avatar";
 import type { User, UserDirectoryPage } from "../types/models";
 
 const DEFAULT_PAGE_SIZE = 25;
+const EMPTY_SEED_USERS: User[] = [];
 
 export interface UserDirectoryCheckboxPickerProps {
   value: string[];
@@ -29,7 +30,7 @@ export interface UserDirectoryCheckboxPickerProps {
 export function UserDirectoryCheckboxPicker({
   value,
   onChange,
-  seedUsers = [],
+  seedUsers = EMPTY_SEED_USERS,
   pageSize = DEFAULT_PAGE_SIZE,
   variant = "form",
   maxSelections,

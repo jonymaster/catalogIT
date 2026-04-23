@@ -1,7 +1,7 @@
 """Add case-insensitive unique index for laptop serial numbers.
 
-Revision ID: 042
-Revises: 041
+Revision ID: 046
+Revises: 045
 Create Date: 2026-04-18
 """
 
@@ -12,8 +12,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "042"
-down_revision: Union[str, None] = "041"
+revision: str = "046"
+down_revision: Union[str, None] = "045"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
