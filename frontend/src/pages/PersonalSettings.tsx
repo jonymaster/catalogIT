@@ -512,6 +512,8 @@ export function PersonalSettings() {
                 locale: preferences?.locale ?? null,
                 timezone: preferences?.timezone ?? null,
                 theme: preferences?.theme ?? "light",
+                receive_renewal_notifications:
+                  preferences?.receive_renewal_notifications ?? true,
               })
             }
             disabled={savingPrefs}
