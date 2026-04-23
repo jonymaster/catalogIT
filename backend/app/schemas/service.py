@@ -15,7 +15,6 @@ from app.schemas.tag import TagRead
 from app.schemas.user import UserRead
 from app.schemas.vendor import VendorRead
 
-ALLOWED_BILLING_SCHEDULES = {"", "monthly", "annually", "na", "on_demand"}
 ALLOWED_CRITICALITY_VALUES = {"Critical", "High", "Medium", "Low"}
 MAX_TAGS_PER_SERVICE = 5
 
@@ -88,7 +87,6 @@ class ServiceCreate(BaseModel):
     name: str
     description: str | None = Field(default=None, max_length=255)
     status: str = "Contract"
-    billing_schedule: str = ""
     renewal_config: RenewalConfig | None = None
     renewal_date: date | None = None
     subcategory: str | None = Field(default=None, max_length=100)
@@ -133,15 +131,6 @@ class ServiceCreate(BaseModel):
     def validate_optional_text(cls, value: str | None) -> str | None:
         return _normalize_optional_text(value)
 
-    @field_validator("billing_schedule")
-    @classmethod
-    def validate_billing_schedule(cls, value: str) -> str:
-        return _normalize_optional_choice(
-            value,
-            label="billing_schedule",
-            allowed=ALLOWED_BILLING_SCHEDULES,
-        ) or ""
-
     @field_validator("criticality")
     @classmethod
     def validate_criticality(cls, value: str | None) -> str | None:
@@ -181,7 +170,6 @@ class ServiceUpdate(BaseModel):
     name: str | None = None
     description: str | None = Field(default=None, max_length=255)
     status: str | None = None
-    billing_schedule: str | None = None
     renewal_config: RenewalConfig | None = None
     renewal_date: date | None = None
     subcategory: str | None = Field(default=None, max_length=100)
@@ -228,17 +216,6 @@ class ServiceUpdate(BaseModel):
     @classmethod
     def validate_optional_text(cls, value: str | None) -> str | None:
         return _normalize_optional_text(value)
-
-    @field_validator("billing_schedule")
-    @classmethod
-    def validate_billing_schedule(cls, value: str | None) -> str | None:
-        if value is None:
-            raise ValueError("billing_schedule cannot be null")
-        return _normalize_optional_choice(
-            value,
-            label="billing_schedule",
-            allowed=ALLOWED_BILLING_SCHEDULES,
-        )
 
     @field_validator("criticality")
     @classmethod

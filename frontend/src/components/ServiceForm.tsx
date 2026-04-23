@@ -46,7 +46,6 @@ interface RefData {
 // Extra fields carried by this form beyond ServiceDraft. The backend accepts
 // them but the shared ServiceDraft/Service types haven't been extended yet.
 interface ExtraFields {
-  billing_schedule: string;
   renewal_date: string;
   subcategory: string;
   environment: string;
@@ -54,23 +53,7 @@ interface ExtraFields {
 }
 
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
-const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const FLASH_TOAST_KEY = "catalogit:flash-toast";
-
-function formatBillingOption(value: string): string {
-  switch (value) {
-    case "annually":
-      return "Annually";
-    case "monthly":
-      return "Monthly";
-    case "na":
-      return "N/A";
-    case "on_demand":
-      return "On Demand";
-    default:
-      return value;
-  }
-}
 
 function toDraft(s?: Service): ServiceDraft {
   return {
@@ -96,10 +79,7 @@ function toDraft(s?: Service): ServiceDraft {
 }
 
 function toExtraFields(s?: Service): ExtraFields {
-  const maybeBilling = (s as (Service & { billing_schedule?: string | null }) | undefined)
-    ?.billing_schedule;
   return {
-    billing_schedule: maybeBilling ?? "",
     renewal_date: s?.renewal_date ?? "",
     subcategory: s?.subcategory ?? "",
     environment: s?.environment ?? "",
@@ -330,7 +310,6 @@ export function ServiceForm({ initial }: Props) {
       nonprofit_pricing: draft.nonprofit_pricing,
       tag_ids: draft.tags.map((tag) => tag.id),
       // Extra fields supported by backend but not yet on ServiceDraft.
-      billing_schedule: extras.billing_schedule,
       renewal_date: extras.renewal_date || null,
       subcategory: extras.subcategory.trim() || null,
       environment: extras.environment.trim() || null,
@@ -555,24 +534,6 @@ export function ServiceForm({ initial }: Props) {
                 {refData?.paymentMethods.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
-                Billing Schedule
-              </label>
-              <select
-                value={extras.billing_schedule}
-                onChange={(e) => setExtra("billing_schedule", e.target.value)}
-                className={fieldClass(false) + " mt-1"}
-              >
-                <option value="">- None -</option>
-                {BILLING_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {formatBillingOption(o)}
                   </option>
                 ))}
               </select>
