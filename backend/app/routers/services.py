@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -17,10 +17,18 @@ from app.models.payment_method import PaymentMethod
 from app.models.service import Service
 from app.models.service_classification import ServiceClassification
 from app.models.service_status import ServiceStatus
+from app.models.tag import Tag
 from app.models.user import User
 from app.models.vendor import Vendor
+from app.notifications.renewal_schedule import compute_next_renewal
 from app.routers.attachments import delete_entity_attachments
-from app.schemas.service import ServiceCreate, ServiceRead, ServiceUpdate
+from app.schemas.service import (
+    MAX_TAGS_PER_SERVICE,
+    RenewalConfig,
+    ServiceCreate,
+    ServiceRead,
+    ServiceUpdate,
+)
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -93,6 +101,56 @@ async def _get_optional_reference(
     if row is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
     return row
+
+
+def _renewal_config_dict(cfg: RenewalConfig | None) -> dict | None:
+    if cfg is None:
+        return None
+    return cfg.model_dump(exclude_none=True)
+
+
+async def _resolve_notification_recipients(
+    db: AsyncSession,
+    user_ids: list[uuid.UUID],
+) -> list[User]:
+    if not user_ids:
+        return []
+    result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users = list(result.scalars().all())
+    found = {u.id for u in users}
+    missing = [str(uid) for uid in user_ids if uid not in found]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User(s) not found: {', '.join(missing)}",
+        )
+    by_id = {u.id: u for u in users}
+    return [by_id[uid] for uid in user_ids]
+
+
+async def _resolve_tags(
+    db: AsyncSession,
+    tag_ids: list[uuid.UUID],
+) -> list[Tag]:
+    if not tag_ids:
+        return []
+    if len(tag_ids) > MAX_TAGS_PER_SERVICE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A service can have at most {MAX_TAGS_PER_SERVICE} tags",
+        )
+    result = await db.execute(select(Tag).where(Tag.id.in_(tag_ids)))
+    tags = list(result.scalars().all())
+    found_ids = {tag.id for tag in tags}
+    missing = [str(tid) for tid in tag_ids if tid not in found_ids]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tag(s) not found: {', '.join(missing)}",
+        )
+    # Preserve the order the caller sent.
+    by_id = {tag.id: tag for tag in tags}
+    return [by_id[tid] for tid in tag_ids]
 
 
 async def _resolve_service_status(
@@ -229,13 +287,23 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         detail="Contract not found",
     )
     related_services = await _get_related_services(db, body.related_service_ids)
+    tags = await _resolve_tags(db, body.tag_ids)
+    recipients = await _resolve_notification_recipients(
+        db, body.notification_recipient_ids
+    )
+
+    cfg_dict = _renewal_config_dict(body.renewal_config)
+    next_renewal = (
+        compute_next_renewal(cfg_dict, date.today()) if cfg_dict else None
+    )
 
     service = Service(
         name=body.name,
         description=body.description,
         status=service_status.name if service_status else body.status,
         billing_schedule=body.billing_schedule,
-        renewal_date=body.renewal_date,
+        renewal_config=cfg_dict,
+        renewal_date=next_renewal if cfg_dict else body.renewal_date,
         subcategory=body.subcategory,
         environment=body.environment,
         sso_integrated=body.sso_integrated,
@@ -244,6 +312,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         owners=owners,
         assignees=assignees,
         related_services=related_services,
+        notification_recipients=recipients,
         total_seats=body.total_seats,
         vendor_id=vendor.id if vendor else None,
         category_id=category.id if category else None,
@@ -257,6 +326,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         nonprofit_pricing=body.nonprofit_pricing,
         renewal_reminders_enabled=body.renewal_reminders_enabled,
         renewal_offsets_days=body.renewal_offsets_days,
+        tags=tags,
     )
     db.add(service)
     await db.flush()
@@ -287,6 +357,21 @@ async def update_service(
         else:
             service.renewal_offsets_days = ro
 
+    if "renewal_config" in update_data:
+        raw_cfg = update_data.pop("renewal_config")
+        cfg_dict = (
+            RenewalConfig.model_validate(raw_cfg).model_dump(exclude_none=True)
+            if raw_cfg is not None
+            else None
+        )
+        service.renewal_config = cfg_dict
+        service.renewal_date = (
+            compute_next_renewal(cfg_dict, date.today()) if cfg_dict else None
+        )
+
+    recipient_ids_provided = "notification_recipient_ids" in update_data
+    recipient_ids = update_data.pop("notification_recipient_ids", None)
+
     owner_ids = update_data.pop("owner_ids", None)
     assignee_ids = update_data.pop("assignee_ids", None)
     related_service_ids = (
@@ -294,6 +379,8 @@ async def update_service(
         if "related_service_ids" in update_data
         else None
     )
+    tag_ids_provided = "tag_ids" in update_data
+    tag_ids = update_data.pop("tag_ids", None)
     classification_id = (
         update_data.pop("classification_id", None) if "classification_id" in update_data else ...
     )
@@ -400,6 +487,14 @@ async def update_service(
                 )
             service.status = status_name
             service.service_status_id = matched_status.id if matched_status else None
+
+    if tag_ids_provided:
+        service.tags = await _resolve_tags(db, tag_ids or [])
+
+    if recipient_ids_provided:
+        service.notification_recipients = await _resolve_notification_recipients(
+            db, recipient_ids or []
+        )
 
     for field, value in update_data.items():
         setattr(service, field, value)

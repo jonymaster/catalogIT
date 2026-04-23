@@ -15,12 +15,10 @@ export type ServiceFieldKey =
   | "subcategory"
   | "environment"
   | "cost_center"
-  | "billing_schedule"
-  | "renewal_date"
+  | "renewal"
   | "yearly_cost"
   | "payment_method"
   | "nonprofit_pricing"
-  | "renewal_reminders"
   | "point_of_contact"
   | "notes"
   | "total_seats";
@@ -53,12 +51,10 @@ export const SERVICE_VIEW_SECTIONS: readonly {
       "subcategory",
       "environment",
       "cost_center",
-      "billing_schedule",
-      "renewal_date",
+      "renewal",
       "yearly_cost",
       "payment_method",
       "nonprofit_pricing",
-      "renewal_reminders",
     ],
   },
   {
@@ -82,12 +78,10 @@ export const SERVICE_FIELD_LABELS: Record<ServiceFieldKey, string> = {
   subcategory: "Subcategory",
   environment: "Environment",
   cost_center: "Cost Center",
-  billing_schedule: "Billing Schedule",
-  renewal_date: "Renewal Date",
+  renewal: "Renewal",
   yearly_cost: "Yearly Cost",
   payment_method: "Payment Method",
   nonprofit_pricing: "Nonprofit Pricing",
-  renewal_reminders: "Renewal reminders",
   point_of_contact: "Point of contact",
   notes: "Notes",
   total_seats: "Number of seats",

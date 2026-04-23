@@ -1,3 +1,5 @@
+import type { OperatingSystem } from "./models";
+
 export type DashboardCostSource = "service" | "hardware";
 export type DashboardCostDimension =
   | "category"
@@ -30,6 +32,8 @@ export interface DashboardCostRecord {
   environment_name: string | null;
   team_name: string | null;
   team_names: string[];
+  /** Hardware rows only; null for services or unknown OS. */
+  operating_system: OperatingSystem | null;
   fiscal_year: number;
   amount: number;
   record_type: string;

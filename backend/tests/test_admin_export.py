@@ -58,7 +58,7 @@ class AdminExportCsvTest(unittest.TestCase):
             name="Email Suite",
             description="Corporate email and calendar",
             status="Active",
-            billing_schedule="yearly",
+            renewal_config=None,
             renewal_date=None,
             yearly_cost=None,
             sso_integrated=True,
@@ -109,7 +109,7 @@ class AdminExportSeedJsonTest(unittest.TestCase):
             name="CRM",
             description="Customer relationship platform",
             status="Archived",
-            billing_schedule="monthly",
+            renewal_config={"type": "monthly", "day": 15},
             vendor_id=None,
             category_id=None,
             payment_method_id=None,
@@ -137,11 +137,13 @@ class AdminExportSeedJsonTest(unittest.TestCase):
             cpu="M3",
             ram="16GB",
             storage_size="512GB",
+            operating_system="macos",
             status="Assigned",
             hardware_status_id=hardware_status_id,
             hardware_location_id=hardware_location_id,
             assigned_to_id=None,
             notes=None,
+            mdm_connected=True,
             is_active=False,
             archived_at=datetime(2026, 3, 20, 8, 0, 0),
             created_at=datetime(2026, 1, 10, 10, 0, 0),
@@ -197,6 +199,8 @@ class AdminExportSeedJsonTest(unittest.TestCase):
         self.assertEqual(hardware_locations[0]["id"], str(hardware_location_id))
         self.assertEqual(laptops[0]["hardware_status_id"], str(hardware_status_id))
         self.assertEqual(laptops[0]["hardware_location_id"], str(hardware_location_id))
+        self.assertEqual(laptops[0]["operating_system"], "macos")
+        self.assertTrue(laptops[0]["mdm_connected"])
 
 
 class AdminExportAuthTest(unittest.TestCase):

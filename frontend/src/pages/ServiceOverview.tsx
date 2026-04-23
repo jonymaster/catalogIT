@@ -1,26 +1,28 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import client from "../api/client";
-import { Attachments } from "../components/Attachments";
 import {
   BooleanYesNoBadge,
   ClassificationBadge,
   ColoredReferenceBadge,
   CriticalityBadge,
 } from "../components/Badge";
-import { AvatarStack, Avatar } from "../components/ui/Avatar";
+import { RenewalConfigField } from "../components/RenewalConfigField";
+import { Avatar } from "../components/ui/Avatar";
 import { useAuth } from "../context/useAuth";
-import { formatBillingSchedule } from "../service/serviceBilling";
+import { formatRenewalConfig } from "../service/renewalConfig";
 import type {
   Category,
   CostCenter,
   PaymentMethod,
   Service,
   ServiceClassification,
-  User,
+  ServiceStatus,
   UserPreferences,
   Vendor,
 } from "../types/models";
+import { TagPicker } from "../components/TagPicker";
+import { UserDirectoryCheckboxPicker } from "../components/UserDirectoryCheckboxPicker";
 import { formatDateOnly } from "../utils/formatting";
 import type {
   ServiceDetailContext,
@@ -28,15 +30,14 @@ import type {
   ServiceValidationErrors,
 } from "../service/serviceDetailContext";
 
-const BILLING_OPTIONS = ["annually", "monthly", "na", "on_demand"] as const;
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
 
 interface RefData {
-  users: User[];
   vendors: Vendor[];
   categories: Category[];
   costCenters: CostCenter[];
   paymentMethods: PaymentMethod[];
+  serviceStatuses: ServiceStatus[];
   classifications: ServiceClassification[];
 }
 
@@ -84,20 +85,20 @@ function useRefData(editing: boolean): RefData | null {
     if (!editing || data) return;
     let cancelled = false;
     Promise.all([
-      client.get<User[]>("/api/users/"),
       client.get<Vendor[]>("/api/vendors/"),
       client.get<Category[]>("/api/categories/"),
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
+      client.get<ServiceStatus[]>("/api/service-statuses/"),
       client.get<ServiceClassification[]>("/api/service-classifications/"),
-    ]).then(([u, v, c, cc, p, cl]) => {
+    ]).then(([v, c, cc, p, ss, cl]) => {
       if (cancelled) return;
       setData({
-        users: u.data,
         vendors: v.data,
         categories: c.data,
         costCenters: cc.data,
         paymentMethods: p.data,
+        serviceStatuses: ss.data,
         classifications: cl.data,
       });
     });
@@ -131,6 +132,30 @@ function LeftColumn({
     <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
       <h2 className="mb-4 text-base font-semibold text-fg">General</h2>
       <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <Row label="Status">
+          {editing ? (
+            <select
+              value={draft.service_status_id}
+              onChange={(e) => setField("service_status_id", e.target.value)}
+              className={fieldClass(false)}
+            >
+              <option value="">— None —</option>
+              {refData?.serviceStatuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+          ) : service.service_status ? (
+            <ColoredReferenceBadge
+              label={service.service_status.name}
+              color={service.service_status.color}
+            />
+          ) : (
+            <span className="text-fg-4">—</span>
+          )}
+        </Row>
+
         <div className="sm:col-span-2">
           <Row label="Description">
             {editing ? (
@@ -295,59 +320,49 @@ function LeftColumn({
           )}
         </Row>
 
-        <Row label="Billing Schedule">
-          {editing ? (
-            <select
-              value={draft.billing_schedule}
-              onChange={(e) => setField("billing_schedule", e.target.value)}
-              className={fieldClass(false)}
-            >
-              <option value="">— None —</option>
-              {BILLING_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {formatBillingSchedule(o)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            formatBillingSchedule(service.billing_schedule)
-          )}
-        </Row>
-
         <Row
-          label="Renewal Date"
-          error={editing ? errors.renewal_date : undefined}
+          label="Renewal"
+          error={editing ? errors.renewal_config : undefined}
         >
           {editing ? (
-            <input
-              type="date"
-              value={draft.renewal_date}
-              onChange={(e) => setField("renewal_date", e.target.value)}
-              className={fieldClass(Boolean(errors.renewal_date))}
+            <RenewalConfigField
+              value={draft.renewal_config}
+              onChange={(cfg) => setField("renewal_config", cfg)}
+              error={errors.renewal_config}
             />
           ) : (
-            formatDateOnly(service.renewal_date, preferences)
+            <div className="space-y-0.5">
+              <div>{formatRenewalConfig(service.renewal_config)}</div>
+              {service.renewal_date && (
+                <div className="text-xs text-fg-4">
+                  Next renewal: {formatDateOnly(service.renewal_date, preferences)}
+                </div>
+              )}
+            </div>
           )}
         </Row>
 
         <Row
           label="Yearly Cost"
-          error={editing ? errors.yearly_cost : undefined}
         >
           {editing ? (
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={draft.yearly_cost}
-              onChange={(e) => setField("yearly_cost", e.target.value)}
-              placeholder="0"
-              className={fieldClass(Boolean(errors.yearly_cost))}
-            />
-          ) : service.yearly_cost != null ? (
-            `$${Number(service.yearly_cost).toLocaleString()}`
+            <Link
+              to={`/services/${service.id}/costs`}
+              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {service.yearly_cost != null
+                ? `$${Number(service.yearly_cost).toLocaleString()}`
+                : "Costs page"}
+            </Link>
           ) : (
-            <span className="text-fg-4">—</span>
+            <Link
+              to={`/services/${service.id}/costs`}
+              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              {service.yearly_cost != null
+                ? `$${Number(service.yearly_cost).toLocaleString()}`
+                : "Costs page"}
+            </Link>
           )}
         </Row>
 
@@ -381,7 +396,6 @@ interface RightColumnProps {
   editing: boolean;
   draft: ServiceDraft;
   setField: ServiceDetailContext["setDraftField"];
-  refData: RefData | null;
 }
 
 function RightColumn({
@@ -389,12 +403,7 @@ function RightColumn({
   editing,
   draft,
   setField,
-  refData,
 }: RightColumnProps) {
-  const selectedOwners =
-    refData?.users.filter((u) => draft.owner_ids.includes(u.id)) ??
-    service.owners;
-
   return (
     <div className="flex flex-col gap-5">
       <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
@@ -403,45 +412,45 @@ function RightColumn({
           service.owners.length === 0 ? (
             <p className="text-sm text-fg-4">No owners assigned.</p>
           ) : (
-            <div className="space-y-2">
-              <AvatarStack users={service.owners} max={5} size={24} />
-              <ul className="space-y-1.5">
-                {service.owners.map((o) => (
-                  <li key={o.id} className="flex items-center gap-2 text-sm">
-                    <Avatar user={o} size={22} />
-                    <Link to={`/users/${o.id}`} className="hlink text-fg">
-                      {o.first_name} {o.last_name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ul className="space-y-1.5">
+              {service.owners.map((o) => (
+                <li key={o.id} className="flex items-center gap-2 text-sm">
+                  <Avatar user={o} size={22} />
+                  <Link to={`/users/${o.id}`} className="hlink text-fg">
+                    {o.first_name} {o.last_name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )
         ) : (
-          <div className="space-y-2">
-            {selectedOwners.length > 0 && (
-              <AvatarStack users={selectedOwners} max={5} size={22} />
-            )}
-            <select
-              multiple
-              value={draft.owner_ids}
-              onChange={(e) =>
-                setField(
-                  "owner_ids",
-                  Array.from(e.target.selectedOptions, (o) => o.value),
-                )
-              }
-              className={`${fieldClass(false)} h-32`}
-            >
-              {refData?.users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.first_name} {u.last_name} ({u.email})
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-fg-3">
-              Hold Ctrl/Cmd to select multiple.
-            </p>
+          <UserDirectoryCheckboxPicker
+            variant="overview"
+            value={draft.owner_ids}
+            onChange={(ids) => setField("owner_ids", ids)}
+            seedUsers={service.owners}
+          />
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-3 text-base font-semibold text-fg">Tags</h2>
+        {editing ? (
+          <TagPicker
+            value={draft.tags}
+            onChange={(tags) => setField("tags", tags)}
+          />
+        ) : service.tags.length === 0 ? (
+          <p className="text-sm text-fg-4">No tags.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {service.tags.map((tag) => (
+              <ColoredReferenceBadge
+                key={tag.id}
+                label={tag.name}
+                color={tag.color}
+              />
+            ))}
           </div>
         )}
       </section>
@@ -562,25 +571,21 @@ export function ServiceOverview() {
             editing={editing}
             draft={draft}
             setField={setDraftField}
-            refData={refData}
           />
         </div>
       </div>
 
       {!editing && (
-        <>
-          <Attachments entityType="service" entityId={service.id} />
-          <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-            <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
-            {service.notes?.trim() ? (
-              <p className="whitespace-pre-wrap text-sm text-fg">
-                {service.notes}
-              </p>
-            ) : (
-              <p className="text-sm text-fg-4">No notes yet.</p>
-            )}
-          </section>
-        </>
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
+          {service.notes?.trim() ? (
+            <p className="whitespace-pre-wrap text-sm text-fg">
+              {service.notes}
+            </p>
+          ) : (
+            <p className="text-sm text-fg-4">No notes yet.</p>
+          )}
+        </section>
       )}
 
       {editing && (

@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import client from "../api/client";
 import { PageTransition } from "../components/PageTransition";
 import {
   ArrowDownTrayIcon,
-  InformationCircleIcon,
   PlusIcon,
 } from "../components/Icons";
 import {
@@ -15,22 +14,31 @@ import {
 } from "../components/Badge";
 import {
   ColumnHeaderMenu,
+  type SortDirection,
 } from "../components/ColumnHeaderMenu";
 import { ColumnSelector } from "../components/ColumnSelector";
 import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { SearchInput } from "../components/SearchInput";
 import { StatusBadge } from "../components/StatusBadge";
-import { UserLinkList } from "../components/UserLinks";
+import { Monogram } from "../components/ui/Monogram";
+import { Avatar, AvatarStack } from "../components/ui/Avatar";
+import { Days } from "../components/ui/Days";
+import { Money } from "../components/ui/Money";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { formatMoneyFull } from "../components/ui/money-format";
 import { useAuth } from "../context/useAuth";
-import { formatBillingSchedule } from "../service/serviceBilling";
-import type {
-  Service,
-  ServiceListPreferences,
-  ServiceListSortPreference,
-  UserPreferences,
-} from "../types/models";
+import { useToast } from "../context/useToast";
+import { useColumnPrefs } from "../hooks/useColumnPrefs";
+import { useDashboardCostData } from "../hooks/useDashboardCostData";
+import { formatRenewalConfig } from "../service/renewalConfig";
+import type { Service, User, UserPreferences } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
+import {
+  combinedActualEstimatedByYear,
+  totalByYear,
+  visualAmountForRecordTypeAndYear,
+} from "../utils/dashboardCostAggregates";
 import { formatDateOnly } from "../utils/formatting";
 
 type FilterType = "text" | "select";
@@ -41,14 +49,25 @@ interface ServiceColumnDefinition {
   filterType: FilterType;
   filterPlaceholder?: string;
   getFilterValue: (service: Service) => string;
+  /**
+   * For "multi-valued" columns (e.g. tags) a service carries several labels at
+   * once. When provided, the list filter treats a service as a match if ANY of
+   * the labels intersects with the selected filter values. When omitted, the
+   * standard single-value `getFilterValue` equality is used.
+   */
+  getFilterValues?: (service: Service) => string[];
   getSortValue: (service: Service) => string | number | boolean | null;
   getFilterOptions?: (services: Service[]) => string[];
   render?: (service: Service) => React.ReactNode;
 }
 
 type ServiceFilters = Record<string, string | string[]>;
+type ViewMode = "table" | "gallery";
 
-type SortState = ServiceListSortPreference;
+interface SortState {
+  key: string | null;
+  direction: SortDirection | null;
+}
 
 interface HoveredDescriptionState {
   text: string;
@@ -56,16 +75,89 @@ interface HoveredDescriptionState {
   top: number;
 }
 
-interface ResolvedServiceListPreferences {
-  visible_columns: string[];
+const VIEW_STORAGE_KEY = "catalogit:services:view";
+const FLASH_TOAST_KEY = "catalogit:flash-toast";
+const LIST_STATE_STORAGE_KEY = "catalogit:services:list-state";
+
+interface ServicesListState {
+  view: "active" | "archived";
+  search: string;
   filters: ServiceFilters;
-  sort: SortState;
+  sortState: SortState;
 }
 
-const SERVICE_LIST_PREFERENCES_STORAGE_KEY = "catalogit:services:preferences";
+function loadViewPref(): ViewMode {
+  try {
+    const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (stored === "table" || stored === "gallery") return stored;
+  } catch {
+    /* ignore */
+  }
+  return "table";
+}
+
+function createDefaultFilters(): ServiceFilters {
+  return Object.fromEntries(
+    columnDefinitions.map((column) => [
+      column.key,
+      column.filterType === "select" ? [] : "",
+    ]),
+  ) as ServiceFilters;
+}
+
+function loadListState(): ServicesListState | null {
+  try {
+    const raw = sessionStorage.getItem(LIST_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ServicesListState>;
+    const defaultFilters = createDefaultFilters();
+    const normalizedFilters: ServiceFilters = { ...defaultFilters };
+    const keys = new Set(columnDefinitions.map((column) => column.key));
+    const parsedFilters = parsed.filters ?? {};
+    for (const column of columnDefinitions) {
+      const value = parsedFilters[column.key];
+      if (column.filterType === "select") {
+        normalizedFilters[column.key] = Array.isArray(value)
+          ? value.filter((entry): entry is string => typeof entry === "string")
+          : [];
+      } else {
+        normalizedFilters[column.key] = typeof value === "string" ? value : "";
+      }
+    }
+    const normalizedSortState: SortState =
+      parsed.sortState &&
+      typeof parsed.sortState === "object" &&
+      ((parsed.sortState.direction === "asc" ||
+        parsed.sortState.direction === "desc" ||
+        parsed.sortState.direction === null) &&
+        ((typeof parsed.sortState.key === "string" &&
+          keys.has(parsed.sortState.key)) ||
+          parsed.sortState.key === null))
+        ? {
+            key: parsed.sortState.key,
+            direction: parsed.sortState.direction,
+          }
+        : { key: null, direction: null };
+
+    return {
+      view: parsed.view === "archived" ? "archived" : "active",
+      search: typeof parsed.search === "string" ? parsed.search : "",
+      filters: normalizedFilters,
+      sortState: normalizedSortState,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function getOwnerNames(service: Service) {
   return service.owners.map((owner) => `${owner.first_name} ${owner.last_name}`).join(", ");
+}
+
+function getOwnerDisplayName(user: Pick<User, "first_name" | "last_name" | "display_name" | "email">) {
+  const full = `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
+  if (full) return full;
+  return user.display_name ?? user.email;
 }
 
 function getBooleanLabel(value: boolean) {
@@ -130,15 +222,6 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     filterPlaceholder: "Filter by name...",
     getFilterValue: (service) => service.name,
     getSortValue: (service) => service.name,
-  },
-  {
-    key: "description",
-    label: "Description",
-    filterType: "text",
-    filterPlaceholder: "Filter by description...",
-    getFilterValue: (service) => service.description ?? "",
-    getSortValue: (service) => service.description ?? "",
-    render: (service) => service.description?.trim() || "—",
   },
   {
     key: "status",
@@ -232,10 +315,7 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     getFilterValue: (service) =>
       service.yearly_cost != null ? String(service.yearly_cost) : "--",
     getSortValue: (service) => service.yearly_cost ?? -1,
-    render: (service) =>
-      service.yearly_cost != null
-        ? `$${Number(service.yearly_cost).toLocaleString()}`
-        : "--",
+    render: (service) => <Money value={service.yearly_cost} />,
   },
   {
     key: "payment_method",
@@ -258,23 +338,22 @@ const columnDefinitions: ServiceColumnDefinition[] = [
       ),
   },
   {
-    key: "billing_schedule",
-    label: "Billing Schedule",
+    key: "renewal",
+    label: "Renewal",
     filterType: "select",
-    getFilterValue: (service) =>
-      formatBillingSchedule(service.billing_schedule),
-    getSortValue: (service) => service.billing_schedule ?? "",
+    getFilterValue: (service) => formatRenewalConfig(service.renewal_config),
+    getSortValue: (service) => formatRenewalConfig(service.renewal_config),
     getFilterOptions: (services) =>
       getUniqueOptions(
-        services.map((service) => formatBillingSchedule(service.billing_schedule)),
+        services.map((service) => formatRenewalConfig(service.renewal_config)),
       ),
-    render: (service) => formatBillingSchedule(service.billing_schedule),
+    render: (service) => formatRenewalConfig(service.renewal_config),
   },
   {
     key: "renewal_date",
-    label: "Renewal Date",
+    label: "Next Renewal",
     filterType: "text",
-    filterPlaceholder: "Filter by renewal date...",
+    filterPlaceholder: "Filter by next renewal...",
     getFilterValue: (service) => service.renewal_date ?? "--",
     getSortValue: (service) => service.renewal_date ?? "",
   },
@@ -309,170 +388,76 @@ const columnDefinitions: ServiceColumnDefinition[] = [
     render: (service) => service.vendor?.name ?? "--",
   },
   {
+    key: "tags",
+    label: "Tags",
+    filterType: "select",
+    getFilterValue: (service) =>
+      service.tags.map((tag) => tag.name).join(", "),
+    getFilterValues: (service) => service.tags.map((tag) => tag.name),
+    getSortValue: (service) =>
+      service.tags.map((tag) => tag.name).join(", ").toLowerCase(),
+    getFilterOptions: (services) =>
+      getUniqueOptions(services.flatMap((service) => service.tags.map((tag) => tag.name))),
+    render: (service) => {
+      if (!service.tags?.length) {
+        return <span className="text-fg-4">—</span>;
+      }
+      const visible = service.tags.slice(0, 3);
+      const extra = service.tags.length - visible.length;
+      return (
+        <div className="flex flex-wrap items-center gap-1">
+          {visible.map((tag) => (
+            <ColoredReferenceBadge
+              key={tag.id}
+              label={tag.name}
+              color={tag.color}
+            />
+          ))}
+          {extra > 0 && (
+            <span
+              className="text-[11px] text-fg-3"
+              title={service.tags
+                .slice(3)
+                .map((tag) => tag.name)
+                .join(", ")}
+            >
+              +{extra} more
+            </span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
     key: "owners",
     label: "Owners",
     filterType: "text",
     filterPlaceholder: "Filter by owner...",
     getFilterValue: (service) => getOwnerNames(service) || "--",
     getSortValue: (service) => getOwnerNames(service),
-    render: (service) => <UserLinkList users={service.owners} />,
-  },
-  {
-    key: "seat_usage",
-    label: "Seat Usage",
-    filterType: "text",
-    filterPlaceholder: "Filter by seat usage...",
-    getFilterValue: (service) => {
-      const occupied = service.assignees?.length ?? 0;
-      const capacity = service.total_seats != null ? String(service.total_seats) : "Unlimited";
-      return `${occupied} / ${capacity}`;
-    },
-    getSortValue: (service) => service.assignees?.length ?? 0,
     render: (service) => {
-      const occupied = service.assignees?.length ?? 0;
-      return `${occupied} / ${service.total_seats ?? "Unlimited"}`;
+      if (service.owners.length === 0) {
+        return <span className="text-fg-4">—</span>;
+      }
+      if (service.owners.length === 1) {
+        const owner = service.owners[0];
+        return (
+          <Link
+            to={`/users/${owner.id}`}
+            onClick={(event) => event.stopPropagation()}
+            className="hlink inline-flex items-center gap-1.5 text-[13px] text-fg-2"
+          >
+            <Avatar user={owner} size={20} />
+            <span>{getOwnerDisplayName(owner)}</span>
+          </Link>
+        );
+      }
+      return <AvatarStack users={service.owners} max={4} size={22} />;
     },
-  },
-  {
-    key: "point_of_contact",
-    label: "Point of Contact",
-    filterType: "text",
-    filterPlaceholder: "Filter by contact...",
-    getFilterValue: (service) => service.point_of_contact ?? "",
-    getSortValue: (service) => service.point_of_contact ?? "",
-    render: (service) => service.point_of_contact?.trim() || "—",
   },
 ];
 
 const ALL_COLUMN_KEYS = columnDefinitions.map((column) => column.key);
-const DEFAULT_VISIBLE_COLUMN_KEYS = [
-  "name",
-  "status",
-  "spending_category",
-  "cost_center",
-  "classification",
-  "criticality",
-  "nonprofit_pricing",
-  "yearly_cost",
-  "payment_method",
-  "billing_schedule",
-  "renewal_date",
-  "sso_integrated",
-  "scim_enabled",
-  "vendor",
-  "owners",
-];
-
-function createDefaultServiceFilters(): ServiceFilters {
-  return Object.fromEntries(
-    columnDefinitions.map((column) => [
-      column.key,
-      column.filterType === "select" ? [] : "",
-    ]),
-  ) as ServiceFilters;
-}
-
-function cloneServiceFilters(filters: ServiceFilters): ServiceFilters {
-  return Object.fromEntries(
-    Object.entries(filters).map(([key, value]) => [
-      key,
-      Array.isArray(value) ? [...value] : value,
-    ]),
-  ) as ServiceFilters;
-}
-
-function normalizeVisibleColumns(raw: unknown): string[] {
-  if (!Array.isArray(raw)) {
-    return [...DEFAULT_VISIBLE_COLUMN_KEYS];
-  }
-
-  const valid = Array.from(
-    new Set(
-      raw.filter(
-        (key): key is string =>
-          typeof key === "string" && ALL_COLUMN_KEYS.includes(key),
-      ),
-    ),
-  );
-
-  return valid.length > 0 ? valid : [...DEFAULT_VISIBLE_COLUMN_KEYS];
-}
-
-function normalizeSortPreference(raw: unknown): SortState {
-  if (!raw || typeof raw !== "object") {
-    return { key: null, direction: null };
-  }
-
-  const candidate = raw as { key?: unknown; direction?: unknown };
-  const key =
-    typeof candidate.key === "string" && ALL_COLUMN_KEYS.includes(candidate.key)
-      ? candidate.key
-      : null;
-  const direction =
-    candidate.direction === "asc" || candidate.direction === "desc"
-      ? candidate.direction
-      : null;
-
-  if (!key || !direction) {
-    return { key: null, direction: null };
-  }
-
-  return { key, direction };
-}
-
-function normalizeFilters(raw: unknown): ServiceFilters {
-  const defaults = createDefaultServiceFilters();
-  if (!raw || typeof raw !== "object") {
-    return defaults;
-  }
-
-  const source = raw as Record<string, unknown>;
-  return Object.fromEntries(
-    columnDefinitions.map((column) => {
-      const value = source[column.key];
-      if (column.filterType === "select") {
-        const selected = Array.isArray(value)
-          ? Array.from(
-              new Set(
-                value.filter(
-                  (entry): entry is string =>
-                    typeof entry === "string" && entry.trim().length > 0,
-                ),
-              ),
-            )
-          : [];
-        return [column.key, selected];
-      }
-
-      return [column.key, typeof value === "string" ? value : ""];
-    }),
-  ) as ServiceFilters;
-}
-
-function normalizeServiceListPreferences(
-  raw: ServiceListPreferences | null | undefined,
-): ResolvedServiceListPreferences {
-  return {
-    visible_columns: normalizeVisibleColumns(raw?.visible_columns),
-    filters: normalizeFilters(raw?.filters),
-    sort: normalizeSortPreference(raw?.sort),
-  };
-}
-
-function readStoredServiceListPreferences(): ResolvedServiceListPreferences {
-  try {
-    const stored = localStorage.getItem(SERVICE_LIST_PREFERENCES_STORAGE_KEY);
-    if (!stored) {
-      return normalizeServiceListPreferences(null);
-    }
-
-    return normalizeServiceListPreferences(
-      JSON.parse(stored) as ServiceListPreferences,
-    );
-  } catch {
-    return normalizeServiceListPreferences(null);
-  }
-}
 
 function todayFilenameDate(): string {
   const d = new Date();
@@ -499,110 +484,160 @@ function getServiceExportValue(
   return def ? def.getFilterValue(service) : "";
 }
 
+interface GalleryCardProps {
+  service: Service;
+  preferences: UserPreferences | null;
+  showDescriptionTooltip: (
+    event: React.SyntheticEvent<HTMLElement>,
+    description: string,
+  ) => void;
+  hideDescriptionTooltip: () => void;
+}
+
+function ServiceGalleryCard({
+  service,
+  preferences,
+  showDescriptionTooltip,
+  hideDescriptionTooltip,
+}: GalleryCardProps) {
+  const renewalIso = service.renewal_date;
+  const renewalLabel = formatDateOnly(renewalIso, preferences);
+  return (
+    <Link
+      to={`/services/${service.id}`}
+      className="interactive-record flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 text-left shadow-sm transition-all hover:border-border-strong hover:shadow-md"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`shrink-0 ${service.description ? "cursor-help" : ""}`}
+          onMouseEnter={
+            service.description
+              ? (event) =>
+                  showDescriptionTooltip(event, service.description ?? "")
+              : undefined
+          }
+          onMouseLeave={
+            service.description ? hideDescriptionTooltip : undefined
+          }
+        >
+          <Monogram name={service.name} seed={service.id} size={36} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="record-primary-label truncate text-[14px] font-semibold text-fg">
+            {service.name}
+          </div>
+          <div className="truncate text-[12px] text-fg-3">
+            {service.vendor?.name ?? "—"}
+            {service.category_rel ? ` · ${service.category_rel.name}` : ""}
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {service.service_status ? (
+          <ColoredReferenceBadge
+            label={service.service_status.name}
+            color={service.service_status.color}
+          />
+        ) : (
+          <StatusBadge status={getServiceStatusLabel(service)} />
+        )}
+        {service.service_classification && (
+          <ClassificationBadge classification={service.service_classification} />
+        )}
+        {service.tags?.slice(0, 3).map((tag) => (
+          <ColoredReferenceBadge
+            key={tag.id}
+            label={tag.name}
+            color={tag.color}
+          />
+        ))}
+        {(service.tags?.length ?? 0) > 3 && (
+          <span
+            className="text-[11px] text-fg-3"
+            title={service.tags
+              .slice(3)
+              .map((tag) => tag.name)
+              .join(", ")}
+          >
+            +{service.tags.length - 3}
+          </span>
+        )}
+      </div>
+      <div className="mt-auto flex items-center justify-between border-t border-border pt-2.5 text-[12px] text-fg-3">
+        <span className="inline-flex items-center gap-1.5">
+          {renewalIso ? (
+            <>
+              <span>Renews {renewalLabel}</span>
+              <Days date={renewalIso} />
+            </>
+          ) : (
+            <span className="text-fg-4">No renewal</span>
+          )}
+        </span>
+        <Money value={service.yearly_cost} className="text-fg-2 font-medium" />
+      </div>
+    </Link>
+  );
+}
+
 export function Services() {
+  const persistedState = useMemo(() => loadListState(), []);
   const pageRef = useRef<HTMLDivElement | null>(null);
-  const storedServiceListPreferences = useMemo(
-    () => readStoredServiceListPreferences(),
-    [],
-  );
   const [services, setServices] = useState<Service[]>([]);
-  const [view, setView] = useState<"active" | "archived">("active");
-  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ServiceFilters>(() =>
-    cloneServiceFilters(storedServiceListPreferences.filters),
+  const [view, setView] = useState<"active" | "archived">(
+    persistedState?.view ?? "active",
   );
-  const [sortState, setSortState] = useState<SortState>(() => ({
-    ...storedServiceListPreferences.sort,
-  }));
+  const [loadedView, setLoadedView] = useState<"active" | "archived" | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewPref());
+  const [search, setSearch] = useState(persistedState?.search ?? "");
+  const [filters, setFilters] = useState<ServiceFilters>(
+    persistedState?.filters ?? createDefaultFilters(),
+  );
+  const [sortState, setSortState] = useState<SortState>(
+    persistedState?.sortState ?? { key: null, direction: null },
+  );
   const [hoveredDescription, setHoveredDescription] =
     useState<HoveredDescriptionState | null>(null);
-  const [visibleKeys, setVisibleKeys] = useState<string[]>(
-    () => [...storedServiceListPreferences.visible_columns],
+  const [visibleKeys, setVisibleKeys] = useColumnPrefs(
+    "catalogit:services:columns",
+    ALL_COLUMN_KEYS,
   );
-  const { canEdit, preferences, preferencesLoading, setPreferences } = useAuth();
-  const navigate = useNavigate();
-  const loading = loadedView !== view;
-  const serviceListPreferencesHydratedRef = useRef(false);
-  const lastSyncedServiceListSignatureRef = useRef<string | null>(null);
-
-  const profileServiceListPreferences = useMemo(
-    () => normalizeServiceListPreferences(preferences?.ui_preferences.service_list),
-    [preferences],
-  );
-  const currentServiceListPreferences = useMemo(
-    () =>
-      normalizeServiceListPreferences({
-        visible_columns: visibleKeys,
-        filters,
-        sort: sortState,
-      }),
-    [filters, sortState, visibleKeys],
-  );
+  const { canEdit, preferences } = useAuth();
+  const { showToast } = useToast();
+  const { records, fiscalYears } = useDashboardCostData();
 
   useEffect(() => {
-    if (preferencesLoading || serviceListPreferencesHydratedRef.current) {
-      return;
-    }
-
-    const hasProfilePreferences =
-      preferences?.ui_preferences.service_list !== undefined;
-    const sourcePreferences = hasProfilePreferences
-      ? profileServiceListPreferences
-      : storedServiceListPreferences;
-
-    const timeoutId = window.setTimeout(() => {
-      setVisibleKeys([...sourcePreferences.visible_columns]);
-      setFilters(cloneServiceFilters(sourcePreferences.filters));
-      setSortState({ ...sourcePreferences.sort });
-      lastSyncedServiceListSignatureRef.current = hasProfilePreferences
-        ? JSON.stringify(profileServiceListPreferences)
-        : null;
-      serviceListPreferencesHydratedRef.current = true;
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    preferences,
-    preferencesLoading,
-    profileServiceListPreferences,
-    storedServiceListPreferences,
-  ]);
-
-  useEffect(() => {
-    const serialized = JSON.stringify(currentServiceListPreferences);
-
     try {
-      localStorage.setItem(SERVICE_LIST_PREFERENCES_STORAGE_KEY, serialized);
+      const raw = sessionStorage.getItem(FLASH_TOAST_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { type?: "success" | "error"; text?: string };
+      if (parsed.type && parsed.text) {
+        showToast({ type: parsed.type, text: parsed.text });
+      }
+      sessionStorage.removeItem(FLASH_TOAST_KEY);
     } catch {
-      // Ignore storage failures; per-user persistence still attempts to save.
+      // Ignore malformed or unavailable storage.
     }
+  }, [showToast]);
 
-    if (!serviceListPreferencesHydratedRef.current) {
-      return;
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+    } catch {
+      /* ignore */
     }
-    if (serialized === lastSyncedServiceListSignatureRef.current) {
-      return;
+  }, [viewMode]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        LIST_STATE_STORAGE_KEY,
+        JSON.stringify({ view, search, filters, sortState } satisfies ServicesListState),
+      );
+    } catch {
+      // Ignore unavailable storage.
     }
-
-    const timeoutId = window.setTimeout(() => {
-      client
-        .patch<UserPreferences>("/api/me/preferences", {
-          ui_preferences: {
-            service_list: currentServiceListPreferences,
-          },
-        })
-        .then((response) => {
-          lastSyncedServiceListSignatureRef.current = serialized;
-          setPreferences(response.data);
-        })
-        .catch(() => {
-          // Keep local fallback state if profile sync fails.
-        });
-    }, 300);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [currentServiceListPreferences, setPreferences]);
+  }, [filters, search, sortState, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -611,10 +646,9 @@ export function Services() {
       .then((r) => {
         if (!cancelled) {
           setServices(r.data);
-          setLoadedView(view);
         }
       })
-      .catch(() => {
+      .finally(() => {
         if (!cancelled) {
           setLoadedView(view);
         }
@@ -623,6 +657,8 @@ export function Services() {
       cancelled = true;
     };
   }, [view]);
+
+  const loading = loadedView !== view;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -637,8 +673,9 @@ export function Services() {
           .includes(q) ||
         getServiceStatusLabel(service).toLowerCase().includes(q) ||
         (service.payment_method?.name ?? "").toLowerCase().includes(q) ||
-        service.billing_schedule.toLowerCase().includes(q) ||
+        formatRenewalConfig(service.renewal_config).toLowerCase().includes(q) ||
         (service.vendor?.name ?? "").toLowerCase().includes(q) ||
+        service.tags.some((tag) => tag.name.toLowerCase().includes(q)) ||
         service.owners.some(
           (owner) =>
             owner.first_name.toLowerCase().includes(q) ||
@@ -656,6 +693,11 @@ export function Services() {
           const values = Array.isArray(selected) ? selected : [];
           if (values.length === 0) {
             return true;
+          }
+          if (column.getFilterValues) {
+            // Multi-valued column (e.g. tags): ANY-of semantics.
+            const serviceValues = column.getFilterValues(service);
+            return serviceValues.some((entry) => values.includes(entry));
           }
           return values.includes(cellValue);
         }
@@ -711,7 +753,7 @@ export function Services() {
   }, [filtered, preferences, visibleKeys]);
 
   const showDescriptionTooltip = useCallback(
-    (event: React.SyntheticEvent<HTMLSpanElement>, description: string) => {
+    (event: React.SyntheticEvent<HTMLElement>, description: string) => {
       const containerRect = pageRef.current?.getBoundingClientRect();
       if (!containerRect) return;
       const rect = event.currentTarget.getBoundingClientRect();
@@ -733,14 +775,6 @@ export function Services() {
     setHoveredDescription(null);
   }, []);
 
-  const resetServiceListView = useCallback(() => {
-    const defaults = normalizeServiceListPreferences(null);
-    setSearch("");
-    setVisibleKeys([...defaults.visible_columns]);
-    setFilters(cloneServiceFilters(defaults.filters));
-    setSortState({ ...defaults.sort });
-  }, []);
-
   const hasActiveFilters = useMemo(() => {
     if (search.trim()) {
       return true;
@@ -749,6 +783,41 @@ export function Services() {
       Array.isArray(value) ? value.length > 0 : value.trim(),
     );
   }, [search, filters]);
+
+  const headerCounts = useMemo(() => {
+    const activeCount = services.filter((service) => {
+      const label = (service.service_status?.name ?? service.status ?? "").toLowerCase();
+      return service.is_active && (label === "" || label === "active" || label === "contract");
+    }).length;
+    const currentYear = new Date().getFullYear();
+    const dashYear =
+      fiscalYears.length === 0
+        ? currentYear
+        : fiscalYears.includes(currentYear)
+          ? currentYear
+          : fiscalYears[fiscalYears.length - 1];
+    const actualRecords = records.filter((record) => record.record_type === "actual");
+    const actualByYear = totalByYear(actualRecords, fiscalYears);
+    const combinedByYear = combinedActualEstimatedByYear(
+      records,
+      fiscalYears,
+      currentYear,
+    );
+    const annualTotal = visualAmountForRecordTypeAndYear(
+      "actual",
+      dashYear,
+      actualByYear[dashYear] ?? 0,
+      combinedByYear[dashYear] ?? 0,
+      currentYear,
+    );
+    return { activeCount, annualTotal };
+  }, [fiscalYears, records, services]);
+
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    setFilters(createDefaultFilters());
+    setSortState({ key: null, direction: null });
+  }, []);
 
   const columns = useMemo<Column<Service>[]>(() => {
     return columnDefinitions.map((column) => {
@@ -761,31 +830,49 @@ export function Services() {
         render:
           column.key === "name"
             ? (service) => (
-              <div className="inline-flex items-center gap-1.5">
-                {service.description && (
+                <div className="flex items-center gap-2.5">
                   <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Description: ${service.description}`}
-                    onMouseEnter={(event) =>
-                      showDescriptionTooltip(event, service.description ?? "")
+                    className={`shrink-0 ${service.description ? "cursor-help" : ""}`}
+                    onMouseEnter={
+                      service.description
+                        ? (event) =>
+                            showDescriptionTooltip(
+                              event,
+                              service.description ?? "",
+                            )
+                        : undefined
                     }
-                    onMouseLeave={hideDescriptionTooltip}
-                    onFocus={(event) =>
-                      showDescriptionTooltip(event, service.description ?? "")
+                    onMouseLeave={
+                      service.description ? hideDescriptionTooltip : undefined
                     }
-                    onBlur={hideDescriptionTooltip}
-                    className="inline-flex cursor-help text-[#4f46e5]"
                   >
-                    <InformationCircleIcon className="h-5 w-5" strokeWidth={2.25} />
+                    <Monogram name={service.name} seed={service.id} size={26} />
                   </span>
-                )}
-                <span>{service.name}</span>
-              </div>
-            )
+                  <div className="min-w-0">
+                    <div className="truncate">
+                      <Link
+                        to={`/services/${service.id}`}
+                        className="hlink text-fg"
+                      >
+                      {service.name}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )
             : column.key === "renewal_date"
-            ? (service) => formatDateOnly(service.renewal_date, preferences)
-            : column.render,
+              ? (service) =>
+                  service.renewal_date ? (
+                    <div className="flex flex-col leading-tight">
+                      <span className="tnum text-[12.5px]">
+                        {formatDateOnly(service.renewal_date, preferences)}
+                      </span>
+                      <Days date={service.renewal_date} />
+                    </div>
+                  ) : (
+                    <span className="text-fg-4">—</span>
+                  )
+              : column.render,
         header:
           column.filterType === "select" ? (
             <ColumnHeaderMenu
@@ -844,120 +931,176 @@ export function Services() {
 
   return (
     <PageTransition>
-    <div ref={pageRef} className="relative">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Services</h1>
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="rounded-md border border-gray-300 dark:border-gray-700 p-0.5 flex">
-            <button
-              type="button"
-              onClick={() => setView("active")}
-              className={`px-3 py-1.5 text-sm rounded ${
-                view === "active"
-                  ? "bg-brand-600 text-white"
-                  : "text-gray-600 dark:text-gray-300"
-              }`}
+      <div ref={pageRef} className="relative">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1
+              className="text-fg"
+              style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
             >
-              Active
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("archived")}
-              className={`px-3 py-1.5 text-sm rounded ${
-                view === "archived"
-                  ? "bg-brand-600 text-white"
-                  : "text-gray-600 dark:text-gray-300"
-              }`}
-            >
-              Archived
-            </button>
-          </div>
-          {!loading && (
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              disabled={filtered.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-150 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ArrowDownTrayIcon className="h-4 w-4" />
-              Export CSV
-            </button>
-          )}
-          {canEdit && view === "active" && (
-            <Link
-              to="/services/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-brand-700"
-            >
-              <PlusIcon className="h-4 w-4" />
-              New Service
-            </Link>
-          )}
-        </div>
-      </div>
-      {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-12 w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
-          ))}
-        </div>
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="max-w-sm min-w-[200px] flex-1">
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="Search services..."
-              />
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-              {hasActiveFilters ? (
-                <>
-                  <span className="font-medium text-gray-900 dark:text-gray-100">
-                    {filtered.length}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400"> / {services.length} </span>
-                  {services.length === 1 ? "service" : "services"}
-                </>
+              Services
+            </h1>
+            <div className="mt-1 text-[13px] text-fg-3">
+              {loading ? (
+                "Loading…"
               ) : (
                 <>
-                  {services.length}{" "}
-                  {services.length === 1 ? "service" : "services"}
+                  <span>
+                    {services.length} {services.length === 1 ? "service" : "services"}
+                  </span>
+                  <span className="mx-1.5">·</span>
+                  <span>{headerCounts.activeCount} active</span>
+                  <span className="mx-1.5">·</span>
+                  <span className="tnum">
+                    {formatMoneyFull(headerCounts.annualTotal, "USD")} annualized
+                  </span>
                 </>
               )}
-            </p>
-            <ColumnSelector
-              columns={columns}
-              visibleKeys={visibleKeys}
-              onChange={setVisibleKeys}
-            />
-            <button
-              type="button"
-              onClick={resetServiceListView}
-              className="inline-flex items-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Reset view
-            </button>
+            </div>
           </div>
-          <DataTable
-            columns={columns}
-            data={filtered}
-            visibleKeys={visibleKeys}
-            striped
-            primaryColumnKey="name"
-            onRowClick={(s) => navigate(`/services/${s.id}`)}
-          />
-        </>
-      )}
-      {hoveredDescription && (
-        <div
-          className="pointer-events-none absolute z-[9999] max-w-xs rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-1 text-xs text-gray-700 dark:text-gray-200 shadow-lg"
-          style={{ left: hoveredDescription.left, top: hoveredDescription.top }}
-        >
-          {hoveredDescription.text}
+          <div className="flex shrink-0 items-center gap-2">
+            <SegmentedControl<ViewMode>
+              value={viewMode}
+              onChange={setViewMode}
+              size="sm"
+              options={[
+                { value: "table", label: "Table" },
+                { value: "gallery", label: "Gallery" },
+              ]}
+            />
+            <div className="inline-flex rounded-md border border-border bg-surface-2 p-0.5">
+              <button
+                type="button"
+                onClick={() => setView("active")}
+                className={`rounded px-3 py-1 text-xs font-medium transition-all ${
+                  view === "active"
+                    ? "bg-surface text-fg shadow-sm"
+                    : "text-fg-3 hover:text-fg-2"
+                }`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("archived")}
+                className={`rounded px-3 py-1 text-xs font-medium transition-all ${
+                  view === "archived"
+                    ? "bg-surface text-fg shadow-sm"
+                    : "text-fg-3 hover:text-fg-2"
+                }`}
+              >
+                Archived
+              </button>
+            </div>
+            {!loading && (
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                disabled={filtered.length === 0}
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] font-medium text-fg-2 transition-colors hover:border-border-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                Export
+              </button>
+            )}
+            {canEdit && view === "active" && (
+              <Link
+                to="/services/new"
+                className="inline-flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-strong"
+              >
+                <PlusIcon className="h-4 w-4" />
+                New service
+              </Link>
+            )}
+          </div>
         </div>
-      )}
-    </div>
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="h-12 w-full animate-pulse rounded-lg bg-surface-2"
+              />
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="min-w-[220px] max-w-sm flex-1">
+                <SearchInput
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Search services..."
+                />
+              </div>
+              <div className="flex-1" />
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="rounded-md px-2 py-1 text-[12px] text-fg-3 hover:bg-surface-2 hover:text-fg-2"
+                >
+                  Clear all filters
+                </button>
+              )}
+              <p className="whitespace-nowrap text-[13px] text-fg-3">
+                {hasActiveFilters ? (
+                  <>
+                    <span className="font-medium text-fg">{filtered.length}</span>
+                    <span className="text-fg-3"> / {services.length} </span>
+                    {services.length === 1 ? "service" : "services"}
+                  </>
+                ) : (
+                  <>
+                    {services.length}{" "}
+                    {services.length === 1 ? "service" : "services"}
+                  </>
+                )}
+              </p>
+              {viewMode === "table" && (
+                <ColumnSelector
+                  columns={columns}
+                  visibleKeys={visibleKeys}
+                  onChange={setVisibleKeys}
+                />
+              )}
+            </div>
+            {viewMode === "table" ? (
+              <DataTable
+                columns={columns}
+                data={filtered}
+                visibleKeys={visibleKeys}
+                striped
+                primaryColumnKey="name"
+              />
+            ) : filtered.length === 0 ? (
+              <div className="rounded-lg border border-border bg-surface py-12 text-center text-[13px] text-fg-3">
+                No services match your filters.
+              </div>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
+                {filtered.map((service) => (
+                  <ServiceGalleryCard
+                    key={service.id}
+                    service={service}
+                    preferences={preferences}
+                    showDescriptionTooltip={showDescriptionTooltip}
+                    hideDescriptionTooltip={hideDescriptionTooltip}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {hoveredDescription && (
+          <div
+            className="pointer-events-none absolute z-[9999] max-w-xs rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg-2 shadow-lg"
+            style={{ left: hoveredDescription.left, top: hoveredDescription.top }}
+          >
+            {hoveredDescription.text}
+          </div>
+        )}
+      </div>
     </PageTransition>
   );
 }

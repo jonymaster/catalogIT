@@ -30,6 +30,7 @@ import {
 } from "../components/Badge";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/useToast";
 import {
   toDraft,
   validateDraft,
@@ -39,13 +40,16 @@ import {
 } from "../service/serviceDetailContext";
 import type { Service } from "../types/models";
 
-type ExtraTab = "activity" | "integrations" | null;
+type ExtraTab = "activity" | null;
+const FLASH_TOAST_KEY = "catalogit:flash-toast";
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
-  const { canEdit } = useAuth();
+  const { canEdit, user } = useAuth();
+  const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const isAdmin = user?.role === "admin";
 
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +59,23 @@ export function ServiceDetail() {
   const [errors, setErrors] = useState<ServiceValidationErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState<"archive" | "unarchive" | "delete" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [extraTab, setExtraTab] = useState<ExtraTab>(null);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(FLASH_TOAST_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { type?: "success" | "error"; text?: string };
+      if (parsed.type && parsed.text) {
+        showToast({ type: parsed.type, text: parsed.text });
+      }
+      sessionStorage.removeItem(FLASH_TOAST_KEY);
+    } catch {
+      // Ignore malformed or unavailable storage.
+    }
+  }, [showToast]);
 
   useEffect(() => {
     if (!id) {
@@ -140,10 +160,7 @@ export function ServiceDetail() {
       payment_method_id: draft.payment_method_id || null,
       service_status_id: draft.service_status_id || null,
       classification_id: draft.classification_id || null,
-      billing_schedule: draft.billing_schedule,
-      renewal_date: draft.renewal_date || null,
-      yearly_cost:
-        draft.yearly_cost.trim() === "" ? null : Number(draft.yearly_cost),
+      renewal_config: draft.renewal_config,
       criticality: draft.criticality || null,
       total_seats:
         draft.total_seats.trim() === "" ? null : Number(draft.total_seats),
@@ -151,6 +168,7 @@ export function ServiceDetail() {
       scim_enabled: draft.scim_enabled,
       nonprofit_pricing: draft.nonprofit_pricing,
       owner_ids: draft.owner_ids,
+      tag_ids: draft.tags.map((tag) => tag.id),
     };
     try {
       const res = await client.put<Service>(
@@ -160,6 +178,7 @@ export function ServiceDetail() {
       setService(res.data);
       setDraft(toDraft(res.data));
       setEditingState(false);
+      showToast({ type: "success", text: "Service updated." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save service";
       setSaveError(msg);
@@ -168,8 +187,73 @@ export function ServiceDetail() {
     }
   }
 
-  // Leave edit mode if the route moves off the overview tab. The check mirrors
-  // React's new guidance to only setState when the external value genuinely changed.
+  function getActionErrorMessage(err: unknown): string {
+    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return "Action failed. Please try again.";
+  }
+
+  async function handleArchive() {
+    if (!service) return;
+    const confirmed = window.confirm(
+      `Archive "${service.name}"? It will move to the Archived services view.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("archive");
+    setActionError(null);
+    try {
+      const res = await client.post<Service>(`/api/services/${service.id}/archive`);
+      setService(res.data);
+      setDraft(toDraft(res.data));
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleUnarchive() {
+    if (!service) return;
+    const confirmed = window.confirm(
+      `Unarchive "${service.name}"? It will return to Active services.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("unarchive");
+    setActionError(null);
+    try {
+      const res = await client.post<Service>(`/api/services/${service.id}/unarchive`);
+      setService(res.data);
+      setDraft(toDraft(res.data));
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!service) return;
+    const confirmed = window.confirm(
+      `Delete "${service.name}" permanently? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setActionBusy("delete");
+    setActionError(null);
+    try {
+      await client.delete(`/api/services/${service.id}`);
+      navigate("/services");
+    } catch (err: unknown) {
+      setActionError(getActionErrorMessage(err));
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
   const pathname = location.pathname;
   const lastPathRef = useRef(pathname);
   if (lastPathRef.current !== pathname) {
@@ -227,6 +311,12 @@ export function ServiceDetail() {
     setExtraTab(tab);
   }
 
+  const displayName = editing ? draft.name : service.name;
+  const serviceNameReadCls =
+    "block min-w-0 w-full max-w-full break-words text-[22px] font-semibold leading-tight text-fg";
+  const serviceNameEditCls =
+    "box-border border-0 bg-transparent px-0 py-0 outline-none transition-colors placeholder:text-fg-4 focus-visible:rounded-sm focus-visible:bg-surface focus-visible:shadow-[inset_0_0_0_1px_theme(colors.gray.400)] focus-visible:ring-2 focus-visible:ring-accent/30 dark:focus-visible:shadow-[inset_0_0_0_1px_theme(colors.gray.600)]";
+
   return (
     <PageTransition>
       <div className="space-y-6">
@@ -235,20 +325,45 @@ export function ServiceDetail() {
             Services
           </Link>
           <ChevronRightIcon className="h-3 w-3" />
-          <span className="text-fg-2">{service.name}</span>
+          <span className="text-fg-2">{displayName}</span>
         </div>
 
         <div className="flex flex-wrap items-start gap-4">
           <div className="shrink-0">
-            <Monogram name={service.name} seed={service.id} size={40} />
+            <Monogram name={displayName} seed={service.id} size={40} />
           </div>
           <div className="min-w-0 flex-1">
-            <h1
-              className="text-[22px] font-semibold text-fg"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              {service.name}
-            </h1>
+            {!service.is_active && (
+              <div className="mb-2 inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                Archived
+              </div>
+            )}
+            {editing ? (
+              <div>
+                <input
+                  id="service-header-name"
+                  type="text"
+                  name="service_name"
+                  autoComplete="off"
+                  aria-label="Service name"
+                  value={draft.name}
+                  onChange={(e) => setDraftField("name", e.target.value)}
+                  className={`${serviceNameReadCls} ${serviceNameEditCls}`}
+                  style={{ letterSpacing: "-0.02em" }}
+                  aria-invalid={!!errors.name}
+                />
+                {errors.name && (
+                  <p className="mt-1 text-xs text-danger">{errors.name}</p>
+                )}
+              </div>
+            ) : (
+              <h1
+                className={serviceNameReadCls}
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                {service.name}
+              </h1>
+            )}
             {service.vendor?.name && (
               <p className="mt-0.5 text-sm text-fg-3">{service.vendor.name}</p>
             )}
@@ -266,6 +381,13 @@ export function ServiceDetail() {
                   classification={service.service_classification}
                 />
               )}
+              {service.tags?.map((tag) => (
+                <ColoredReferenceBadge
+                  key={tag.id}
+                  label={tag.name}
+                  color={tag.color}
+                />
+              ))}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -302,13 +424,34 @@ export function ServiceDetail() {
                 </button>
               </>
             )}
-            {!editing && <KebabMenu />}
+            {!editing && (
+              <KebabMenu
+                canEdit={canEdit}
+                canDelete={isAdmin}
+                isArchived={!service.is_active}
+                busyAction={actionBusy}
+                onArchive={() => {
+                  void handleArchive();
+                }}
+                onUnarchive={() => {
+                  void handleUnarchive();
+                }}
+                onDelete={() => {
+                  void handleDelete();
+                }}
+              />
+            )}
           </div>
         </div>
 
         {saveError && editing && (
           <div className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
             {saveError}
+          </div>
+        )}
+        {actionError && !editing && (
+          <div className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+            {actionError}
           </div>
         )}
 
@@ -336,23 +479,30 @@ export function ServiceDetail() {
               active={location.pathname.endsWith("/costs")}
               onClick={() => openRoutedTab(`/services/${id}/costs`)}
             />
+            <TabLink
+              to="attachments"
+              end={false}
+              label="Attachments"
+              active={location.pathname.endsWith("/attachments")}
+              onClick={() => openRoutedTab(`/services/${id}/attachments`)}
+            />
+            <TabLink
+              to="notifications"
+              end={false}
+              label="Notifications"
+              active={location.pathname.endsWith("/notifications")}
+              onClick={() => openRoutedTab(`/services/${id}/notifications`)}
+            />
             <TabButton
               label="Activity"
               active={activeExtra === "activity"}
               onClick={() => openExtraTab("activity")}
-            />
-            <TabButton
-              label="Integrations"
-              active={activeExtra === "integrations"}
-              onClick={() => openExtraTab("integrations")}
             />
           </nav>
         </div>
 
         {activeExtra === "activity" ? (
           <ActivityPanel serviceId={service.id} />
-        ) : activeExtra === "integrations" ? (
-          <IntegrationsPanel service={service} />
         ) : (
           <Outlet context={outletContext} />
         )}
@@ -416,8 +566,36 @@ function TabButton({ label, active, onClick }: TabButtonProps) {
   );
 }
 
-function KebabMenu() {
+interface KebabMenuProps {
+  canEdit: boolean;
+  canDelete: boolean;
+  isArchived: boolean;
+  busyAction: "archive" | "unarchive" | "delete" | null;
+  onArchive: () => void;
+  onUnarchive: () => void;
+  onDelete: () => void;
+}
+
+function KebabMenu({
+  canEdit,
+  canDelete,
+  isArchived,
+  busyAction,
+  onArchive,
+  onUnarchive,
+  onDelete,
+}: KebabMenuProps) {
   const [open, setOpen] = useState(false);
+  const isBusy = busyAction !== null;
+
+  function runAndClose(action: () => void) {
+    action();
+    setOpen(false);
+  }
+
+  const archiveLabel = isArchived ? "Unarchive" : "Archive";
+  const archiveBusy = busyAction === "archive" || busyAction === "unarchive";
+  const deleteDisabled = !isArchived || !canDelete || isBusy;
   return (
     <div className="relative">
       <button
@@ -425,6 +603,7 @@ function KebabMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
+        disabled={isBusy}
         className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-fg-2 transition-colors hover:bg-surface-2"
       >
         <span className="sr-only">More actions</span>
@@ -452,11 +631,27 @@ function KebabMenu() {
             className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-md"
           >
             <MenuItem label="Duplicate" onClick={() => setOpen(false)} />
-            <MenuItem label="Archive" onClick={() => setOpen(false)} />
+            {canEdit && (
+              <MenuItem
+                label={archiveBusy ? `${archiveLabel}...` : archiveLabel}
+                disabled={isBusy}
+                onClick={() =>
+                  runAndClose(isArchived ? onUnarchive : onArchive)
+                }
+              />
+            )}
             <MenuItem
               label="Delete"
               variant="danger"
-              onClick={() => setOpen(false)}
+              disabled={deleteDisabled}
+              title={
+                !isArchived
+                  ? "Archive service before deleting"
+                  : !canDelete
+                    ? "Only admins can delete services"
+                    : undefined
+              }
+              onClick={() => runAndClose(onDelete)}
             />
           </div>
         </>
@@ -469,17 +664,23 @@ function MenuItem({
   label,
   onClick,
   variant,
+  disabled,
+  title,
 }: {
   label: string;
   onClick: () => void;
   variant?: "danger";
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
+      title={title}
+      disabled={disabled}
       onClick={onClick}
-      className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors hover:bg-surface-2 ${
+      className={`flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 ${
         variant === "danger" ? "text-danger" : "text-fg-2"
       }`}
     >
@@ -502,49 +703,6 @@ function ActivityPanel({ serviceId }: { serviceId: string }) {
     <Panel title="Activity">
       <p className="mb-4 text-sm text-fg-3">Recent changes to this service.</p>
       <AuditTimeline tableName="services" recordId={serviceId} perPage={20} />
-    </Panel>
-  );
-}
-
-function IntegrationsPanel({ service }: { service: Service }) {
-  const items = [
-    {
-      label: "SSO",
-      enabled: Boolean(service.sso_integrated),
-      description:
-        "Single sign-on via the organization's identity provider.",
-    },
-    {
-      label: "SCIM provisioning",
-      enabled: Boolean(service.scim_enabled),
-      description:
-        "Automated user lifecycle via SCIM. Toggle on the Overview tab in edit mode.",
-    },
-  ];
-  return (
-    <Panel title="Integrations">
-      <ul className="divide-y divide-border">
-        {items.map((item) => (
-          <li
-            key={item.label}
-            className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
-          >
-            <div>
-              <p className="text-sm font-medium text-fg">{item.label}</p>
-              <p className="mt-0.5 text-xs text-fg-3">{item.description}</p>
-            </div>
-            <span
-              className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                item.enabled
-                  ? "bg-success-soft text-success"
-                  : "bg-surface-2 text-fg-3"
-              }`}
-            >
-              {item.enabled ? "Enabled" : "Disabled"}
-            </span>
-          </li>
-        ))}
-      </ul>
     </Panel>
   );
 }

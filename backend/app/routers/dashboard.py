@@ -39,6 +39,7 @@ class CostRecordOut(BaseModel):
     environment_name: str | None = None
     team_name: str | None = None
     team_names: list[str] = Field(default_factory=list)
+    operating_system: str | None = None
     fiscal_year: int
     amount: float
     record_type: str
@@ -132,6 +133,7 @@ async def get_dashboard(
                     environment_name=svc.environment,
                     team_name=", ".join(team_names) if team_names else None,
                     team_names=team_names,
+                    operating_system=None,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,
@@ -164,6 +166,7 @@ async def get_dashboard(
                     environment_name=None,
                     team_name=None,
                     team_names=[],
+                    operating_system=lap.operating_system,
                     fiscal_year=r.fiscal_year,
                     amount=float(r.amount),
                     record_type=r.record_type,

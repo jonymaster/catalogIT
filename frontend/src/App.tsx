@@ -15,13 +15,17 @@ import { ServiceDetail } from "./pages/ServiceDetail";
 import { ServiceOverview } from "./pages/ServiceOverview";
 import { ServiceCosts } from "./pages/ServiceCosts";
 import { ServiceAssignments } from "./pages/ServiceAssignments";
+import { ServiceAttachments } from "./pages/ServiceAttachments";
+import { ServiceNotifications } from "./pages/ServiceNotifications";
 import { CostRecordCreate } from "./pages/CostRecordCreate";
 import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
 import { LaptopDetail } from "./pages/LaptopDetail";
+import { LaptopOverview } from "./pages/LaptopOverview";
+import { LaptopAttachments } from "./pages/LaptopAttachments";
 import { ServiceCreate } from "./pages/ServiceCreate";
 import { LaptopCreate } from "./pages/LaptopCreate";
-import { LaptopEdit } from "./pages/LaptopEdit";
+import { LaptopEditRedirect } from "./pages/LaptopEditRedirect";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
 import { UserDetail } from "./pages/UserDetail";
@@ -67,13 +71,18 @@ export default function App() {
                   <Route index element={<ServiceOverview />} />
                   <Route path="costs" element={<ServiceCosts />} />
                   <Route path="assignments" element={<ServiceAssignments />} />
+                  <Route path="attachments" element={<ServiceAttachments />} />
+                  <Route path="notifications" element={<ServiceNotifications />} />
                 </Route>
                 <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
                 <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
                 <Route path="/hardware" element={<Hardware />} />
                 <Route path="/hardware/new" element={<LaptopCreate />} />
-                <Route path="/hardware/:id" element={<LaptopDetail />} />
-                <Route path="/hardware/:id/edit" element={<LaptopEdit />} />
+                <Route path="/hardware/:id" element={<LaptopDetail />}>
+                  <Route index element={<LaptopOverview />} />
+                  <Route path="attachments" element={<LaptopAttachments />} />
+                </Route>
+                <Route path="/hardware/:id/edit" element={<LaptopEditRedirect />} />
                 <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
             </Route>

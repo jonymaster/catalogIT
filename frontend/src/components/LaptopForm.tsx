@@ -6,11 +6,15 @@ import {
   LAPTOP_VIEW_SECTIONS,
   type LaptopFieldKey,
 } from "../hardware/laptopViewLayout";
+import { OsIcon } from "./ui/OsIcon";
+import { Button } from "./ui/Button";
+import { OS_OPTIONS } from "../utils/operatingSystem";
 import type {
   CostRecord,
   HardwareLocation,
   HardwareStatus,
   Laptop,
+  OperatingSystem,
   User,
 } from "../types/models";
 
@@ -21,6 +25,7 @@ interface Props {
 interface FormData {
   serial_number: string;
   model_name: string;
+  operating_system: string;
   cpu: string;
   ram: string;
   storage_size: string;
@@ -29,7 +34,7 @@ interface FormData {
   hardware_location_id: string;
   assigned_to_id: string;
   notes: string;
-  /** Shown on create only; stored on the first cost record, not on the laptop row */
+  mdm_connected: boolean;
   purchase_year: string;
   purchase_cost: string;
 }
@@ -44,6 +49,7 @@ function toFormData(l?: Laptop): FormData {
   return {
     serial_number: l?.serial_number ?? "",
     model_name: l?.model_name ?? "",
+    operating_system: l?.operating_system ?? "",
     cpu: l?.cpu ?? "",
     ram: l?.ram ?? "",
     storage_size: l?.storage_size ?? "",
@@ -52,14 +58,15 @@ function toFormData(l?: Laptop): FormData {
     hardware_location_id: l?.hardware_location_id ?? "",
     assigned_to_id: l?.assigned_to_id ?? "",
     notes: l?.notes ?? "",
+    mdm_connected: l?.mdm_connected ?? false,
     purchase_year: "",
     purchase_cost: "",
   };
 }
 
-export function LaptopForm({ initial }: Props) {
+export function LaptopForm({ initial }: Props = {}) {
   const navigate = useNavigate();
-  const isEdit = !!initial;
+  const isEdit = Boolean(initial?.id);
 
   const [form, setForm] = useState<FormData>(() => toFormData(initial));
   const [saving, setSaving] = useState(false);
@@ -68,10 +75,12 @@ export function LaptopForm({ initial }: Props) {
     Partial<Record<LaptopFieldErrorKey, string>>
   >({});
   const [users, setUsers] = useState<User[]>([]);
-  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>([]);
-  const [hardwareLocations, setHardwareLocations] = useState<HardwareLocation[]>(
+  const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>(
     [],
   );
+  const [hardwareLocations, setHardwareLocations] = useState<
+    HardwareLocation[]
+  >([]);
 
   useEffect(() => {
     client.get<User[]>("/api/users/").then((r) => setUsers(r.data));
@@ -194,6 +203,9 @@ export function LaptopForm({ initial }: Props) {
     const payload = {
       serial_number: trimmedSerial,
       model_name: trimmedModel,
+      operating_system: form.operating_system
+        ? (form.operating_system as OperatingSystem)
+        : null,
       cpu: form.cpu,
       ram: form.ram,
       storage_size: form.storage_size,
@@ -202,10 +214,11 @@ export function LaptopForm({ initial }: Props) {
       hardware_location_id: form.hardware_location_id || null,
       assigned_to_id: form.assigned_to_id || null,
       notes: form.notes || null,
+      mdm_connected: form.mdm_connected,
     };
 
     try {
-      if (isEdit) {
+      if (isEdit && initial) {
         await client.put(`/api/laptops/${initial.id}`, payload);
         if (initial.is_active) {
           await client.put(`/api/laptops/${initial.id}/hardware-cost`, {
@@ -243,6 +256,10 @@ export function LaptopForm({ initial }: Props) {
       .join(" ");
   const sectionCardCls =
     "rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm";
+
+  const rowGridCls = "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3";
+
+  const showPurchaseFields = !isEdit || (initial?.is_active ?? false);
 
   function renderFieldControl(key: LaptopFieldKey) {
     switch (key) {
@@ -405,7 +422,7 @@ export function LaptopForm({ initial }: Props) {
       )}
 
       <div className={sectionCardCls}>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelCls}>Serial Number *</label>
             <input
@@ -431,13 +448,51 @@ export function LaptopForm({ initial }: Props) {
               <p className="mt-1 text-xs text-red-600">{fieldErrors.model_name}</p>
             )}
           </div>
+
+          <div>
+            <label className={labelCls}>Operating system</label>
+            <div className="flex items-center gap-2">
+              <OsIcon
+                operatingSystem={
+                  form.operating_system
+                    ? (form.operating_system as OperatingSystem)
+                    : null
+                }
+                className="h-7 w-7 shrink-0"
+              />
+              <select
+                className={`${inputCls} min-w-0 flex-1`}
+                value={form.operating_system}
+                onChange={(e) => set("operating_system", e.target.value)}
+              >
+                <option value="">— Unknown —</option>
+                {OS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+            <input
+              type="checkbox"
+              checked={form.mdm_connected}
+              onChange={(e) => set("mdm_connected", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+            />
+            MDM Connected
+          </label>
         </div>
       </div>
 
       {LAPTOP_VIEW_SECTIONS.map((section) => {
         const visibleFields = section.fields.filter((key) => {
           if (key === "purchase_year" || key === "purchase_cost") {
-            return !isEdit || (initial?.is_active ?? false);
+            return showPurchaseFields;
           }
           return true;
         });
@@ -451,7 +506,7 @@ export function LaptopForm({ initial }: Props) {
             <h2 className="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
               {section.title}
             </h2>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className={rowGridCls}>
               {visibleFields.map((key) => (
                 <div
                   key={key}
@@ -466,13 +521,9 @@ export function LaptopForm({ initial }: Props) {
       })}
 
       <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : isEdit ? "Update Laptop" : "Create Laptop"}
-        </button>
+        <Button type="submit" disabled={saving}>
+          {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Laptop"}
+        </Button>
         <button
           type="button"
           onClick={() => navigate(-1)}

@@ -112,6 +112,7 @@ class UserPreferencesRead(BaseModel):
     timezone: str | None = None
     theme: Literal["light", "dark"] = "light"
     ui_preferences: dict[str, Any] = Field(default_factory=dict)
+    receive_renewal_notifications: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -126,6 +127,7 @@ class UserPreferencesUpdate(BaseModel):
     timezone: str | None = None
     theme: Literal["light", "dark"] | None = None
     ui_preferences: dict[str, Any] | None = None
+    receive_renewal_notifications: bool | None = None
 
 
 def user_read_from_orm(user: UserOrm) -> UserRead:

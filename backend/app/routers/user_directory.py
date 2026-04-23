@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from math import ceil
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
@@ -35,19 +34,17 @@ def _escape_like_term(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _apply_directory_search(stmt, q: str | None):
+def _directory_search_filter(q: str | None):
     needle = (q or "").strip().lower()
     if not needle:
-        return stmt
+        return None
     like = f"%{_escape_like_term(needle)}%"
-    return stmt.where(
-        or_(
-            func.lower(User.email).like(like, escape="\\"),
-            func.lower(User.first_name).like(like, escape="\\"),
-            func.lower(User.last_name).like(like, escape="\\"),
-            func.lower(func.coalesce(User.display_name, "")).like(like, escape="\\"),
-            func.lower(func.coalesce(User.department, "")).like(like, escape="\\"),
-        )
+    return or_(
+        func.lower(User.email).like(like, escape="\\"),
+        func.lower(User.first_name).like(like, escape="\\"),
+        func.lower(User.last_name).like(like, escape="\\"),
+        func.lower(func.coalesce(User.display_name, "")).like(like, escape="\\"),
+        func.lower(func.coalesce(User.department, "")).like(like, escape="\\"),
     )
 
 
@@ -59,26 +56,21 @@ async def list_users_paginated(
     _user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    count_stmt = _apply_directory_search(
-        select(func.count()).select_from(User),
-        q,
-    )
-    total = int(
-        (await db.execute(count_stmt)).scalar_one()
-    )
-    total_pages = max(1, ceil(total / per_page)) if total > 0 else 1
-    offset = (page - 1) * per_page
-    page_stmt = _apply_directory_search(
+    filt = _directory_search_filter(q)
+    count_stmt = select(func.count()).select_from(User)
+    list_stmt = (
         select(User)
         .options(selectinload(User.permission_rows))
-        .order_by(User.email),
-        q,
+        .order_by(User.email)
     )
-    result = await db.execute(
-        page_stmt
-        .offset(offset)
-        .limit(per_page)
-    )
+    if filt is not None:
+        count_stmt = count_stmt.where(filt)
+        list_stmt = list_stmt.where(filt)
+
+    total = int((await db.execute(count_stmt)).scalar_one())
+    total_pages = max(1, ceil(total / per_page)) if total > 0 else 1
+    offset = (page - 1) * per_page
+    result = await db.execute(list_stmt.offset(offset).limit(per_page))
     items = [user_read_from_orm(u) for u in result.scalars().all()]
     return UserDirectoryPage(
         items=items,

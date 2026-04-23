@@ -42,6 +42,7 @@ export interface UserPreferences {
   timezone: string | null;
   theme: "light" | "dark";
   ui_preferences: UserUiPreferences;
+  receive_renewal_notifications: boolean;
 }
 
 export type DashboardWidgetId =
@@ -122,6 +123,12 @@ export interface HardwareLocation {
   description: string | null;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface ServiceClassification {
   id: string;
   slug: string;
@@ -177,12 +184,16 @@ export interface RelatedService {
   is_active: boolean;
 }
 
+export type RenewalConfig =
+  | { type: "annual"; month: number; day: number }
+  | { type: "monthly"; day: number };
+
 export interface Service {
   id: string;
   name: string;
   description: string | null;
   status: string;
-  billing_schedule: string;
+  renewal_config: RenewalConfig | null;
   renewal_date: string | null;
   subcategory: string | null;
   environment: string | null;
@@ -193,6 +204,7 @@ export interface Service {
   owners: User[];
   assignees: User[];
   related_services: RelatedService[];
+  notification_recipients: User[];
   total_seats: number | null;
   // Normalized fields
   vendor_id: string | null;
@@ -215,9 +227,12 @@ export interface Service {
   payment_method: PaymentMethod | null;
   service_status: ServiceStatus | null;
   service_classification: ServiceClassification | null;
+  tags: Tag[];
   created_at: string;
   updated_at: string;
 }
+
+export type OperatingSystem = "macos" | "linux" | "windows";
 
 export interface Laptop {
   id: string;
@@ -226,6 +241,7 @@ export interface Laptop {
   cpu: string;
   ram: string;
   storage_size: string;
+  operating_system: OperatingSystem | null;
   status: string;
   hardware_status_id: string | null;
   hardware_location_id: string | null;
@@ -234,6 +250,7 @@ export interface Laptop {
   assigned_to_id: string | null;
   assigned_to: User | null;
   notes: string | null;
+  mdm_connected: boolean;
   is_active: boolean;
   archived_at: string | null;
   created_at: string;

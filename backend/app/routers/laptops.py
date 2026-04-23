@@ -26,7 +26,13 @@ router = APIRouter(prefix="/api/laptops", tags=["laptops"])
 
 _writer = require_role("admin", "editor")
 _admin = require_role("admin")
-_ARCHIVED_LAPTOP_EDITABLE_FIELDS = {"notes", "status", "hardware_status_id", "hardware_location_id"}
+_ARCHIVED_LAPTOP_EDITABLE_FIELDS = {
+    "notes",
+    "status",
+    "hardware_status_id",
+    "hardware_location_id",
+    "mdm_connected",
+}
 _DUPLICATE_SERIAL_NUMBER_DETAIL = "A laptop with this serial number already exists"
 
 
@@ -35,7 +41,7 @@ def _validate_archived_laptop_update_fields(update_data: dict[str, object]) -> N
     if disallowed_fields:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Archived laptops only allow updates to notes, status, and location; unarchive to change other fields",
+            detail="Archived laptops only allow updates to notes, status, location, and MDM connected; unarchive to change other fields",
         )
 
 
@@ -266,11 +272,13 @@ async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: 
         cpu=body.cpu,
         ram=body.ram,
         storage_size=body.storage_size,
+        operating_system=body.operating_system,
         status=hw_status.name if hw_status else body.status,
         hardware_status_id=hw_status.id if hw_status else None,
         hardware_location_id=hw_location.id if hw_location else None,
         assigned_to_id=assigned_user.id if assigned_user else None,
         notes=body.notes,
+        mdm_connected=body.mdm_connected,
     )
     db.add(laptop)
     try:

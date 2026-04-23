@@ -13,6 +13,8 @@ interface SegmentedControlProps<T extends string> {
   options: Option<T>[];
   size?: "sm" | "md";
   compact?: boolean;
+  /** `brand`: strong fill on the selected segment (e.g. report chart controls). */
+  activeTone?: "default" | "brand";
 }
 
 export function SegmentedControl<T extends string>({
@@ -21,6 +23,7 @@ export function SegmentedControl<T extends string>({
   options,
   size = "md",
   compact = false,
+  activeTone = "default",
 }: SegmentedControlProps<T>) {
   const textSize = size === "sm" ? "text-[11.5px]" : "text-xs";
   return (
@@ -30,6 +33,10 @@ export function SegmentedControl<T extends string>({
     >
       {options.map((opt) => {
         const active = opt.value === value;
+        const activeClasses =
+          activeTone === "brand"
+            ? "bg-brand-600 font-semibold text-white shadow-sm hover:bg-brand-600 dark:bg-brand-500 dark:hover:bg-brand-500"
+            : "bg-surface font-semibold text-fg shadow-sm";
         return (
           <button
             key={opt.value}
@@ -42,8 +49,8 @@ export function SegmentedControl<T extends string>({
               "inline-flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 transition-all duration-150",
               size === "sm" ? "py-0.5" : "py-1",
               active
-                ? "bg-surface text-fg font-semibold shadow-sm"
-                : "text-fg-3 hover:text-fg-2",
+                ? activeClasses
+                : "text-fg-3 hover:text-fg-2 dark:text-gray-400 dark:hover:text-gray-200",
             ].join(" ")}
           >
             {opt.icon}

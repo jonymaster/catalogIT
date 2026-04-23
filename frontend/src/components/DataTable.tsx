@@ -3,6 +3,8 @@ export interface Column<T> {
   header: React.ReactNode;
   label?: string;
   render?: (row: T) => React.ReactNode;
+  /** Cell and header alignment (default left) */
+  align?: "left" | "right" | "center";
 }
 
 interface Props<T> {
@@ -14,6 +16,17 @@ interface Props<T> {
   striped?: boolean;
   /** Renders this column with stronger weight (e.g. primary identifier) */
   primaryColumnKey?: string;
+  /** Extra classes on the outer card wrapper */
+  className?: string;
+  /** Extra classes merged onto `<table>` */
+  tableClassName?: string;
+  /** Extra classes on the primary column `<td>` (e.g. print helpers) */
+  primaryCellClassName?: string;
+  /**
+   * When set, only rows for which this returns true get pointer hover / primary underline.
+   * Use when some rows are not navigable. Requires `onRowClick`.
+   */
+  rowInteractive?: (row: T) => boolean;
 }
 
 function clickCameFromInteractiveElement(target: EventTarget | null) {
@@ -31,6 +44,12 @@ function columnsInOrder<T>(columns: Column<T>[], visibleKeys: string[]): Column<
   return visibleKeys.map((key) => byKey.get(key)).filter((c): c is Column<T> => c != null);
 }
 
+function alignClass(align: Column<unknown>["align"]): string {
+  if (align === "right") return "text-right";
+  if (align === "center") return "text-center";
+  return "text-left";
+}
+
 export function DataTable<T extends { id: string }>({
   columns,
   data,
@@ -38,22 +57,45 @@ export function DataTable<T extends { id: string }>({
   visibleKeys,
   striped = false,
   primaryColumnKey,
+  className: wrapClassName,
+  tableClassName,
+  primaryCellClassName,
+  rowInteractive,
 }: Props<T>) {
   const active = visibleKeys
     ? columnsInOrder(columns, visibleKeys)
     : columns;
 
+  const cardClass = [
+    "overflow-visible rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm",
+    wrapClassName ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const tableClass = [
+    "min-w-full divide-y divide-gray-200 dark:divide-gray-800",
+    tableClassName ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="overflow-visible rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+    <div className={cardClass}>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+        <table className={tableClass}>
           <thead>
             <tr className="bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-sm">
               {active.map((col) => (
                 <th
                   key={col.key}
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                  className={[
+                    "px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400",
+                    alignClass(col.align),
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
                   {col.header}
                 </th>
@@ -80,27 +122,32 @@ export function DataTable<T extends { id: string }>({
                 </td>
               </tr>
             )}
-            {data.map((row) => (
+            {data.map((row) => {
+              const rowIsInteractive =
+                !!onRowClick &&
+                (rowInteractive ? rowInteractive(row) : true);
+              return (
               <tr
                 key={row.id}
                 onClick={(event) => {
                   if (!onRowClick || clickCameFromInteractiveElement(event.target)) {
                     return;
                   }
+                  if (rowInteractive && !rowInteractive(row)) return;
                   onRowClick(row);
                 }}
                 className={
                   striped
                     ? [
                         "[&:nth-child(odd)]:bg-white dark:[&:nth-child(odd)]:bg-gray-900 [&:nth-child(even)]:bg-gray-50/50 dark:[&:nth-child(even)]:bg-gray-950/50",
-                        onRowClick
-                          ? "cursor-pointer transition-colors duration-100 hover:bg-brand-50/50 dark:hover:bg-brand-950/30"
+                        rowIsInteractive
+                          ? "interactive-record cursor-pointer transition-colors duration-100 hover:bg-brand-50/50 dark:hover:bg-brand-950/30"
                           : "",
                       ]
                         .filter(Boolean)
                         .join(" ")
-                    : onRowClick
-                      ? "cursor-pointer transition-colors duration-100 hover:bg-brand-50/50 dark:hover:bg-brand-950/30"
+                    : rowIsInteractive
+                      ? "interactive-record cursor-pointer transition-colors duration-100 hover:bg-brand-50/50 dark:hover:bg-brand-950/30"
                       : undefined
                 }
               >
@@ -109,8 +156,15 @@ export function DataTable<T extends { id: string }>({
                     key={col.key}
                     className={[
                       "whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-200",
+                      alignClass(col.align),
                       col.key === primaryColumnKey
-                        ? "font-semibold text-gray-900 dark:text-gray-100"
+                        ? [
+                            "font-semibold text-fg",
+                            rowIsInteractive ? "data-record-primary" : "",
+                            primaryCellClassName ?? "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")
                         : "",
                     ]
                       .filter(Boolean)
@@ -122,7 +176,8 @@ export function DataTable<T extends { id: string }>({
                   </td>
                 ))}
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

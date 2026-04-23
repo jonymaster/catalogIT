@@ -2,13 +2,26 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, func, select
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Table, Text, case, func, select
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from app.database import Base
 from app.models.cost_record import CostRecord
+
+if TYPE_CHECKING:
+    from app.models.category import Category
+    from app.models.contract import Contract
+    from app.models.cost_center import CostCenter
+    from app.models.payment_method import PaymentMethod
+    from app.models.service_classification import ServiceClassification
+    from app.models.service_history import ServiceHistoryEntry
+    from app.models.service_status import ServiceStatus
+    from app.models.tag import Tag
+    from app.models.user import User
+    from app.models.vendor import Vendor
 
 service_owners = Table(
     "service_owners",
@@ -33,6 +46,20 @@ service_related_services = Table(
     Column("related_service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
 )
 
+service_tags = Table(
+    "service_tags",
+    Base.metadata,
+    Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
+
+service_notification_recipients = Table(
+    "service_notification_recipients",
+    Base.metadata,
+    Column("service_id", ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Service(Base):
     __tablename__ = "services"
@@ -44,15 +71,46 @@ class Service(Base):
     status: Mapped[str] = mapped_column(String(50))
     sso_integrated: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    yearly_cost = column_property(
-        select(CostRecord.amount)
+    _latest_service_cost_year = (
+        select(func.max(CostRecord.fiscal_year))
         .where(
             CostRecord.service_id == id,
             CostRecord.laptop_id.is_(None),
         )
-        .order_by(CostRecord.fiscal_year.desc(), CostRecord.recorded_at.desc())
-        .limit(1)
+        .correlate_except(CostRecord)
         .scalar_subquery()
+    )
+    _latest_actual_amount = (
+        select(CostRecord.amount)
+        .where(
+            CostRecord.service_id == id,
+            CostRecord.laptop_id.is_(None),
+            CostRecord.fiscal_year == _latest_service_cost_year,
+            CostRecord.record_type == "actual",
+        )
+        .order_by(CostRecord.recorded_at.desc())
+        .limit(1)
+        .correlate_except(CostRecord)
+        .scalar_subquery()
+    )
+    _latest_estimated_amount = (
+        select(CostRecord.amount)
+        .where(
+            CostRecord.service_id == id,
+            CostRecord.laptop_id.is_(None),
+            CostRecord.fiscal_year == _latest_service_cost_year,
+            CostRecord.record_type == "estimated",
+        )
+        .order_by(CostRecord.recorded_at.desc())
+        .limit(1)
+        .correlate_except(CostRecord)
+        .scalar_subquery()
+    )
+    yearly_cost = column_property(
+        case(
+            (_latest_service_cost_year.is_(None), None),
+            else_=func.coalesce(_latest_actual_amount, 0) + func.coalesce(_latest_estimated_amount, 0),
+        )
     )
 
     # --- New normalized columns ---
@@ -77,7 +135,7 @@ class Service(Base):
     contract_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("contracts.id", ondelete="SET NULL"), nullable=True
     )
-    billing_schedule: Mapped[str] = mapped_column(String(100), default="")
+    renewal_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     subcategory: Mapped[str | None] = mapped_column(String(100), nullable=True)
     environment: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -112,6 +170,15 @@ class Service(Base):
         secondary=service_related_services,
         primaryjoin=id == service_related_services.c.service_id,
         secondaryjoin=id == service_related_services.c.related_service_id,
+        lazy="selectin",
+    )
+    tags: Mapped[list["Tag"]] = relationship(  # noqa: F821
+        secondary=service_tags,
+        lazy="selectin",
+        order_by="Tag.name",
+    )
+    notification_recipients: Mapped[list["User"]] = relationship(  # noqa: F821
+        secondary=service_notification_recipients,
         lazy="selectin",
     )
     vendor: Mapped["Vendor | None"] = relationship(lazy="selectin")  # noqa: F821

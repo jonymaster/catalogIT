@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { CommandPaletteProvider } from "../context/CommandPaletteContext";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 
 function ShellInner() {
@@ -28,7 +29,9 @@ function ShellInner() {
 export function Shell() {
   return (
     <SidebarProvider>
-      <ShellInner />
+      <CommandPaletteProvider>
+        <ShellInner />
+      </CommandPaletteProvider>
     </SidebarProvider>
   );
 }

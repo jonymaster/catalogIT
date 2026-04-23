@@ -3,6 +3,7 @@ import client from "../../api/client";
 import { useToast } from "../../context/useToast";
 import { PageTransition } from "../../components/PageTransition";
 import { IntegrationEnabledIndicator } from "../../components/IntegrationEnabledIndicator";
+import { Button } from "../../components/ui/Button";
 
 interface OidcConfig {
   provider_name: string;
@@ -176,13 +177,9 @@ export function SettingsOidc() {
         >
           {testing ? "Testing..." : "Test connection"}
         </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={saving}>
           {saving ? "Saving..." : "Save"}
-        </button>
+        </Button>
       </div>
       <div className="space-y-2">
         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">

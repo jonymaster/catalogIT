@@ -25,6 +25,10 @@ class Laptop(Base):
     cpu: Mapped[str] = mapped_column(String(100), default="")
     ram: Mapped[str] = mapped_column(String(50), default="")
     storage_size: Mapped[str] = mapped_column(String(50), default="")
+    operating_system: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(String(50))
     hardware_status_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("hardware_statuses.id", ondelete="SET NULL"), nullable=True
@@ -36,6 +40,7 @@ class Laptop(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mdm_connected: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

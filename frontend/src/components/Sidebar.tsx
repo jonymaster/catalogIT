@@ -1,6 +1,7 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useSidebar } from "../context/SidebarContext";
+import { BrandMark } from "./BrandMark";
 import {
   HomeIcon,
   ServerStackIcon,
@@ -27,30 +28,6 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
-}
-
-function BrandMonogram({ collapsed }: { collapsed: boolean }) {
-  return (
-    <Link
-      to="/"
-      className="flex items-center gap-2 transition-opacity hover:opacity-90"
-    >
-      <span
-        className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-fg text-bg font-bold"
-        style={{ fontSize: 13, letterSpacing: "-0.04em" }}
-      >
-        C
-      </span>
-      {!collapsed && (
-        <span
-          className="text-[14.5px] font-semibold text-fg"
-          style={{ letterSpacing: "-0.01em" }}
-        >
-          CatalogIT
-        </span>
-      )}
-    </Link>
-  );
 }
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
@@ -149,6 +126,19 @@ export function Sidebar() {
         transition: "width 220ms cubic-bezier(.2,.8,.2,1)",
       }}
     >
+      <button
+        type="button"
+        onClick={toggle}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-expanded={!collapsed}
+        className="absolute right-0 top-1/2 z-50 flex h-9 w-9 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-border bg-surface text-fg-3 shadow-sm transition-[color,background-color,box-shadow] duration-150 hover:bg-surface-2 hover:text-fg-2"
+      >
+        {collapsed ? (
+          <ChevronRightIcon className="h-4 w-4" />
+        ) : (
+          <ChevronLeftIcon className="h-4 w-4" />
+        )}
+      </button>
       {/* Brand */}
       <div
         className="flex items-center border-b border-border"
@@ -158,7 +148,7 @@ export function Sidebar() {
           justifyContent: collapsed ? "center" : "flex-start",
         }}
       >
-        <BrandMonogram collapsed={collapsed} />
+        <BrandMark collapsed={collapsed} className="gap-0 [&_img]:max-h-9" />
       </div>
 
       {/* Navigation */}
@@ -209,28 +199,9 @@ export function Sidebar() {
                     {isAdmin ? "Admin" : "Member"} · CatalogIT
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={toggle}
-                  title="Collapse sidebar"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-                >
-                  <ChevronLeftIcon className="h-4 w-4" />
-                </button>
               </>
             )}
           </div>
-        )}
-
-        {collapsed && (
-          <button
-            type="button"
-            onClick={toggle}
-            title="Expand sidebar"
-            className="mb-1 inline-flex h-8 w-full items-center justify-center rounded-md text-fg-3 hover:bg-surface-2 hover:text-fg-2"
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
         )}
 
         {!collapsed && (
