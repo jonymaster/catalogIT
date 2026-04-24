@@ -231,12 +231,6 @@ async def get_service(service_id: uuid.UUID, db: AsyncSession = Depends(get_audi
 
 @router.post("/", response_model=ServiceRead, status_code=status.HTTP_201_CREATED)
 async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
-    if len(body.owner_ids) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one owner is required",
-        )
-
     owners = []
     if body.owner_ids:
         for uid in body.owner_ids:
@@ -393,11 +387,6 @@ async def update_service(
     )
     contract_id = update_data.pop("contract_id", None) if "contract_id" in update_data else ...
     if owner_ids is not None:
-        if len(owner_ids) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one owner is required",
-            )
         owners = []
         for uid in owner_ids:
             user = await db.get(User, uid)

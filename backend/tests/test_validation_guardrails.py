@@ -63,19 +63,26 @@ class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(index.unique)
         self.assertIn("lower", str(index.expressions[0]).lower())
 
-    async def test_service_create_requires_at_least_one_owner(self) -> None:
+    async def test_service_create_allows_empty_owners(self) -> None:
+        """Creating a service without owners must succeed.
+
+        Matches main's behavior; the branch-only 400 "At least one owner is
+        required" was removed so users can save a service and assign owners
+        later.
+        """
         db = _FakeDb()
 
-        with self.assertRaises(HTTPException) as exc:
-            await create_service(
-                ServiceCreate(name="Docs"),
-                _user=SimpleNamespace(id=uuid.uuid4()),
-                db=db,
-            )
+        result = await create_service(
+            ServiceCreate(name="Docs"),
+            _user=SimpleNamespace(id=uuid.uuid4()),
+            db=db,
+        )
 
-        self.assertEqual(exc.exception.status_code, 400)
-        self.assertEqual(exc.exception.detail, "At least one owner is required")
-        self.assertEqual(db.added, [])
+        self.assertEqual(len(db.added), 1)
+        created = db.added[0]
+        self.assertIsInstance(created, Service)
+        self.assertEqual(created.owners, [])
+        self.assertIs(result, created)
 
     async def test_service_create_rejects_unknown_vendor(self) -> None:
         vendor_id = uuid.uuid4()
