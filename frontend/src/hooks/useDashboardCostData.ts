@@ -1,11 +1,22 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import client from "../api/client";
-import type { DashboardCostPayload } from "../types/dashboardCost";
+import type {
+  DashboardCostPayload,
+  DashboardCostRecord,
+} from "../types/dashboardCost";
+
+// Stable references keep downstream memoized consumers (e.g. Dashboard's
+// `ctx`, `actualRecords`, `costByYear`) from invalidating on every render
+// while data is still loading. Fresh `[]` literals in the return below would
+// otherwise invalidate them and cause FLIP drag animations on the dashboard
+// to fire mid-gesture.
+const EMPTY_RECORDS: DashboardCostRecord[] = [];
+const EMPTY_FISCAL_YEARS: number[] = [];
 
 const EMPTY_DASHBOARD_COST: DashboardCostPayload = {
-  cost_records: [],
-  fiscal_years: [],
+  cost_records: EMPTY_RECORDS,
+  fiscal_years: EMPTY_FISCAL_YEARS,
 };
 
 export function useDashboardCostData() {
@@ -41,7 +52,7 @@ export function useDashboardCostData() {
     data,
     loading,
     error,
-    records: data?.cost_records ?? [],
-    fiscalYears: data?.fiscal_years ?? [],
+    records: data?.cost_records ?? EMPTY_RECORDS,
+    fiscalYears: data?.fiscal_years ?? EMPTY_FISCAL_YEARS,
   };
 }

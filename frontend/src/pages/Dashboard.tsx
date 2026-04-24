@@ -1644,28 +1644,56 @@ export function Dashboard() {
           ? "byYear"
           : "none";
 
-  const ctx: WidgetCtx = {
-    services,
-    laptops,
-    records,
-    fiscalYears,
-    costByYear,
-    dashYear,
-    setDashYear,
-    yoyChange,
-    canFinancialView,
-    hasCostData,
-    upcoming30,
-    upcoming90,
-    laptopsInUse,
-    ssoPct,
-    ssoCount,
-    activeServices,
-    isAdmin,
-    spendChartScale,
-    setSpendChartScale,
-    spendAxisTogglePlacement,
-  };
+  // Memoize the widget context so that unrelated parent re-renders (auth
+  // preferences refresh, sidebar toggles, etc.) don't produce a new `ctx`
+  // reference mid-drag, which would otherwise force every WidgetShell to
+  // re-render and break FLIP reorder animations.
+  const ctx: WidgetCtx = useMemo(
+    () => ({
+      services,
+      laptops,
+      records,
+      fiscalYears,
+      costByYear,
+      dashYear,
+      setDashYear,
+      yoyChange,
+      canFinancialView,
+      hasCostData,
+      upcoming30,
+      upcoming90,
+      laptopsInUse,
+      ssoPct,
+      ssoCount,
+      activeServices,
+      isAdmin,
+      spendChartScale,
+      setSpendChartScale,
+      spendAxisTogglePlacement,
+    }),
+    [
+      services,
+      laptops,
+      records,
+      fiscalYears,
+      costByYear,
+      dashYear,
+      setDashYear,
+      yoyChange,
+      canFinancialView,
+      hasCostData,
+      upcoming30,
+      upcoming90,
+      laptopsInUse,
+      ssoPct,
+      ssoCount,
+      activeServices,
+      isAdmin,
+      spendChartScale,
+      setSpendChartScale,
+      spendAxisTogglePlacement,
+    ],
+  );
 
   const rightForWidget = (id: WidgetId): React.ReactNode => {
     switch (id) {
