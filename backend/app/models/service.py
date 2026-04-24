@@ -137,7 +137,6 @@ class Service(Base):
     )
     renewal_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    subcategory: Mapped[str | None] = mapped_column(String(100), nullable=True)
     environment: Mapped[str | None] = mapped_column(String(100), nullable=True)
     renewal_reminders_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     renewal_offsets_days: Mapped[list[int] | None] = mapped_column(

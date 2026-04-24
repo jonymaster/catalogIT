@@ -195,7 +195,6 @@ export interface Service {
   status: string;
   renewal_config: RenewalConfig | null;
   renewal_date: string | null;
-  subcategory: string | null;
   environment: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;

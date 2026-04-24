@@ -12,7 +12,6 @@ export type ServiceFieldKey =
   | "scim_enabled"
   | "vendor"
   | "spending_category"
-  | "subcategory"
   | "environment"
   | "cost_center"
   | "renewal"
@@ -48,7 +47,6 @@ export const SERVICE_VIEW_SECTIONS: readonly {
     title: "Cost Management",
     fields: [
       "spending_category",
-      "subcategory",
       "environment",
       "cost_center",
       "renewal",
@@ -75,7 +73,6 @@ export const SERVICE_FIELD_LABELS: Record<ServiceFieldKey, string> = {
   scim_enabled: "SCIM Enabled",
   vendor: "Vendor",
   spending_category: "Spending Category",
-  subcategory: "Subcategory",
   environment: "Environment",
   cost_center: "Cost Center",
   renewal: "Renewal",

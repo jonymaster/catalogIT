@@ -19,7 +19,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("services", sa.Column("subcategory", sa.String(length=100), nullable=True))
     op.add_column("services", sa.Column("environment", sa.String(length=100), nullable=True))
     op.create_table(
         "service_related_services",
@@ -34,4 +33,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("service_related_services")
     op.drop_column("services", "environment")
-    op.drop_column("services", "subcategory")

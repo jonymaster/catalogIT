@@ -35,7 +35,6 @@ class CostRecordOut(BaseModel):
     category_name: str | None
     cost_center_id: str | None = None
     cost_center_name: str | None = None
-    subcategory_name: str | None = None
     environment_name: str | None = None
     team_name: str | None = None
     team_names: list[str] = Field(default_factory=list)
@@ -129,7 +128,6 @@ async def get_dashboard(
                     category_name=cat_name,
                     cost_center_id=str(svc.cost_center.id) if svc.cost_center else None,
                     cost_center_name=cc_name,
-                    subcategory_name=svc.subcategory,
                     environment_name=svc.environment,
                     team_name=", ".join(team_names) if team_names else None,
                     team_names=team_names,
@@ -162,7 +160,6 @@ async def get_dashboard(
                     category_name="Hardware",
                     cost_center_id=None,
                     cost_center_name=None,
-                    subcategory_name=None,
                     environment_name=None,
                     team_name=None,
                     team_names=[],

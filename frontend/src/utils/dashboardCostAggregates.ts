@@ -117,10 +117,6 @@ export function categoryDisplayName(raw: string): string {
   return raw === "" ? "(Uncategorized)" : raw;
 }
 
-export function subcategoryDisplayName(raw: string): string {
-  return raw === "" ? "(No subcategory)" : raw;
-}
-
 export function vendorDisplayName(raw: string): string {
   return raw === "" ? "(No vendor)" : raw;
 }
@@ -215,11 +211,6 @@ export function dimensionValuesForRecord(
       return [{
         key: record.category_name ?? "",
         label: categoryDisplayName(record.category_name ?? ""),
-      }];
-    case "subcategory":
-      return [{
-        key: record.subcategory_name ?? "",
-        label: subcategoryDisplayName(record.subcategory_name ?? ""),
       }];
     case "classification":
       return [{
@@ -424,7 +415,6 @@ export const COST_CENTER_HARDWARE_KEY = "__hw__";
 export interface CostFilterCriteria {
   /** Internal keys: "" means uncategorized */
   categories?: readonly string[];
-  subcategories?: readonly string[];
   source?: CostSourceFilter;
   classifications?: readonly string[];
   /** Include only rows whose record_type is in this list (one or two types). */
@@ -456,11 +446,6 @@ export function filterCostRecords(
     if ((f.classifications?.length ?? 0) > 0) {
       const key = r.classification ?? "";
       if (!f.classifications?.includes(key)) return false;
-    }
-
-    if ((f.subcategories?.length ?? 0) > 0) {
-      const key = r.subcategory_name ?? "";
-      if (!f.subcategories?.includes(key)) return false;
     }
 
     if ((f.recordTypes?.length ?? 0) > 0) {

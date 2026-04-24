@@ -89,7 +89,6 @@ class ServiceCreate(BaseModel):
     status: str = "Contract"
     renewal_config: RenewalConfig | None = None
     renewal_date: date | None = None
-    subcategory: str | None = Field(default=None, max_length=100)
     environment: str | None = Field(default=None, max_length=100)
     sso_integrated: bool = False
     point_of_contact: str | None = None
@@ -126,7 +125,7 @@ class ServiceCreate(BaseModel):
     def validate_name(cls, value: str) -> str:
         return _normalize_name(value)
 
-    @field_validator("subcategory", "environment")
+    @field_validator("environment")
     @classmethod
     def validate_optional_text(cls, value: str | None) -> str | None:
         return _normalize_optional_text(value)
@@ -172,7 +171,6 @@ class ServiceUpdate(BaseModel):
     status: str | None = None
     renewal_config: RenewalConfig | None = None
     renewal_date: date | None = None
-    subcategory: str | None = Field(default=None, max_length=100)
     environment: str | None = Field(default=None, max_length=100)
     sso_integrated: bool | None = None
     point_of_contact: str | None = None
@@ -212,7 +210,7 @@ class ServiceUpdate(BaseModel):
             return value
         return _normalize_name(value)
 
-    @field_validator("subcategory", "environment")
+    @field_validator("environment")
     @classmethod
     def validate_optional_text(cls, value: str | None) -> str | None:
         return _normalize_optional_text(value)
@@ -259,7 +257,6 @@ class ServiceRead(BaseModel):
     status: str
     renewal_config: RenewalConfig | None = None
     renewal_date: date | None
-    subcategory: str | None = None
     environment: str | None = None
     yearly_cost: float | None
     sso_integrated: bool

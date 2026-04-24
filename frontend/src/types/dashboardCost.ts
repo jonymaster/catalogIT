@@ -3,7 +3,6 @@ import type { OperatingSystem } from "./models";
 export type DashboardCostSource = "service" | "hardware";
 export type DashboardCostDimension =
   | "category"
-  | "subcategory"
   | "classification"
   | "vendor"
   | "team"
@@ -28,7 +27,6 @@ export interface DashboardCostRecord {
   category_name: string | null;
   cost_center_id: string | null;
   cost_center_name: string | null;
-  subcategory_name: string | null;
   environment_name: string | null;
   team_name: string | null;
   team_names: string[];
@@ -50,7 +48,6 @@ export const DASHBOARD_COST_DIMENSION_LABEL: Record<
   string
 > = {
   category: "Category",
-  subcategory: "Subcategory",
   classification: "Classification",
   vendor: "Vendor",
   team: "Team",

@@ -297,7 +297,6 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
         status=service_status.name if service_status else body.status,
         renewal_config=cfg_dict,
         renewal_date=next_renewal if cfg_dict else body.renewal_date,
-        subcategory=body.subcategory,
         environment=body.environment,
         sso_integrated=body.sso_integrated,
         point_of_contact=body.point_of_contact,

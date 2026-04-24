@@ -270,7 +270,6 @@ async def _seed_services(session: AsyncSession) -> None:
             name=r["name"],
             status=normalized_status,
             renewal_config=r.get("renewal_config"),
-            subcategory=r.get("subcategory"),
             environment=r.get("environment"),
             total_seats=r.get("total_seats"),
             vendor_id=_uuid("vendor", r["vendor_id"]),

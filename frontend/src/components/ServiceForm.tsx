@@ -48,7 +48,6 @@ interface RefData {
 // them but the shared ServiceDraft/Service types haven't been extended yet.
 interface ExtraFields {
   renewal_date: string;
-  subcategory: string;
   environment: string;
   related_service_ids: string[];
   renewal_reminders_enabled: boolean;
@@ -85,7 +84,6 @@ function toDraft(s?: Service): ServiceDraft {
 function toExtraFields(s?: Service): ExtraFields {
   return {
     renewal_date: s?.renewal_date ?? "",
-    subcategory: s?.subcategory ?? "",
     environment: s?.environment ?? "",
     related_service_ids: s?.related_services.map((rs) => rs.id) ?? [],
     renewal_reminders_enabled: s?.renewal_reminders_enabled ?? true,
@@ -326,7 +324,6 @@ export function ServiceForm({ initial }: Props) {
       tag_ids: draft.tags.map((tag) => tag.id),
       // Extra fields supported by backend but not yet on ServiceDraft.
       renewal_date: extras.renewal_date || null,
-      subcategory: extras.subcategory.trim() || null,
       environment: extras.environment.trim() || null,
       related_service_ids: extras.related_service_ids,
       // Renewal notification config — aligned with the ServiceNotifications
@@ -428,19 +425,6 @@ export function ServiceForm({ initial }: Props) {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
-                Subcategory
-              </label>
-              <input
-                type="text"
-                value={extras.subcategory}
-                onChange={(e) => setExtra("subcategory", e.target.value)}
-                placeholder="e.g. Collaboration"
-                className={fieldClass(false) + " mt-1"}
-              />
             </div>
 
             <div>
