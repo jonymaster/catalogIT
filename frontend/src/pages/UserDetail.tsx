@@ -341,7 +341,7 @@ function GeneralPanel({
           )}
         </Row>
 
-        <Row label="Financial view permissions">
+        <Row label="Financial permissions">
           {draft.role === "admin" && !editing ? (
             <span className="text-fg-4">
               Granted implicitly to admins
@@ -379,7 +379,7 @@ function GeneralPanel({
           )}
         </Row>
 
-        <Row label="Hardware view permissions">
+        <Row label="Hardware permissions">
           {draft.role === "admin" && !editing ? (
             <span className="text-fg-4">
               Granted implicitly to admins
