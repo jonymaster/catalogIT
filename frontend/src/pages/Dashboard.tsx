@@ -1461,7 +1461,10 @@ export function Dashboard() {
         ? currentYearValue
         : fiscalYears[fiscalYears.length - 1];
   const dashYear = dashYearOverride ?? defaultDashYear;
-  const setDashYear = (y: number) => setDashYearOverride(y);
+  const setDashYear = useCallback(
+    (y: number) => setDashYearOverride(y),
+    [setDashYearOverride],
+  );
 
   const loading = inventoryLoading || costLoading;
 
@@ -1625,16 +1628,6 @@ export function Dashboard() {
     [setWidgetIds],
   );
 
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
-
-  const todayLabel = today.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-
   const spendAxisTogglePlacement: "trend" | "byYear" | "none" =
     !canFinancialView
       ? "none"
@@ -1647,7 +1640,8 @@ export function Dashboard() {
   // Memoize the widget context so that unrelated parent re-renders (auth
   // preferences refresh, sidebar toggles, etc.) don't produce a new `ctx`
   // reference mid-drag, which would otherwise force every WidgetShell to
-  // re-render and break FLIP reorder animations.
+  // re-render and break FLIP reorder animations. Must sit above the
+  // `if (loading)` early return to respect rules-of-hooks.
   const ctx: WidgetCtx = useMemo(
     () => ({
       services,
@@ -1694,6 +1688,16 @@ export function Dashboard() {
       spendAxisTogglePlacement,
     ],
   );
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
+  const todayLabel = today.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   const rightForWidget = (id: WidgetId): React.ReactNode => {
     switch (id) {

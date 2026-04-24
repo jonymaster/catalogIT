@@ -5,6 +5,7 @@ import { useToast } from "../context/useToast";
 import type { ServiceDraft, ServiceValidationErrors } from "../service/serviceDetailContext";
 import { validateDraft } from "../service/serviceDetailContext";
 import { RenewalConfigField } from "./RenewalConfigField";
+import { parseRenewalOffsets } from "../service/renewalConfig";
 import { TagPicker } from "./TagPicker";
 import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
 import { Button } from "./ui/Button";
@@ -50,6 +51,9 @@ interface ExtraFields {
   subcategory: string;
   environment: string;
   related_service_ids: string[];
+  renewal_reminders_enabled: boolean;
+  renewal_offsets_text: string;
+  notification_recipient_ids: string[];
 }
 
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
@@ -84,6 +88,10 @@ function toExtraFields(s?: Service): ExtraFields {
     subcategory: s?.subcategory ?? "",
     environment: s?.environment ?? "",
     related_service_ids: s?.related_services.map((rs) => rs.id) ?? [],
+    renewal_reminders_enabled: s?.renewal_reminders_enabled ?? true,
+    renewal_offsets_text: s?.renewal_offsets_days?.join(", ") ?? "",
+    notification_recipient_ids:
+      s?.notification_recipients.map((u) => u.id) ?? [],
   };
 }
 
@@ -130,6 +138,7 @@ export function ServiceForm({ initial }: Props) {
 
   const [draft, setDraft] = useState<ServiceDraft>(() => toDraft(initial));
   const [extras, setExtras] = useState<ExtraFields>(() => toExtraFields(initial));
+  const [offsetsError, setOffsetsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<ServiceValidationErrors>({});
@@ -271,6 +280,12 @@ export function ServiceForm({ initial }: Props) {
       setErrors(validationErrors);
       return;
     }
+    const parsedOffsets = parseRenewalOffsets(extras.renewal_offsets_text);
+    if (!parsedOffsets.ok) {
+      setOffsetsError(parsedOffsets.message);
+      return;
+    }
+    setOffsetsError(null);
     submitLockRef.current = true;
     setSaving(true);
     setError(null);
@@ -314,6 +329,11 @@ export function ServiceForm({ initial }: Props) {
       subcategory: extras.subcategory.trim() || null,
       environment: extras.environment.trim() || null,
       related_service_ids: extras.related_service_ids,
+      // Renewal notification config — aligned with the ServiceNotifications
+      // page so the create and edit flows expose the same controls.
+      renewal_reminders_enabled: extras.renewal_reminders_enabled,
+      renewal_offsets_days: parsedOffsets.value,
+      notification_recipient_ids: extras.notification_recipient_ids,
     };
 
     try {
@@ -688,6 +708,80 @@ export function ServiceForm({ initial }: Props) {
           </section>
         </div>
       </div>
+
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-1 text-base font-semibold text-fg">
+          Renewal notifications
+        </h2>
+        <p className="mb-4 text-xs text-fg-3">
+          Owners and admins always receive reminders. Use the controls below
+          to enable or silence this service's reminders, override the global
+          offsets, and add extra recipients. Global defaults live in Settings
+          &rarr; Notifications.
+        </p>
+        <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-3 sm:col-span-2">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wider text-fg-3">
+                Reminders enabled
+              </div>
+              <p className="mt-1 text-xs text-fg-3">
+                Turn off to silence renewal reminders for this service.
+              </p>
+            </div>
+            <Toggle
+              checked={extras.renewal_reminders_enabled}
+              onChange={(v) =>
+                setExtra("renewal_reminders_enabled", v)
+              }
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              Offsets override (days before renewal)
+            </label>
+            <input
+              type="text"
+              value={extras.renewal_offsets_text}
+              onChange={(e) => {
+                setExtra("renewal_offsets_text", e.target.value);
+                if (offsetsError) setOffsetsError(null);
+              }}
+              placeholder="e.g. 30, 14, 7, 1"
+              className={fieldClass(Boolean(offsetsError)) + " mt-1"}
+            />
+            <p className="mt-1 text-xs text-fg-3">
+              Comma-separated positive integers. Leave empty to use the
+              global defaults.
+            </p>
+            {offsetsError && (
+              <p className="mt-1 text-xs text-danger">{offsetsError}</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              Extra recipients
+            </label>
+            <p className="mt-1 text-xs text-fg-3">
+              Users added here receive reminders for this service only, in
+              addition to owners, admins, and globally-configured
+              recipients.
+            </p>
+            <div className="mt-2">
+              <UserDirectoryCheckboxPicker
+                variant="overview"
+                value={extras.notification_recipient_ids}
+                onChange={(ids) =>
+                  setExtra("notification_recipient_ids", ids)
+                }
+                seedUsers={initial?.notification_recipients}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
         <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>

@@ -4,7 +4,10 @@ import client from "../api/client";
 import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
-import { formatRenewalConfig } from "../service/renewalConfig";
+import {
+  formatRenewalConfig,
+  parseRenewalOffsets,
+} from "../service/renewalConfig";
 import type { Service, User } from "../types/models";
 import { formatDateOnly } from "../utils/formatting";
 
@@ -69,24 +72,12 @@ export function ServiceNotifications() {
   );
 
   async function save() {
-    let offsets: number[] | null = null;
-    const trimmed = offsetsText.trim();
-    if (trimmed) {
-      const parts = trimmed.split(/[\s,]+/).filter(Boolean);
-      const parsed: number[] = [];
-      for (const p of parts) {
-        const n = parseInt(p, 10);
-        if (Number.isNaN(n) || n <= 0) {
-          showToast({
-            type: "error",
-            text: "Offsets must be positive integers (e.g. 30, 14, 7, 1).",
-          });
-          return;
-        }
-        parsed.push(n);
-      }
-      offsets = parsed;
+    const parsed = parseRenewalOffsets(offsetsText);
+    if (!parsed.ok) {
+      showToast({ type: "error", text: parsed.message });
+      return;
     }
+    const offsets = parsed.value;
     setSaving(true);
     try {
       await client.put<Service>(`/api/services/${service.id}`, {
