@@ -85,6 +85,7 @@ class MePreferencesRouterTest(unittest.TestCase):
                 "timezone": None,
                 "theme": "light",
                 "ui_preferences": {},
+                "receive_renewal_notifications": True,
             },
         )
 
