@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +16,69 @@ from app.models.user import User
 from app.schemas.user import MeProfileUpdate, UserPreferencesRead, UserPreferencesUpdate, UserRead, user_read_from_orm
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+
+_ALLOWED_UI_PREFERENCE_KEYS = {"dashboard", "service_list"}
+_MAX_UI_PREFERENCES_DEPTH = 8
+_MAX_UI_PREFERENCES_JSON_BYTES = 64 * 1024
+
+
+def _normalized_ui_preferences(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _deep_merge_preferences(
+    current: dict[str, Any],
+    updates: dict[str, Any],
+) -> dict[str, Any]:
+    merged = dict(current)
+    for key, value in updates.items():
+        if value is None:
+            merged.pop(key, None)
+            continue
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_preferences(merged[key], value)
+            continue
+        merged[key] = value
+    return merged
+
+
+def _validate_ui_preferences_depth(value: Any, *, depth: int = 0) -> None:
+    if depth > _MAX_UI_PREFERENCES_DEPTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences exceed maximum nesting depth",
+        )
+
+    if isinstance(value, dict):
+        for nested_value in value.values():
+            _validate_ui_preferences_depth(nested_value, depth=depth + 1)
+        return
+
+    if isinstance(value, list):
+        for nested_value in value:
+            _validate_ui_preferences_depth(nested_value, depth=depth + 1)
+
+
+def _validate_ui_preferences_size(value: dict[str, Any]) -> None:
+    serialized = json.dumps(value, separators=(",", ":"), sort_keys=True)
+    if len(serialized.encode("utf-8")) > _MAX_UI_PREFERENCES_JSON_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="UI preferences exceed maximum size",
+        )
+
+
+def _validate_ui_preferences(value: dict[str, Any]) -> None:
+    unknown_keys = sorted(
+        key for key in value if key not in _ALLOWED_UI_PREFERENCE_KEYS
+    )
+    if unknown_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown UI preference sections: {', '.join(unknown_keys)}",
+        )
+    _validate_ui_preferences_depth(value)
+    _validate_ui_preferences_size(value)
 
 
 @router.get("/profile", response_model=UserRead)
@@ -120,11 +186,24 @@ async def update_preferences(
     db: AsyncSession = Depends(get_audited_db),
 ):
     user = await db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     update_data = body.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
         if field == "theme":
             user.theme = value if value in ("light", "dark") else "light"
+            continue
+        if field == "ui_preferences":
+            if value is None:
+                user.ui_preferences = {}
+            else:
+                merged_preferences = _deep_merge_preferences(
+                    _normalized_ui_preferences(user.ui_preferences),
+                    value,
+                )
+                _validate_ui_preferences(merged_preferences)
+                user.ui_preferences = merged_preferences
             continue
         setattr(user, field, value.strip() or None if isinstance(value, str) else value)
 

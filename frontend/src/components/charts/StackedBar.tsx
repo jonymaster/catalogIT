@@ -11,15 +11,28 @@ interface CatSlice {
   color: string;
 }
 
+interface GroupData {
+  key: string;
+  label: string;
+  cats: CatSlice[];
+}
+
 interface YearData {
   year: number;
   cats: CatSlice[];
 }
 
 interface Props {
-  yearData: YearData[];
+  /** Generic drill-down groups (PR branch API). Optional when `yearData` is used. */
+  groups?: GroupData[];
+  /** Fiscal-year oriented data (legacy API). Normalized internally to `groups`. */
+  yearData?: YearData[];
   width?: number;
   height?: number;
+  // Generic (groups) callbacks -----------------------------------------------
+  onGroupClick?: (group: GroupData) => void;
+  onSliceClick?: (group: GroupData, slice: CatSlice) => void;
+  // Year-oriented callbacks --------------------------------------------------
   /** Called with fiscal year when a year column is clicked (empty area / label). */
   onYearClick?: (year: number) => void;
   /** Called with fiscal year and category id when a specific stack segment is clicked. */
@@ -42,9 +55,12 @@ const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `$${n}`;
 
 export function StackedBar({
+  groups,
   yearData,
   width = 640,
   height = 300,
+  onGroupClick,
+  onSliceClick,
   onYearClick,
   onCategoryClick,
   selectedYear = null,
@@ -52,8 +68,28 @@ export function StackedBar({
   scale = "linearZero",
   showAxisHint = false,
 }: Props) {
-  const totals = yearData.map((yd) =>
-    yd.cats.reduce((s, c) => s + c.value, 0),
+  // Normalize both input shapes to a single `GroupData[]`. When `yearData` is
+  // provided, the numeric year becomes the group key (as a string) and label.
+  const normalizedGroups: GroupData[] =
+    groups ??
+    (yearData
+      ? yearData.map((yd) => ({
+          key: String(yd.year),
+          label: String(yd.year),
+          cats: yd.cats,
+        }))
+      : []);
+
+  // Keep a parallel mapping back to the original year (when available) so that
+  // the year-oriented click callbacks receive a number rather than a string.
+  const yearForGroup = (i: number): number | null => {
+    if (yearData && yearData[i]) return yearData[i].year;
+    const parsed = Number.parseInt(normalizedGroups[i]?.key ?? "", 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const totals = normalizedGroups.map((g) =>
+    g.cats.reduce((s, c) => s + c.value, 0),
   );
   const axis = buildChartAxis(totals, scale);
 
@@ -63,7 +99,7 @@ export function StackedBar({
   const chartTop = topInset;
   const chartBottom = height - bottomPad;
   const chartH = chartBottom - chartTop;
-  const n = Math.max(yearData.length, 1);
+  const n = Math.max(normalizedGroups.length, 1);
   const slot = (width - startX - 20) / n;
   const bw = Math.min(104, Math.max(28, slot - 12));
   const hasCategorySelection =
@@ -94,32 +130,38 @@ export function StackedBar({
                 textAnchor="end"
                 fontSize="13"
                 fontWeight="500"
-                className="fill-gray-500 dark:text-gray-400"
+                className="fill-gray-500 dark:fill-gray-400"
               >
                 {formatChartTickMoney(axis.tickValue(f))}
               </text>
             </g>
           );
         })}
-        {yearData.map((yd, i) => {
-          const colW = (width - startX - 20) / Math.max(yearData.length, 1);
+        {normalizedGroups.map((group, i) => {
+          const colW = (width - startX - 20) / Math.max(normalizedGroups.length, 1);
           const x = startX + i * colW + (colW - bw) / 2;
           const total = totals[i] ?? 0;
           const colH = axis.valueToHeightFraction(total) * chartH;
+          const year = yearForGroup(i);
           let cumH = 0;
           return (
-            <g key={i}>
-              {yd.cats.map((c, ci) => {
-                const bh =
-                  total > 0 ? (c.value / total) * colH : 0;
+            <g
+              key={group.key || i}
+              className={onGroupClick ? "cursor-pointer" : undefined}
+              onClick={onGroupClick ? () => onGroupClick(group) : undefined}
+            >
+              {group.cats.map((c, ci) => {
+                const bh = total > 0 ? (c.value / total) * colH : 0;
                 const y = chartTop + chartH - cumH - bh;
                 cumH += bh;
                 const isSelected =
                   hasCategorySelection &&
-                  yd.year === selectedYear &&
+                  year !== null &&
+                  year === selectedYear &&
                   c.id === selectedCategoryId;
                 const opacity =
                   hasCategorySelection && !isSelected ? 0.24 : 0.8;
+                const sliceClickable = Boolean(onSliceClick || onCategoryClick);
                 return (
                   <rect
                     key={ci}
@@ -130,18 +172,26 @@ export function StackedBar({
                     rx="3"
                     fill={c.color}
                     opacity={opacity}
-                    className={onCategoryClick ? "cursor-pointer" : undefined}
-                    onClick={(e) => {
-                      if (onCategoryClick) {
-                        e.stopPropagation();
-                        onCategoryClick(yd.year, c.id);
-                      } else if (onYearClick) {
-                        onYearClick(yd.year);
+                    className={sliceClickable ? "cursor-pointer" : undefined}
+                    onClick={(event) => {
+                      if (onSliceClick) {
+                        event.stopPropagation();
+                        onSliceClick(group, c);
+                        return;
+                      }
+                      if (onCategoryClick && year !== null) {
+                        event.stopPropagation();
+                        onCategoryClick(year, c.id);
+                        return;
+                      }
+                      if (onYearClick && year !== null) {
+                        onYearClick(year);
                       }
                     }}
                   >
                     <title>
-                      {c.name} — {fmt(c.value)} (FY {yd.year})
+                      {c.name} — {fmt(c.value)}
+                      {year !== null ? ` (FY ${year})` : ""}
                     </title>
                   </rect>
                 );
@@ -153,9 +203,16 @@ export function StackedBar({
                 fontSize="14"
                 fontWeight="600"
                 className={`fill-gray-900 dark:fill-gray-50 ${
-                  onYearClick ? "cursor-pointer" : ""
+                  onYearClick && year !== null ? "cursor-pointer" : ""
                 }`}
-                onClick={() => onYearClick?.(yd.year)}
+                onClick={
+                  onYearClick && year !== null
+                    ? (event) => {
+                        event.stopPropagation();
+                        onYearClick(year);
+                      }
+                    : undefined
+                }
               >
                 {fmt(total)}
               </text>
@@ -165,12 +222,19 @@ export function StackedBar({
                 textAnchor="middle"
                 fontSize="14"
                 fontWeight="600"
-                className={`fill-gray-700 dark:text-gray-300 ${
-                  onYearClick ? "cursor-pointer" : ""
+                className={`fill-gray-700 dark:fill-gray-300 ${
+                  onYearClick && year !== null ? "cursor-pointer" : ""
                 }`}
-                onClick={() => onYearClick?.(yd.year)}
+                onClick={
+                  onYearClick && year !== null
+                    ? (event) => {
+                        event.stopPropagation();
+                        onYearClick(year);
+                      }
+                    : undefined
+                }
               >
-                {yd.year}
+                {group.label}
               </text>
             </g>
           );

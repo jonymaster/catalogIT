@@ -3,13 +3,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
+
+ALLOWED_COST_RECORD_TYPES = {"actual", "estimated", "budget"}
 
 
 class CostRecordCreate(BaseModel):
     payment_method_id: uuid.UUID | None = None
-    fiscal_year: int
-    amount: float
+    fiscal_year: int = Field(ge=1900, le=2100)
+    amount: float = Field(ge=0)
     record_type: str
     notes: str | None = None
     purchase_year: int | None = None
@@ -23,11 +25,19 @@ class CostRecordCreate(BaseModel):
             raise ValueError("purchase_year must be between 1900 and 2100")
         return v
 
+    @field_validator("record_type")
+    @classmethod
+    def validate_record_type(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if cleaned not in ALLOWED_COST_RECORD_TYPES:
+            raise ValueError("record_type must be actual, estimated, or budget")
+        return cleaned
+
 
 class CostRecordUpdate(BaseModel):
     payment_method_id: uuid.UUID | None = None
-    fiscal_year: int | None = None
-    amount: float | None = None
+    fiscal_year: int | None = Field(default=None, ge=1900, le=2100)
+    amount: float | None = Field(default=None, ge=0)
     record_type: str | None = None
     notes: str | None = None
     purchase_year: int | None = None
@@ -40,6 +50,27 @@ class CostRecordUpdate(BaseModel):
         if v < 1900 or v > 2100:
             raise ValueError("purchase_year must be between 1900 and 2100")
         return v
+
+    @field_validator("fiscal_year")
+    @classmethod
+    def validate_fiscal_year(cls, value: int | None) -> int | None:
+        if value is None:
+            raise ValueError("fiscal_year cannot be null")
+        return value
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, value: float | None) -> float | None:
+        if value is None:
+            raise ValueError("amount cannot be null")
+        return value
+
+    @field_validator("record_type")
+    @classmethod
+    def validate_record_type(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("record_type cannot be null")
+        return CostRecordCreate.validate_record_type(value)
 
 
 class CostRecordRead(BaseModel):

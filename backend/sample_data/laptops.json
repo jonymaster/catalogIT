@@ -5,6 +5,8 @@
     "cpu": "Apple M3 Pro",
     "ram": "18 GB",
     "storage_size": "512 GB SSD",
+    "operating_system": "macos",
+    "mdm_connected": true,
     "status": "Assigned",
     "assigned_to_user_seed_id": 3,
     "notes": "Standard engineering image; hardware cost tracked on device"
@@ -15,6 +17,8 @@
     "cpu": "Apple M3 Pro",
     "ram": "36 GB",
     "storage_size": "1 TB SSD",
+    "operating_system": "macos",
+    "mdm_connected": true,
     "status": "Assigned",
     "assigned_to_user_seed_id": 4,
     "notes": "Build machine — extra RAM; CapEx in laptop cost record"
@@ -25,6 +29,8 @@
     "cpu": "Apple M2",
     "ram": "16 GB",
     "storage_size": "512 GB SSD",
+    "operating_system": "macos",
+    "mdm_connected": false,
     "status": "In Stock",
     "notes": "Unassigned spare; refresh stock"
   },
@@ -34,6 +40,8 @@
     "cpu": "Intel Core Ultra 7 155U",
     "ram": "32 GB",
     "storage_size": "512 GB SSD",
+    "operating_system": "windows",
+    "mdm_connected": true,
     "status": "Assigned",
     "assigned_to_user_seed_id": 1,
     "notes": "IT admin laptop"
@@ -44,6 +52,8 @@
     "cpu": "Intel Core Ultra 7 155U",
     "ram": "16 GB",
     "storage_size": "256 GB SSD",
+    "operating_system": "windows",
+    "mdm_connected": false,
     "status": "In Stock",
     "notes": "Pool device"
   },
@@ -53,6 +63,8 @@
     "cpu": "AMD Ryzen 7 PRO 8840U",
     "ram": "32 GB",
     "storage_size": "512 GB SSD",
+    "operating_system": "linux",
+    "mdm_connected": false,
     "status": "Loaned",
     "assigned_to_user_seed_id": 5,
     "notes": "Short-term loan for contractor; return by end of quarter"

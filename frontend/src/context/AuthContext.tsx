@@ -26,7 +26,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return saved ? decodePayload(saved) : null;
   });
   const [preferences, setPreferencesState] = useState<UserPreferences | null>(null);
-  const [preferencesLoading, setPreferencesLoading] = useState(false);
+  const [preferencesLoading, setPreferencesLoading] = useState(() =>
+    Boolean(getInitialToken()),
+  );
 
   const setPreferences = useCallback((nextPreferences: UserPreferences | null) => {
     setPreferencesState(nextPreferences);
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(newToken);
     setUser(decodePayload(newToken));
     setPreferencesState(null);
+    setPreferencesLoading(true);
   }, []);
 
   const login = useCallback(() => {
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(null);
     setUser(null);
     setPreferencesState(null);
+    setPreferencesLoading(false);
   }, []);
 
   const refreshPreferences = useCallback(async () => {

@@ -31,9 +31,16 @@ from app.models import (
     ServiceClassification,
     ServiceHistoryEntry,
     ServiceStatus,
+    Tag,
     User,
     Vendor,
+    service_assignments,
     service_owners,
+    service_tags,
+)
+from app.models.service import (
+    service_notification_recipients,
+    service_related_services,
 )
 
 import os as _os
@@ -217,6 +224,18 @@ async def _seed_users(session: AsyncSession) -> None:
     print(f"  users: {len(rows)} processed")
 
 
+async def _seed_tags(session: AsyncSession) -> None:
+    rows = _load("tags.json")
+    for r in rows:
+        tag_id = _uuid("tag", r["id"])
+        existing = await session.get(Tag, tag_id)
+        if existing:
+            continue
+        session.add(Tag(id=tag_id, name=r["name"]))
+    await session.flush()
+    print(f"  tags: {len(rows)} processed")
+
+
 async def _seed_services(session: AsyncSession) -> None:
     rows = _load("services.json")
     user_rows = _load("users.json")
@@ -231,6 +250,13 @@ async def _seed_services(session: AsyncSession) -> None:
         c.slug: c.id for c in cls_result.scalars().all()
     }
 
+    async def _user_id_for_seed(seed_id: int) -> uuid.UUID | None:
+        email = user_email_by_seed_id.get(seed_id)
+        if not email:
+            return None
+        r = await session.execute(select(User.id).where(User.email == email))
+        return r.scalar_one_or_none()
+
     for r in rows:
         svc_id = _uuid("service", r["id"])
         existing = await session.get(Service, svc_id)
@@ -244,6 +270,8 @@ async def _seed_services(session: AsyncSession) -> None:
             name=r["name"],
             status=normalized_status,
             renewal_config=r.get("renewal_config"),
+            environment=r.get("environment"),
+            total_seats=r.get("total_seats"),
             vendor_id=_uuid("vendor", r["vendor_id"]),
             category_id=_uuid("category", r["category_id"]),
             payment_method_id=_uuid("payment_method", r["payment_method_id"]),
@@ -264,20 +292,61 @@ async def _seed_services(session: AsyncSession) -> None:
 
         # Owners
         for owner_seed_id in r.get("owner_ids", []):
-            email = user_email_by_seed_id.get(owner_seed_id)
-            if not email:
-                continue
-            result = await session.execute(select(User).where(User.email == email))
-            user = result.scalar_one_or_none()
-            if user:
+            user_id = await _user_id_for_seed(owner_seed_id)
+            if user_id:
                 await session.execute(
                     service_owners.insert().values(
                         id=str(uuid.uuid4()),
                         service_id=svc_id,
-                        user_id=user.id,
+                        user_id=user_id,
                         role="owner",
                     )
                 )
+
+        # Assignees
+        for assignee_seed_id in r.get("assignee_ids", []):
+            user_id = await _user_id_for_seed(assignee_seed_id)
+            if user_id:
+                await session.execute(
+                    service_assignments.insert().values(
+                        service_id=svc_id,
+                        user_id=user_id,
+                    )
+                )
+
+        # Notification recipients
+        for recipient_seed_id in r.get("notification_recipient_ids", []):
+            user_id = await _user_id_for_seed(recipient_seed_id)
+            if user_id:
+                await session.execute(
+                    service_notification_recipients.insert().values(
+                        service_id=svc_id,
+                        user_id=user_id,
+                    )
+                )
+
+        # Tags
+        for tag_seed_id in r.get("tag_ids", []):
+            await session.execute(
+                service_tags.insert().values(
+                    service_id=svc_id,
+                    tag_id=_uuid("tag", tag_seed_id),
+                )
+            )
+
+    # Second pass: related services (needs all services to exist first)
+    for r in rows:
+        svc_id = _uuid("service", r["id"])
+        for related_seed_id in r.get("related_service_ids", []):
+            related_id = _uuid("service", related_seed_id)
+            if related_id == svc_id:
+                continue
+            await session.execute(
+                service_related_services.insert().values(
+                    service_id=svc_id,
+                    related_service_id=related_id,
+                )
+            )
 
     await session.flush()
     print(f"  services: {len(rows)} processed")
@@ -413,6 +482,7 @@ async def seed_database() -> None:
             await _seed_payment_methods(session)
             await _seed_service_statuses(session)
             await _seed_users(session)
+            await _seed_tags(session)
             await _seed_services(session)
             await _seed_cost_records(session)
             await _seed_service_history(session)

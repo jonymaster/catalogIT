@@ -1,0 +1,12 @@
+[
+  { "id": 1, "name": "SSO" },
+  { "id": 2, "name": "PII" },
+  { "id": 3, "name": "Internal" },
+  { "id": 4, "name": "Public" },
+  { "id": 5, "name": "AI" },
+  { "id": 6, "name": "DevOps" },
+  { "id": 7, "name": "Design" },
+  { "id": 8, "name": "Collaboration" },
+  { "id": 9, "name": "Security" },
+  { "id": 10, "name": "Finance" }
+]

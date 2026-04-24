@@ -6,13 +6,36 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 1,
+    "environment": "Production",
     "owner_ids": [
       1,
       2
     ],
+    "assignee_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notification_recipient_ids": [
+      1
+    ],
+    "related_service_ids": [
+      2,
+      3,
+      10
+    ],
+    "tag_ids": [
+      1,
+      3,
+      8
+    ],
     "scim_enabled": true,
     "payment_method_id": 3,
     "criticality": "Critical",
+    "total_seats": 25,
     "renewal_config": {
       "type": "monthly",
       "day": 1
@@ -25,12 +48,36 @@
     "classification": "core_saas",
     "status": "self_managed",
     "category_id": 1,
+    "environment": "Production",
     "owner_ids": [
       1
+    ],
+    "assignee_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notification_recipient_ids": [
+      1,
+      2
+    ],
+    "related_service_ids": [
+      1,
+      3,
+      8
+    ],
+    "tag_ids": [
+      1,
+      3,
+      8
     ],
     "scim_enabled": true,
     "payment_method_id": 1,
     "criticality": "Critical",
+    "total_seats": 40,
     "renewal_config": {
       "type": "monthly",
       "day": 1
@@ -43,12 +90,37 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 1,
+    "environment": "Production",
     "owner_ids": [
+      2
+    ],
+    "assignee_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notification_recipient_ids": [
+      2
+    ],
+    "related_service_ids": [
+      1,
+      2,
+      4,
+      10,
+      14
+    ],
+    "tag_ids": [
+      1,
+      9,
       2
     ],
     "scim_enabled": false,
     "payment_method_id": 3,
     "criticality": "Critical",
+    "total_seats": 50,
     "renewal_config": {
       "type": "annual",
       "month": 1,
@@ -62,12 +134,32 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 4,
+    "environment": "Production",
     "owner_ids": [
       3
+    ],
+    "assignee_ids": [
+      3,
+      4,
+      6
+    ],
+    "notification_recipient_ids": [
+      3
+    ],
+    "related_service_ids": [
+      3,
+      14,
+      13
+    ],
+    "tag_ids": [
+      1,
+      6,
+      9
     ],
     "scim_enabled": true,
     "payment_method_id": 3,
     "criticality": "Critical",
+    "total_seats": 30,
     "renewal_config": {
       "type": "annual",
       "month": 1,
@@ -81,12 +173,29 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 1,
+    "environment": "Production",
     "owner_ids": [
       1
+    ],
+    "assignee_ids": [
+      1,
+      2
+    ],
+    "notification_recipient_ids": [
+      1,
+      2
+    ],
+    "related_service_ids": [
+      10
+    ],
+    "tag_ids": [
+      9,
+      3
     ],
     "scim_enabled": true,
     "payment_method_id": 2,
     "criticality": "Critical",
+    "total_seats": 10,
     "renewal_config": {
       "type": "annual",
       "month": 1,
@@ -100,8 +209,26 @@
     "classification": "subscription",
     "status": "self_managed",
     "category_id": 4,
+    "environment": "Production",
     "owner_ids": [
       2,
+      3
+    ],
+    "assignee_ids": [
+      3,
+      4,
+      6
+    ],
+    "notification_recipient_ids": [
+      2,
+      3
+    ],
+    "related_service_ids": [
+      7,
+      11
+    ],
+    "tag_ids": [
+      6,
       3
     ],
     "scim_enabled": false,
@@ -119,12 +246,28 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 4,
+    "environment": "Production",
     "owner_ids": [
       3
+    ],
+    "assignee_ids": [
+      3,
+      4,
+      6
+    ],
+    "notification_recipient_ids": [
+      3
+    ],
+    "related_service_ids": [
+      6
+    ],
+    "tag_ids": [
+      6
     ],
     "scim_enabled": false,
     "payment_method_id": 4,
     "criticality": "High",
+    "total_seats": 12,
     "renewal_config": {
       "type": "monthly",
       "day": 1
@@ -137,12 +280,31 @@
     "classification": "core_saas",
     "status": "self_managed",
     "category_id": 2,
+    "environment": "Production",
     "owner_ids": [
       5
+    ],
+    "assignee_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notification_recipient_ids": [
+      5
+    ],
+    "related_service_ids": [
+      2
+    ],
+    "tag_ids": [
+      8
     ],
     "scim_enabled": false,
     "payment_method_id": 1,
     "criticality": "High",
+    "total_seats": 50,
     "renewal_config": {
       "type": "monthly",
       "day": 1
@@ -155,12 +317,27 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 2,
+    "environment": "Production",
     "owner_ids": [
       5
+    ],
+    "assignee_ids": [
+      5
+    ],
+    "notification_recipient_ids": [
+      5
+    ],
+    "related_service_ids": [
+      12
+    ],
+    "tag_ids": [
+      7,
+      8
     ],
     "scim_enabled": false,
     "payment_method_id": 1,
     "criticality": "Medium",
+    "total_seats": 6,
     "renewal_config": {
       "type": "annual",
       "month": 1,
@@ -174,12 +351,35 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 1,
+    "environment": "Production",
     "owner_ids": [
       1
+    ],
+    "assignee_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notification_recipient_ids": [
+      1,
+      2
+    ],
+    "related_service_ids": [
+      3,
+      5
+    ],
+    "tag_ids": [
+      1,
+      9,
+      2
     ],
     "scim_enabled": true,
     "payment_method_id": 3,
     "criticality": "Critical",
+    "total_seats": 20,
     "renewal_config": {
       "type": "annual",
       "month": 1,
@@ -193,8 +393,24 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 4,
+    "environment": "Production",
     "owner_ids": [
       2
+    ],
+    "assignee_ids": [
+      2,
+      3
+    ],
+    "notification_recipient_ids": [
+      2
+    ],
+    "related_service_ids": [
+      6
+    ],
+    "tag_ids": [
+      6,
+      9,
+      4
     ],
     "scim_enabled": true,
     "payment_method_id": 4,
@@ -211,13 +427,34 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 5,
+    "environment": "Production",
     "owner_ids": [
       3,
+      5
+    ],
+    "assignee_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "notification_recipient_ids": [
+      3
+    ],
+    "related_service_ids": [
+      9,
+      14
+    ],
+    "tag_ids": [
+      8,
       5
     ],
     "scim_enabled": true,
     "payment_method_id": 2,
     "criticality": "High",
+    "total_seats": 25,
     "renewal_config": {
       "type": "annual",
       "month": 1,
@@ -231,12 +468,30 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 4,
+    "environment": "Production",
     "owner_ids": [
       3
+    ],
+    "assignee_ids": [
+      3,
+      4,
+      6
+    ],
+    "notification_recipient_ids": [
+      3
+    ],
+    "related_service_ids": [
+      4,
+      14
+    ],
+    "tag_ids": [
+      6,
+      8
     ],
     "scim_enabled": false,
     "payment_method_id": 1,
     "criticality": "High",
+    "total_seats": 15,
     "renewal_config": {
       "type": "monthly",
       "day": 1
@@ -249,13 +504,33 @@
     "classification": "core_saas",
     "status": "contract",
     "category_id": 4,
+    "environment": "Production",
     "owner_ids": [
       3,
       4
     ],
+    "assignee_ids": [
+      3,
+      4,
+      6
+    ],
+    "notification_recipient_ids": [
+      3,
+      4
+    ],
+    "related_service_ids": [
+      4,
+      13,
+      12
+    ],
+    "tag_ids": [
+      6,
+      8
+    ],
     "scim_enabled": true,
     "payment_method_id": 2,
     "criticality": "High",
+    "total_seats": 20,
     "renewal_config": {
       "type": "annual",
       "month": 1,

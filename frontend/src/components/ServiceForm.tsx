@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { useToast } from "../context/useToast";
 import type { ServiceDraft, ServiceValidationErrors } from "../service/serviceDetailContext";
 import { validateDraft } from "../service/serviceDetailContext";
 import { RenewalConfigField } from "./RenewalConfigField";
+import { parseRenewalOffsets } from "../service/renewalConfig";
 import { TagPicker } from "./TagPicker";
 import { UserDirectoryCheckboxPicker } from "./UserDirectoryCheckboxPicker";
 import { Button } from "./ui/Button";
@@ -33,12 +34,24 @@ interface CreateServiceResponse {
   id?: string | null;
 }
 
+type RelatedServiceOption = Pick<Service, "id" | "name" | "is_active">;
+
 interface RefData {
   vendors: Vendor[];
   categories: Category[];
   costCenters: CostCenter[];
   paymentMethods: PaymentMethod[];
   classifications: ServiceClassification[];
+}
+
+// Extra fields carried by this form beyond ServiceDraft. The backend accepts
+// them but the shared ServiceDraft/Service types haven't been extended yet.
+interface ExtraFields {
+  environment: string;
+  related_service_ids: string[];
+  renewal_reminders_enabled: boolean;
+  renewal_offsets_text: string;
+  notification_recipient_ids: string[];
 }
 
 const CRITICALITY_OPTIONS = ["Critical", "High", "Medium", "Low"];
@@ -64,6 +77,17 @@ function toDraft(s?: Service): ServiceDraft {
     nonprofit_pricing: s?.nonprofit_pricing ?? false,
     owner_ids: s?.owners.map((o) => o.id) ?? [],
     tags: s?.tags ?? [],
+  };
+}
+
+function toExtraFields(s?: Service): ExtraFields {
+  return {
+    environment: s?.environment ?? "",
+    related_service_ids: s?.related_services.map((rs) => rs.id) ?? [],
+    renewal_reminders_enabled: s?.renewal_reminders_enabled ?? true,
+    renewal_offsets_text: s?.renewal_offsets_days?.join(", ") ?? "",
+    notification_recipient_ids:
+      s?.notification_recipients.map((u) => u.id) ?? [],
   };
 }
 
@@ -109,11 +133,14 @@ export function ServiceForm({ initial }: Props) {
   const isEdit = !!initial;
 
   const [draft, setDraft] = useState<ServiceDraft>(() => toDraft(initial));
+  const [extras, setExtras] = useState<ExtraFields>(() => toExtraFields(initial));
+  const [offsetsError, setOffsetsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<ServiceValidationErrors>({});
   const submitLockRef = useRef(false);
   const [refData, setRefData] = useState<RefData | null>(null);
+  const [serviceOptions, setServiceOptions] = useState<RelatedServiceOption[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +150,8 @@ export function ServiceForm({ initial }: Props) {
       client.get<CostCenter[]>("/api/cost-centers/"),
       client.get<PaymentMethod[]>("/api/payment-methods/"),
       client.get<ServiceClassification[]>("/api/service-classifications/"),
-    ]).then(([v, c, cc, p, cl]) => {
+      client.get<Service[]>("/api/services/"),
+    ]).then(([v, c, cc, p, cl, svcRes]) => {
       if (cancelled) return;
       setRefData({
         vendors: v.data,
@@ -132,11 +160,29 @@ export function ServiceForm({ initial }: Props) {
         paymentMethods: p.data,
         classifications: cl.data,
       });
+      setServiceOptions(svcRes.data);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const relatedServiceOptions = useMemo(() => {
+    const merged = new Map<string, RelatedServiceOption>();
+
+    serviceOptions.forEach((service) => {
+      merged.set(service.id, service);
+    });
+    initial?.related_services.forEach((service) => {
+      if (!merged.has(service.id)) {
+        merged.set(service.id, service);
+      }
+    });
+
+    return Array.from(merged.values()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    );
+  }, [initial?.related_services, serviceOptions]);
 
   function set<K extends keyof ServiceDraft>(key: K, value: ServiceDraft[K]) {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -146,6 +192,10 @@ export function ServiceForm({ initial }: Props) {
       delete next[key];
       return next;
     });
+  }
+
+  function setExtra<K extends keyof ExtraFields>(key: K, value: ExtraFields[K]) {
+    setExtras((prev) => ({ ...prev, [key]: value }));
   }
 
   function getErrorMessage(err: unknown): string {
@@ -226,6 +276,12 @@ export function ServiceForm({ initial }: Props) {
       setErrors(validationErrors);
       return;
     }
+    const parsedOffsets = parseRenewalOffsets(extras.renewal_offsets_text);
+    if (!parsedOffsets.ok) {
+      setOffsetsError(parsedOffsets.message);
+      return;
+    }
+    setOffsetsError(null);
     submitLockRef.current = true;
     setSaving(true);
     setError(null);
@@ -264,6 +320,17 @@ export function ServiceForm({ initial }: Props) {
       criticality: draft.criticality || null,
       nonprofit_pricing: draft.nonprofit_pricing,
       tag_ids: draft.tags.map((tag) => tag.id),
+      // Extra fields supported by backend but not yet on ServiceDraft.
+      // renewal_date is intentionally not sent: the backend computes it
+      // from renewal_config, and the edit flow (ServiceOverview) takes
+      // the same approach — keeping create and edit 100% aligned.
+      environment: extras.environment.trim() || null,
+      related_service_ids: extras.related_service_ids,
+      // Renewal notification config — aligned with the ServiceNotifications
+      // page so the create and edit flows expose the same controls.
+      renewal_reminders_enabled: extras.renewal_reminders_enabled,
+      renewal_offsets_days: parsedOffsets.value,
+      notification_recipient_ids: extras.notification_recipient_ids,
     };
 
     try {
@@ -398,6 +465,19 @@ export function ServiceForm({ initial }: Props) {
 
             <div>
               <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+                Environment
+              </label>
+              <input
+                type="text"
+                value={extras.environment}
+                onChange={(e) => setExtra("environment", e.target.value)}
+                placeholder="e.g. Production"
+                className={fieldClass(false) + " mt-1"}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
                 Vendor
               </label>
               <select
@@ -474,6 +554,35 @@ export function ServiceForm({ initial }: Props) {
                   error={errors.renewal_config}
                 />
               </div>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+                Related Services
+              </label>
+              <select
+                multiple
+                value={extras.related_service_ids}
+                onChange={(e) =>
+                  setExtra(
+                    "related_service_ids",
+                    Array.from(e.target.selectedOptions, (option) => option.value),
+                  )
+                }
+                className={fieldClass(false) + " mt-1 h-28"}
+              >
+                {relatedServiceOptions
+                  .filter((service) => service.id !== initial?.id)
+                  .map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                      {service.is_active ? "" : " (archived)"}
+                    </option>
+                  ))}
+              </select>
+              <p className="mt-1 text-xs text-fg-3">
+                Hold Ctrl/Cmd to select multiple related services.
+              </p>
             </div>
 
             {isEdit && initial && (
@@ -571,6 +680,80 @@ export function ServiceForm({ initial }: Props) {
           </section>
         </div>
       </div>
+
+      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <h2 className="mb-1 text-base font-semibold text-fg">
+          Renewal notifications
+        </h2>
+        <p className="mb-4 text-xs text-fg-3">
+          Owners and admins always receive reminders. Use the controls below
+          to enable or silence this service's reminders, override the global
+          offsets, and add extra recipients. Global defaults live in Settings
+          &rarr; Notifications.
+        </p>
+        <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+          <div className="flex items-center justify-between gap-3 sm:col-span-2">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wider text-fg-3">
+                Reminders enabled
+              </div>
+              <p className="mt-1 text-xs text-fg-3">
+                Turn off to silence renewal reminders for this service.
+              </p>
+            </div>
+            <Toggle
+              checked={extras.renewal_reminders_enabled}
+              onChange={(v) =>
+                setExtra("renewal_reminders_enabled", v)
+              }
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              Offsets override (days before renewal)
+            </label>
+            <input
+              type="text"
+              value={extras.renewal_offsets_text}
+              onChange={(e) => {
+                setExtra("renewal_offsets_text", e.target.value);
+                if (offsetsError) setOffsetsError(null);
+              }}
+              placeholder="e.g. 30, 14, 7, 1"
+              className={fieldClass(Boolean(offsetsError)) + " mt-1"}
+            />
+            <p className="mt-1 text-xs text-fg-3">
+              Comma-separated positive integers. Leave empty to use the
+              global defaults.
+            </p>
+            {offsetsError && (
+              <p className="mt-1 text-xs text-danger">{offsetsError}</p>
+            )}
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wider text-fg-3">
+              Extra recipients
+            </label>
+            <p className="mt-1 text-xs text-fg-3">
+              Users added here receive reminders for this service only, in
+              addition to owners, admins, and globally-configured
+              recipients.
+            </p>
+            <div className="mt-2">
+              <UserDirectoryCheckboxPicker
+                variant="overview"
+                value={extras.notification_recipient_ids}
+                onChange={(ids) =>
+                  setExtra("notification_recipient_ids", ids)
+                }
+                seedUsers={initial?.notification_recipients}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
         <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>

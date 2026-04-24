@@ -41,7 +41,35 @@ export interface UserPreferences {
   locale: string | null;
   timezone: string | null;
   theme: "light" | "dark";
+  ui_preferences: UserUiPreferences;
   receive_renewal_notifications: boolean;
+}
+
+export type DashboardWidgetId =
+  | "global_search"
+  | "inventory_stats"
+  | "financial_kpis"
+  | "spend_by_year"
+  | "financial_report";
+
+export interface DashboardPreferences {
+  visible_widget_ids?: DashboardWidgetId[];
+}
+
+export interface ServiceListSortPreference {
+  key: string | null;
+  direction: "asc" | "desc" | null;
+}
+
+export interface ServiceListPreferences {
+  visible_columns?: string[];
+  filters?: Record<string, string | string[]>;
+  sort?: ServiceListSortPreference;
+}
+
+export interface UserUiPreferences {
+  dashboard?: DashboardPreferences;
+  service_list?: ServiceListPreferences;
 }
 
 export interface Vendor {
@@ -149,6 +177,13 @@ export interface ServiceHistoryEntry {
   created_at: string;
 }
 
+export interface RelatedService {
+  id: string;
+  name: string;
+  status: string;
+  is_active: boolean;
+}
+
 export type RenewalConfig =
   | { type: "annual"; month: number; day: number }
   | { type: "monthly"; day: number };
@@ -160,12 +195,14 @@ export interface Service {
   status: string;
   renewal_config: RenewalConfig | null;
   renewal_date: string | null;
+  environment: string | null;
   yearly_cost: number | null;
   sso_integrated: boolean;
   point_of_contact: string | null;
   notes: string | null;
   owners: User[];
   assignees: User[];
+  related_services: RelatedService[];
   notification_recipients: User[];
   total_seats: number | null;
   // Normalized fields

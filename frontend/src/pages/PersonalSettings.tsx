@@ -6,6 +6,8 @@ import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import type { User, UserPreferences } from "../types/models";
 
+type PreferencesFormState = Pick<UserPreferences, "locale" | "timezone" | "theme">;
+
 const COMMON_LOCALES = [
   "en-US",
   "en-GB",
@@ -39,7 +41,7 @@ export function PersonalSettings() {
   const [profile, setProfile] = useState<User | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
-  const [form, setForm] = useState<UserPreferences>({
+  const [form, setForm] = useState<PreferencesFormState>({
     locale: null,
     timezone: null,
     theme: "light",
