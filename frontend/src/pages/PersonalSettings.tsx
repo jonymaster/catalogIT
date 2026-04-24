@@ -6,7 +6,7 @@ import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import type { User, UserPreferences } from "../types/models";
 
-type PreferencesFormState = Pick<UserPreferences, "locale" | "timezone" | "theme">;
+type PreferencesFormState = Pick<UserPreferences, "locale" | "timezone" | "theme" | "receive_renewal_notifications">;
 
 const COMMON_LOCALES = [
   "en-US",
