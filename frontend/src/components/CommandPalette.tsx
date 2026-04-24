@@ -160,7 +160,7 @@ function PaletteBody({ onClose }: PaletteProps) {
         usr.display_name ??
         (`${usr.first_name} ${usr.last_name}`.trim() || usr.email),
       hint: usr.department ?? usr.email,
-      to: "/users",
+      to: `/users/${usr.id}`,
       icon: UsersIcon,
     }));
     return [...nav, ...s, ...l, ...u];
