@@ -8,7 +8,7 @@ import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { Monogram } from "../components/ui/Monogram";
 import { useToast } from "../context/useToast";
-import { PERMISSION_FINANCIAL_VIEW } from "../constants/permissions";
+import { PERMISSION_FINANCIAL_VIEW, PERMISSION_HARDWARE_VIEW } from "../constants/permissions";
 import type { ProvisioningSource, User } from "../types/models";
 
 const ROLES = ["admin", "editor", "viewer"] as const;
@@ -56,6 +56,7 @@ export function Users() {
     password: "",
     must_reset_password: false,
     financial_view: false,
+    hardware_view: false,
   });
   const [creating, setCreating] = useState(false);
 
@@ -137,6 +138,22 @@ export function Users() {
         },
       },
       {
+        key: "hardware_view",
+        header: "Hardware view",
+        render: (user) => {
+          const hardwareView =
+            user.permissions?.includes(PERMISSION_HARDWARE_VIEW) ?? false;
+          if (user.role === "admin") {
+            return <span className="text-xs text-gray-400">—</span>;
+          }
+          return (
+            <Badge color={hardwareView ? "blue" : "gray"}>
+              {hardwareView ? "Yes" : "No"}
+            </Badge>
+          );
+        },
+      },
+      {
         key: "status",
         header: "Status",
         render: (user) => (
@@ -177,7 +194,10 @@ export function Users() {
         must_reset_password: createForm.must_reset_password,
       };
       if (createForm.role !== "admin") {
-        createBody.permissions = createForm.financial_view ? [PERMISSION_FINANCIAL_VIEW] : [];
+        const perms: string[] = [];
+        if (createForm.financial_view) perms.push(PERMISSION_FINANCIAL_VIEW);
+        if (createForm.hardware_view) perms.push(PERMISSION_HARDWARE_VIEW);
+        createBody.permissions = perms;
       }
       await client.post<User>("/api/settings/users/", createBody);
       await loadUsers();
@@ -192,6 +212,7 @@ export function Users() {
         password: "",
         must_reset_password: false,
         financial_view: false,
+        hardware_view: false,
       });
       showToast({ type: "success", text: "User created." });
     } catch (err: unknown) {
@@ -321,6 +342,7 @@ export function Users() {
                         ...c,
                         role,
                         financial_view: role === "admin" ? false : c.financial_view,
+                        hardware_view: role === "admin" ? false : c.hardware_view,
                       }));
                     }}
                     className="mt-0.5 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1.5 text-sm"
@@ -333,7 +355,7 @@ export function Users() {
                   </select>
                 </div>
                 {createForm.role !== "admin" && (
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-2 space-y-2">
                     <label className="flex cursor-pointer items-center gap-2">
                       <input
                         type="checkbox"
@@ -345,6 +367,19 @@ export function Users() {
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-200">
                         Financial view (IT Financial Report and dashboard cost data)
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={createForm.hardware_view}
+                        onChange={(e) =>
+                          setCreateForm((c) => ({ ...c, hardware_view: e.target.checked }))
+                        }
+                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-200">
+                        Hardware view (inventory, assignments, hardware reference data)
                       </span>
                     </label>
                   </div>

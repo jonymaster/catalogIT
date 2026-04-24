@@ -209,6 +209,7 @@ export function LaptopOverview() {
     purchaseYear,
     costAmount,
     costLoading,
+    canFinancialView,
     editing,
     draft,
     setDraftField,
@@ -373,55 +374,56 @@ export function LaptopOverview() {
                 </Row>
               </div>
 
-              {costLoading && !activeEdit ? (
-                <div className="text-sm text-fg-3">
-                  Loading purchase &amp; cost…
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
-                  <Row label="Purchase year" error={errors.purchase_year}>
-                    {activeEdit ? (
-                      <input
-                        type="number"
-                        min={1900}
-                        max={2100}
-                        className={fieldClass(Boolean(errors.purchase_year))}
-                        value={draft.purchase_year}
-                        onChange={(e) =>
-                          setDraftField("purchase_year", e.target.value)
-                        }
-                        placeholder="Optional"
-                      />
-                    ) : purchaseYear.trim() ? (
-                      purchaseYear
-                    ) : (
-                      "—"
-                    )}
-                  </Row>
-                  <Row label="Cost" error={errors.purchase_cost}>
-                    {activeEdit ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className={fieldClass(Boolean(errors.purchase_cost))}
-                        value={draft.purchase_cost}
-                        onChange={(e) =>
-                          setDraftField("purchase_cost", e.target.value)
-                        }
-                        placeholder="Optional"
-                      />
-                    ) : costAmount.trim() ? (
-                      `$${Number(costAmount).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}`
-                    ) : (
-                      "—"
-                    )}
-                  </Row>
-                </div>
-              )}
+              {canFinancialView &&
+                (costLoading && !activeEdit ? (
+                  <div className="text-sm text-fg-3">
+                    Loading purchase &amp; cost…
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
+                    <Row label="Purchase year" error={errors.purchase_year}>
+                      {activeEdit ? (
+                        <input
+                          type="number"
+                          min={1900}
+                          max={2100}
+                          className={fieldClass(Boolean(errors.purchase_year))}
+                          value={draft.purchase_year}
+                          onChange={(e) =>
+                            setDraftField("purchase_year", e.target.value)
+                          }
+                          placeholder="Optional"
+                        />
+                      ) : purchaseYear.trim() ? (
+                        purchaseYear
+                      ) : (
+                        "—"
+                      )}
+                    </Row>
+                    <Row label="Cost" error={errors.purchase_cost}>
+                      {activeEdit ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className={fieldClass(Boolean(errors.purchase_cost))}
+                          value={draft.purchase_cost}
+                          onChange={(e) =>
+                            setDraftField("purchase_cost", e.target.value)
+                          }
+                          placeholder="Optional"
+                        />
+                      ) : costAmount.trim() ? (
+                        `$${Number(costAmount).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      ) : (
+                        "—"
+                      )}
+                    </Row>
+                  </div>
+                ))}
             </dl>
           </section>
 

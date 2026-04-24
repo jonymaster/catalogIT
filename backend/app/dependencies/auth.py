@@ -18,7 +18,7 @@ from app.database import get_db
 from app.models.api_token import ApiToken
 from app.models.user import User
 from app.models.user_permission import UserPermission
-from app.permissions import PERMISSION_FINANCIAL_VIEW
+from app.permissions import PERMISSION_FINANCIAL_VIEW, PERMISSION_HARDWARE_VIEW
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -85,22 +85,33 @@ async def load_user_permission_slugs(db: AsyncSession, user_id: uuid.UUID) -> li
     return [row[0] for row in result.all()]
 
 
-async def ensure_financial_view_access(user: User, db: AsyncSession) -> None:
-    """Raise 403 unless the user may read financial aggregates (dashboard / costs)."""
+async def _user_has_permission(user: User, db: AsyncSession, slug: str) -> bool:
+    """Return True if user is admin or holds the given permission slug."""
     if user.role == "admin":
-        return
+        return True
     if user.role not in ("editor", "viewer"):
+        return False
+    row = await db.execute(
+        select(UserPermission).where(
+            UserPermission.user_id == user.id,
+            UserPermission.permission == slug,
+        )
+    )
+    return row.scalar_one_or_none() is not None
+
+
+async def ensure_financial_view_access(user: User, db: AsyncSession) -> None:
+    """Raise 403 unless the user may read financial data."""
+    if not await _user_has_permission(user, db, PERMISSION_FINANCIAL_VIEW):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
         )
-    row = await db.execute(
-        select(UserPermission).where(
-            UserPermission.user_id == user.id,
-            UserPermission.permission == PERMISSION_FINANCIAL_VIEW,
-        )
-    )
-    if row.scalar_one_or_none() is None:
+
+
+async def ensure_hardware_view_access(user: User, db: AsyncSession) -> None:
+    """Raise 403 unless the user may read hardware data."""
+    if not await _user_has_permission(user, db, PERMISSION_HARDWARE_VIEW):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Insufficient permissions",
@@ -114,6 +125,31 @@ async def require_financial_view(
     """Allow admins; editors/viewers need financial_view in user_permissions."""
     await ensure_financial_view_access(user, db)
     return user
+
+
+async def require_hardware_view(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Allow admins; editors/viewers need hardware_view in user_permissions."""
+    await ensure_hardware_view_access(user, db)
+    return user
+
+
+async def get_financial_view_flag(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> bool:
+    """Non-raising probe: True if caller may see financial data."""
+    return await _user_has_permission(user, db, PERMISSION_FINANCIAL_VIEW)
+
+
+async def get_hardware_view_flag(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> bool:
+    """Non-raising probe: True if caller may see hardware data."""
+    return await _user_has_permission(user, db, PERMISSION_HARDWARE_VIEW)
 
 
 def require_role(*allowed_roles: str) -> Callable:

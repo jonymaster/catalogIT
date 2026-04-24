@@ -39,6 +39,8 @@ function preloadBrandingImages(): Plugin {
   };
 }
 
+const proxyTarget = process.env.VITE_PROXY_TARGET ?? "http://api:8000";
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), preloadBrandingImages()],
   build: {
@@ -48,11 +50,11 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     proxy: {
-      "/api": "http://api:8000",
-      "/auth": "http://api:8000",
-      "/scim": "http://api:8000",
-      "/docs": "http://api:8000",
-      "/openapi.json": "http://api:8000",
+      "/api": proxyTarget,
+      "/auth": proxyTarget,
+      "/scim": proxyTarget,
+      "/docs": proxyTarget,
+      "/openapi.json": proxyTarget,
     },
   },
   test: {

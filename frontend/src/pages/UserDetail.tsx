@@ -17,7 +17,7 @@ import { Monogram } from "../components/ui/Monogram";
 import { formatMoneyCompact, formatMoneyFull } from "../components/ui/money-format";
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
-import { PERMISSION_FINANCIAL_VIEW } from "../constants/permissions";
+import { PERMISSION_FINANCIAL_VIEW, PERMISSION_HARDWARE_VIEW } from "../constants/permissions";
 import type { Laptop, Service, User } from "../types/models";
 
 const TABS = [
@@ -40,6 +40,7 @@ type UserDraft = {
   is_active: boolean;
   receive_renewal_notifications: boolean;
   financial_view: boolean;
+  hardware_view: boolean;
 };
 
 function toDraft(user: User): UserDraft {
@@ -53,6 +54,7 @@ function toDraft(user: User): UserDraft {
     is_active: user.is_active,
     receive_renewal_notifications: user.receive_renewal_notifications ?? true,
     financial_view: user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false,
+    hardware_view: user.permissions?.includes(PERMISSION_HARDWARE_VIEW) ?? false,
   };
 }
 
@@ -264,6 +266,7 @@ function GeneralPanel({
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
   const financialValue = draft.role === "admin" ? false : draft.financial_view;
+  const hardwareValue = draft.role === "admin" ? false : draft.hardware_view;
 
   return (
     <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
@@ -370,6 +373,44 @@ function GeneralPanel({
               }
             >
               {user.permissions?.includes(PERMISSION_FINANCIAL_VIEW)
+                ? "Granted"
+                : "Not granted"}
+            </Badge>
+          )}
+        </Row>
+
+        <Row label="Hardware view permissions">
+          {draft.role === "admin" && !editing ? (
+            <span className="text-fg-4">
+              Granted implicitly to admins
+            </span>
+          ) : editing ? (
+            draft.role === "admin" ? (
+              <span className="text-fg-4">
+                Granted implicitly to admins
+              </span>
+            ) : (
+              <label className="inline-flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hardwareValue}
+                  onChange={(e) => setField("hardware_view", e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <span className="text-sm text-fg-2">
+                  Granted (hardware inventory, assignments, reference data)
+                </span>
+              </label>
+            )
+          ) : (
+            <Badge
+              color={
+                user.permissions?.includes(PERMISSION_HARDWARE_VIEW)
+                  ? "blue"
+                  : "gray"
+              }
+            >
+              {user.permissions?.includes(PERMISSION_HARDWARE_VIEW)
                 ? "Granted"
                 : "Not granted"}
             </Badge>
@@ -688,6 +729,12 @@ export function UserDetail() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetMustChange, setResetMustChange] = useState(true);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -768,6 +815,36 @@ export function UserDetail() {
     setEditing(false);
   }
 
+  function openResetPassword() {
+    setResetPassword("");
+    setResetMustChange(true);
+    setResetError(null);
+    setResetOpen(true);
+  }
+
+  async function submitResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+    if (resetPassword.length < 8) {
+      setResetError("Password must be at least 8 characters.");
+      return;
+    }
+    setResetSubmitting(true);
+    setResetError(null);
+    try {
+      await client.post(`/api/settings/users/${user.id}/password`, {
+        new_password: resetPassword,
+        must_reset_password: resetMustChange,
+      });
+      setResetOpen(false);
+      showToast({ type: "success", text: "Password reset." });
+    } catch (err: unknown) {
+      setResetError(formatApiError(err));
+    } finally {
+      setResetSubmitting(false);
+    }
+  }
+
   async function handleSave() {
     if (!user || !draft) return;
     const patch: Record<string, unknown> = {
@@ -783,7 +860,10 @@ export function UserDetail() {
       patch.department = draft.department.trim() || null;
     }
     if (draft.role !== "admin") {
-      patch.permissions = draft.financial_view ? [PERMISSION_FINANCIAL_VIEW] : [];
+      const perms: string[] = [];
+      if (draft.financial_view) perms.push(PERMISSION_FINANCIAL_VIEW);
+      if (draft.hardware_view) perms.push(PERMISSION_HARDWARE_VIEW);
+      patch.permissions = perms;
     } else {
       patch.permissions = [];
     }
@@ -848,6 +928,15 @@ export function UserDetail() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {canEdit && !editing && isLocal && (
+              <button
+                type="button"
+                onClick={openResetPassword}
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm font-medium text-fg-2 shadow-sm transition-colors hover:bg-surface-2"
+              >
+                Reset password
+              </button>
+            )}
             {canEdit && !editing && (
               <button
                 type="button"
@@ -1000,6 +1089,74 @@ export function UserDetail() {
           />
         )}
       </div>
+
+      {resetOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
+          <div
+            className="my-auto w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-password-title"
+          >
+            <h2 id="reset-password-title" className="text-lg font-medium text-fg">
+              Reset password
+            </h2>
+            <p className="mt-1 text-sm text-fg-3">
+              Set a new password for {user.email}.
+            </p>
+            <form onSubmit={submitResetPassword} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-fg-2">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  className="mt-0.5 w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-fg"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="reset_must_change"
+                  type="checkbox"
+                  checked={resetMustChange}
+                  onChange={(e) => setResetMustChange(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <label htmlFor="reset_must_change" className="text-sm text-fg-2">
+                  Require password change on next sign-in
+                </label>
+              </div>
+              {resetError && (
+                <div className="rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+                  {resetError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setResetOpen(false)}
+                  disabled={resetSubmitting}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm text-fg-2 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetSubmitting}
+                  className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-strong disabled:opacity-60"
+                >
+                  {resetSubmitting ? "Saving…" : "Set password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </PageTransition>
   );
 }

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.auth import require_role
+from app.dependencies.auth import require_financial_view, require_hardware_view, require_role
 from app.dependencies.db import get_audited_db
 from app.models.cost_record import CostRecord
 from app.models.laptop import Laptop
@@ -38,6 +38,8 @@ async def _get_laptop(laptop_id: uuid.UUID, db: AsyncSession, *, for_write: bool
 @router.get("/", response_model=list[CostRecordRead])
 async def list_laptop_cost_records(
     laptop_id: uuid.UUID,
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_laptop(laptop_id, db)
@@ -66,6 +68,8 @@ async def list_laptop_cost_records(
 async def get_laptop_cost_record(
     laptop_id: uuid.UUID,
     record_id: uuid.UUID,
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_laptop(laptop_id, db)
@@ -85,6 +89,8 @@ async def create_laptop_cost_record(
     laptop_id: uuid.UUID,
     body: CostRecordCreate,
     user: User = Depends(_writer),
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_laptop(laptop_id, db, for_write=True)
@@ -117,6 +123,8 @@ async def update_laptop_cost_record(
     record_id: uuid.UUID,
     body: CostRecordUpdate,
     _user: User = Depends(_writer),
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_laptop(laptop_id, db, for_write=True)
@@ -149,6 +157,8 @@ async def delete_laptop_cost_record(
     laptop_id: uuid.UUID,
     record_id: uuid.UUID,
     _user: User = Depends(_writer),
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     await _get_laptop(laptop_id, db, for_write=True)

@@ -175,7 +175,6 @@ class UserProfileRouteTest(unittest.TestCase):
 
         asyncio.run(run())
 
-
 class UserProfileRouteValidationTest(unittest.TestCase):
     def setUp(self) -> None:
         app = FastAPI()

@@ -45,7 +45,7 @@ const FLASH_TOAST_KEY = "catalogit:flash-toast";
 
 export function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
-  const { canEdit, user } = useAuth();
+  const { canEdit, canFinancialView, user } = useAuth();
   const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -472,13 +472,15 @@ export function ServiceDetail() {
               active={location.pathname.endsWith("/assignments")}
               onClick={() => openRoutedTab(`/services/${id}/assignments`)}
             />
-            <TabLink
-              to="costs"
-              end={false}
-              label="Costs"
-              active={location.pathname.endsWith("/costs")}
-              onClick={() => openRoutedTab(`/services/${id}/costs`)}
-            />
+            {canFinancialView && (
+              <TabLink
+                to="costs"
+                end={false}
+                label="Costs"
+                active={location.pathname.endsWith("/costs")}
+                onClick={() => openRoutedTab(`/services/${id}/costs`)}
+              />
+            )}
             <TabLink
               to="attachments"
               end={false}

@@ -10,8 +10,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.dependencies.auth import get_current_user
-from app.dependencies.auth import require_role
+from app.dependencies.auth import get_current_user, get_hardware_view_flag, require_role
 from app.dependencies.db import get_audited_db
 from app.models.laptop import Laptop
 from app.models.service import Service
@@ -96,6 +95,7 @@ async def list_users_for_directory(
 async def get_user_profile(
     user_id: uuid.UUID,
     _current_user: User = Depends(get_current_user),
+    has_hardware_view: bool = Depends(get_hardware_view_flag),
     db: AsyncSession = Depends(get_audited_db),
 ):
     result = await db.execute(
@@ -122,12 +122,16 @@ async def get_user_profile(
         .where(Service.assignees.any(User.id == user.id))
         .order_by(Service.name)
     )
-    assigned_laptops_result = await db.execute(
-        select(Laptop)
-        .options(selectinload(Laptop.hardware_location))
-        .where(Laptop.assigned_to_id == user.id)
-        .order_by(Laptop.serial_number)
-    )
+    if has_hardware_view:
+        assigned_laptops_result = await db.execute(
+            select(Laptop)
+            .options(selectinload(Laptop.hardware_location))
+            .where(Laptop.assigned_to_id == user.id)
+            .order_by(Laptop.serial_number)
+        )
+        assigned_laptops_rows = list(assigned_laptops_result.scalars().all())
+    else:
+        assigned_laptops_rows = []
 
     def to_service_link(service: Service) -> UserServiceLinkRead:
         return UserServiceLinkRead(
@@ -159,7 +163,5 @@ async def get_user_profile(
         assigned_services=[
             to_service_link(service) for service in assigned_services_result.scalars().all()
         ],
-        assigned_laptops=[
-            to_laptop_link(laptop) for laptop in assigned_laptops_result.scalars().all()
-        ],
+        assigned_laptops=[to_laptop_link(laptop) for laptop in assigned_laptops_rows],
     )

@@ -602,7 +602,7 @@ export function Services() {
     "catalogit:services:columns",
     ALL_COLUMN_KEYS,
   );
-  const { canEdit, preferences } = useAuth();
+  const { canEdit, canFinancialView, preferences } = useAuth();
   const { showToast } = useToast();
   const { records, fiscalYears } = useDashboardCostData();
 
@@ -660,6 +660,14 @@ export function Services() {
 
   const loading = loadedView !== view;
 
+  const effectiveColumnDefinitions = useMemo(
+    () =>
+      columnDefinitions.filter(
+        (column) => canFinancialView || column.key !== "yearly_cost",
+      ),
+    [canFinancialView],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     const nextRows = services.filter((service) => {
@@ -686,7 +694,7 @@ export function Services() {
         return false;
       }
 
-      return columnDefinitions.every((column) => {
+      return effectiveColumnDefinitions.every((column) => {
         const cellValue = column.getFilterValue(service);
         if (column.filterType === "select") {
           const selected = filters[column.key];
@@ -716,7 +724,7 @@ export function Services() {
       return nextRows;
     }
 
-    const activeColumn = columnDefinitions.find(
+    const activeColumn = effectiveColumnDefinitions.find(
       (column) => column.key === sortState.key,
     );
     if (!activeColumn) {
@@ -729,10 +737,10 @@ export function Services() {
       const comparison = compareServiceValues(leftValue, rightValue);
       return sortState.direction === "asc" ? comparison : -comparison;
     });
-  }, [filters, search, services, sortState]);
+  }, [filters, search, services, sortState, effectiveColumnDefinitions]);
 
   const handleExportCsv = useCallback(() => {
-    const known = new Set(columnDefinitions.map((column) => column.key));
+    const known = new Set(effectiveColumnDefinitions.map((column) => column.key));
     const keysInOrder = visibleKeys.filter((key) => known.has(key));
     if (keysInOrder.length === 0 || filtered.length === 0) {
       return;
@@ -750,7 +758,7 @@ export function Services() {
       `services-${todayFilenameDate()}.csv`,
       buildCsv(headers, rows),
     );
-  }, [filtered, preferences, visibleKeys]);
+  }, [filtered, preferences, visibleKeys, effectiveColumnDefinitions]);
 
   const showDescriptionTooltip = useCallback(
     (event: React.SyntheticEvent<HTMLElement>, description: string) => {
@@ -820,7 +828,7 @@ export function Services() {
   }, []);
 
   const columns = useMemo<Column<Service>[]>(() => {
-    return columnDefinitions.map((column) => {
+    return effectiveColumnDefinitions.map((column) => {
       const sortDirection =
         sortState.key === column.key ? sortState.direction : null;
 
@@ -927,7 +935,7 @@ export function Services() {
           ),
       };
     });
-  }, [filters, hideDescriptionTooltip, preferences, services, showDescriptionTooltip, sortState]);
+  }, [filters, hideDescriptionTooltip, preferences, services, showDescriptionTooltip, sortState, effectiveColumnDefinitions]);
 
   return (
     <PageTransition>

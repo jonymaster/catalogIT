@@ -76,6 +76,7 @@ interface WidgetDef {
   render: (ctx: WidgetCtx) => React.ReactNode;
   adminOnly?: boolean;
   requiresFinancial?: boolean;
+  requiresHardware?: boolean;
 }
 
 const SERVICES_LIST_STATE_STORAGE_KEY = "catalogit:services:list-state";
@@ -1238,6 +1239,7 @@ const WIDGETS: WidgetDef[] = [
     id: "hardware",
     title: "Hardware snapshot",
     span: 6,
+    requiresHardware: true,
     render: (ctx) => <HardwareSnapshot laptops={ctx.laptops} />,
   },
   {
@@ -1407,7 +1409,7 @@ function AddWidgetMenu({
 }
 
 export function Dashboard() {
-  const { user, canFinancialView } = useAuth();
+  const { user, canFinancialView, canHardwareView } = useAuth();
   const isAdmin = user?.role === "admin";
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
@@ -1444,14 +1446,18 @@ export function Dashboard() {
   useEffect(() => {
     Promise.all([
       client.get<Service[]>("/api/services/"),
-      client.get<Laptop[]>("/api/laptops/"),
+      canHardwareView
+        ? client
+            .get<Laptop[]>("/api/laptops/")
+            .catch(() => ({ data: [] as Laptop[] }))
+        : Promise.resolve({ data: [] as Laptop[] }),
     ])
       .then(([sRes, lRes]) => {
         setServices(sRes.data);
         setLaptops(lRes.data);
       })
       .finally(() => setInventoryLoading(false));
-  }, []);
+  }, [canHardwareView]);
 
   const currentYearValue = new Date().getFullYear();
   const defaultDashYear =
@@ -1557,9 +1563,10 @@ export function Dashboard() {
       WIDGETS.filter((w) => {
         if (w.adminOnly && !isAdmin) return false;
         if (w.requiresFinancial && !(canFinancialView && hasCostData)) return false;
+        if (w.requiresHardware && !canHardwareView) return false;
         return true;
       }),
-    [isAdmin, canFinancialView, hasCostData],
+    [isAdmin, canFinancialView, hasCostData, canHardwareView],
   );
 
   const orderedIds = useMemo<WidgetId[]>(() => {

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.auth import require_role
+from app.dependencies.auth import require_hardware_view, require_role
 from app.dependencies.db import get_audited_db
 from app.models.hardware_location import HardwareLocation
 from app.models.laptop import Laptop
@@ -39,7 +39,10 @@ _delete_dependencies = [
 
 
 @router.get("/", response_model=list[HardwareLocationRead])
-async def list_hardware_locations(db: AsyncSession = Depends(get_audited_db)):
+async def list_hardware_locations(
+    _hw: User = Depends(require_hardware_view),
+    db: AsyncSession = Depends(get_audited_db),
+):
     result = await db.execute(select(HardwareLocation).order_by(HardwareLocation.name))
     return result.scalars().all()
 

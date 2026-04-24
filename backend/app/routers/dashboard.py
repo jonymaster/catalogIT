@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.dependencies.auth import require_financial_view
+from app.dependencies.auth import get_hardware_view_flag, require_financial_view
 from app.dependencies.db import get_audited_db
 from app.models.user import User
 from app.models.category import Category
@@ -55,11 +55,13 @@ class DashboardData(BaseModel):
 @router.get("/", response_model=DashboardData)
 async def get_dashboard(
     _user: User = Depends(require_financial_view),
+    has_hardware_view: bool = Depends(get_hardware_view_flag),
     db: AsyncSession = Depends(get_audited_db),
 ):
-    cr_result = await db.execute(
-        select(CostRecord).order_by(CostRecord.fiscal_year)
-    )
+    cr_stmt = select(CostRecord).order_by(CostRecord.fiscal_year)
+    if not has_hardware_view:
+        cr_stmt = cr_stmt.where(CostRecord.laptop_id.is_(None))
+    cr_result = await db.execute(cr_stmt)
     records = cr_result.scalars().all()
 
     svc_result = await db.execute(

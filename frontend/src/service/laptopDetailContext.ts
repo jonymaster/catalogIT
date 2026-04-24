@@ -27,6 +27,7 @@ export interface LaptopDetailContext {
   purchaseYear: string;
   costAmount: string;
   costLoading: boolean;
+  canFinancialView: boolean;
   editing: boolean;
   setEditing: (next: boolean) => void;
   draft: LaptopDraft;
