@@ -88,6 +88,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
             id=laptop_id,
             model_name="MacBook Pro",
             serial_number="SN-42",
+            operating_system="macOS",
         )
         category = SimpleNamespace(id=category_id, name="Productivity")
         db = _FakeDb(

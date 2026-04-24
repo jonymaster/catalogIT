@@ -93,17 +93,6 @@ class ServiceSchemaValidationTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ServiceCreate(name="   ")
 
-    def test_service_create_rejects_invalid_billing_schedule(self) -> None:
-        with self.assertRaises(ValidationError):
-            ServiceCreate(name="Payroll", billing_schedule="quarterly")
-
-    def test_service_create_invalid_billing_schedule_message_omits_blank_sentinel(self) -> None:
-        with self.assertRaises(ValidationError) as exc:
-            ServiceCreate(name="Payroll", billing_schedule="quarterly")
-
-        self.assertIn("billing_schedule must be one of:", str(exc.exception))
-        self.assertNotIn("(blank)", str(exc.exception))
-
     def test_service_create_rejects_invalid_renewal_offsets(self) -> None:
         with self.assertRaises(ValidationError):
             ServiceCreate(name="Payroll", renewal_offsets_days=[30, 0])

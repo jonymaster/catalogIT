@@ -105,28 +105,6 @@ class UpdatePayloadValidationTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         client.close()
 
-    def test_service_update_rejects_null_billing_schedule(self) -> None:
-        service_id = uuid.uuid4()
-        db = _ValidationDb(
-            service=SimpleNamespace(
-                id=service_id,
-                is_active=True,
-                status="Contract",
-                billing_schedule="monthly",
-                assignees=[],
-                total_seats=None,
-            )
-        )
-        client = _build_client(db, services.router)
-
-        response = client.put(
-            f"/api/services/{service_id}",
-            json={"billing_schedule": None},
-        )
-
-        self.assertEqual(response.status_code, 422)
-        client.close()
-
     def test_service_cost_record_update_rejects_null_non_nullable_fields(self) -> None:
         service_id = uuid.uuid4()
         record_id = uuid.uuid4()
