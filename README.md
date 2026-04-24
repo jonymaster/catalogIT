@@ -12,7 +12,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **Hardware Inventory** — manage laptops and devices with assignment tracking
 - **Renewal Calendar** — visual calendar view for upcoming renewals
 - **SSO & Provisioning** — OIDC single sign-on (Okta) with SCIM 2.0 automatic user provisioning
-- **Role-Based Access** — admin and regular user roles with fine-grained permissions
+- **Role-Based Access** — admin/editor/viewer roles plus per-feature permissions for financial data and hardware visibility
 - **Audit Logging** — comprehensive change history with configurable retention policies
 - **Notifications** — renewal reminders and alerts via Gmail, Slack, Telegram, or webhooks ([email templates](docs/email-templates.md))
 - **File Attachments** — attach contracts and documents to services (S3-compatible storage)
@@ -166,6 +166,40 @@ catalogIT/
 ├── Makefile           # e.g. make release — push images; make backup-local
 └── .env.example       # Environment variable template
 ```
+
+## Release history
+
+Highlights from the most recent releases. Full notes on the [GitHub releases page](https://github.com/jonymaster/catalogIT/releases).
+
+### v1.4.0 — April 2026
+
+- **Granular permissions:** new Financial view and Hardware visibility permissions, applied end-to-end across the UI and API. Admins still see everything.
+- **Admin password reset:** admins can reset local users' passwords directly from the user detail page.
+- Bug fixes around user search results.
+
+### v1.3.0 — April 2026
+
+- **User-centric navigation:** new per-user pages for owned/assigned services and assigned assets.
+- **Personalized workspace preferences:** date format, dashboard defaults, column layouts persisted server-side per user.
+- Rolls up five backlog initiatives with regression fixes.
+
+### v1.2.x — April 2026
+
+- **Visual refresh** across the product with new dashboard widgets and flexible layout.
+- **Automatic notification scheduling** so renewal reminders fire without manual cron triggers.
+- **Tags and yearly costs** on services, plus cost-report UI improvements.
+- Deep linking between lists and detail pages for faster navigation.
+
+### v1.1.x — April 2026
+
+- **Cost records** replace the single yearly-cost field, with actual vs. estimated costs merged per fiscal year.
+- **Point of Contact** field for services and reference-data color coding.
+- Dashboard widgets, export-all, and integration disconnection.
+- v1.1.0 introduced a modern UI overhaul, v1 financial permissions, hardware costs and locations.
+
+### v1.0.0 — April 2026
+
+First stable release: service catalog, hardware inventory, renewal calendar, OIDC + SCIM, role-based access, audit logging, notifications, attachments, and API tokens.
 
 ## Contributing
 
