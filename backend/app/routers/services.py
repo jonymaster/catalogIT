@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
-from app.dependencies.auth import require_role
+from app.dependencies.auth import get_financial_view_flag, require_role
 from app.dependencies.db import get_audited_db
 from app.models.category import Category
 from app.models.contract import Contract
@@ -34,6 +35,21 @@ router = APIRouter(prefix="/api/services", tags=["services"])
 
 _writer = require_role("admin", "editor")
 _admin = require_role("admin")
+
+
+def _scrub_financial(service: Service, has_financial_view: bool) -> Service:
+    """Null financial fields for serialization without marking the ORM attribute dirty.
+
+    `set_committed_value` bypasses the SQLAlchemy change tracker so the audit
+    `after_flush` hook does not see this as a user-initiated UPDATE.
+    """
+    if not has_financial_view:
+        try:
+            set_committed_value(service, "yearly_cost", None)
+        except Exception:
+            # Non-ORM objects (e.g. test mocks) fall back to plain attribute assignment.
+            service.yearly_cost = None
+    return service
 _ARCHIVED_SERVICE_EDITABLE_FIELDS = {
     "description",
     "point_of_contact",
@@ -204,6 +220,7 @@ async def _get_related_services(
 @router.get("/", response_model=list[ServiceRead])
 async def list_services(
     archived: bool = Query(False),
+    has_financial_view: bool = Depends(get_financial_view_flag),
     db: AsyncSession = Depends(get_audited_db),
 ):
     stmt = (
@@ -213,11 +230,16 @@ async def list_services(
         .order_by(Service.name)
     )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    services = result.scalars().all()
+    return [_scrub_financial(s, has_financial_view) for s in services]
 
 
 @router.get("/{service_id}", response_model=ServiceRead)
-async def get_service(service_id: uuid.UUID, db: AsyncSession = Depends(get_audited_db)):
+async def get_service(
+    service_id: uuid.UUID,
+    has_financial_view: bool = Depends(get_financial_view_flag),
+    db: AsyncSession = Depends(get_audited_db),
+):
     result = await db.execute(
         select(Service)
         .options(selectinload(Service.related_services))
@@ -226,11 +248,16 @@ async def get_service(service_id: uuid.UUID, db: AsyncSession = Depends(get_audi
     service = result.scalar_one_or_none()
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
-    return service
+    return _scrub_financial(service, has_financial_view)
 
 
 @router.post("/", response_model=ServiceRead, status_code=status.HTTP_201_CREATED)
-async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
+async def create_service(
+    body: ServiceCreate,
+    _user: User = Depends(_writer),
+    has_financial_view: bool = Depends(get_financial_view_flag),
+    db: AsyncSession = Depends(get_audited_db),
+):
     owners = []
     if body.owner_ids:
         for uid in body.owner_ids:
@@ -323,7 +350,7 @@ async def create_service(body: ServiceCreate, _user: User = Depends(_writer), db
     db.add(service)
     await db.flush()
     await db.refresh(service)
-    return service
+    return _scrub_financial(service, has_financial_view)
 
 
 @router.put("/{service_id}", response_model=ServiceRead)
@@ -331,6 +358,7 @@ async def update_service(
     service_id: uuid.UUID,
     body: ServiceUpdate,
     _user: User = Depends(_writer),
+    has_financial_view: bool = Depends(get_financial_view_flag),
     db: AsyncSession = Depends(get_audited_db),
 ):
     service = await db.get(Service, service_id)
@@ -490,7 +518,7 @@ async def update_service(
 
     await db.flush()
     await db.refresh(service)
-    return service
+    return _scrub_financial(service, has_financial_view)
 
 
 @router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -515,6 +543,7 @@ async def delete_service(
 async def archive_service(
     service_id: uuid.UUID,
     _user: User = Depends(_writer),
+    has_financial_view: bool = Depends(get_financial_view_flag),
     db: AsyncSession = Depends(get_audited_db),
 ):
     service = await db.get(Service, service_id)
@@ -525,13 +554,14 @@ async def archive_service(
         service.deprecated_at = datetime.utcnow()
     await db.flush()
     await db.refresh(service)
-    return service
+    return _scrub_financial(service, has_financial_view)
 
 
 @router.post("/{service_id}/unarchive", response_model=ServiceRead)
 async def unarchive_service(
     service_id: uuid.UUID,
     _user: User = Depends(_writer),
+    has_financial_view: bool = Depends(get_financial_view_flag),
     db: AsyncSession = Depends(get_audited_db),
 ):
     service = await db.get(Service, service_id)
@@ -542,4 +572,4 @@ async def unarchive_service(
         service.deprecated_at = None
     await db.flush()
     await db.refresh(service)
-    return service
+    return _scrub_financial(service, has_financial_view)

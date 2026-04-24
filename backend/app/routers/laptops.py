@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.auth import require_role
+from app.dependencies.auth import require_financial_view, require_hardware_view, require_role
 from app.dependencies.db import get_audited_db
 from app.models.cost_record import CostRecord
 from app.models.hardware_location import HardwareLocation
@@ -145,6 +145,7 @@ def _raise_duplicate_serial_number_http_error(exc: IntegrityError) -> None:
 @router.get("/", response_model=list[LaptopRead])
 async def list_laptops(
     archived: bool = Query(False),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     stmt = select(Laptop).where(Laptop.is_active.is_(not archived)).order_by(Laptop.serial_number)
@@ -155,6 +156,8 @@ async def list_laptops(
 @router.get("/{laptop_id}/hardware-cost", response_model=CostRecordRead | None)
 async def get_laptop_hardware_cost(
     laptop_id: uuid.UUID,
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)
@@ -181,6 +184,8 @@ async def put_laptop_hardware_cost(
     laptop_id: uuid.UUID,
     body: LaptopHardwareCostPut,
     user: User = Depends(_writer),
+    _fin: User = Depends(require_financial_view),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)
@@ -243,7 +248,11 @@ async def put_laptop_hardware_cost(
 
 
 @router.get("/{laptop_id}", response_model=LaptopRead)
-async def get_laptop(laptop_id: uuid.UUID, db: AsyncSession = Depends(get_audited_db)):
+async def get_laptop(
+    laptop_id: uuid.UUID,
+    _hw: User = Depends(require_hardware_view),
+    db: AsyncSession = Depends(get_audited_db),
+):
     laptop = await db.get(Laptop, laptop_id)
     if not laptop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
@@ -251,7 +260,12 @@ async def get_laptop(laptop_id: uuid.UUID, db: AsyncSession = Depends(get_audite
 
 
 @router.post("/", response_model=LaptopRead, status_code=status.HTTP_201_CREATED)
-async def create_laptop(body: LaptopCreate, _user: User = Depends(_writer), db: AsyncSession = Depends(get_audited_db)):
+async def create_laptop(
+    body: LaptopCreate,
+    _user: User = Depends(_writer),
+    _hw: User = Depends(require_hardware_view),
+    db: AsyncSession = Depends(get_audited_db),
+):
     await _ensure_unique_serial_number(db, body.serial_number)
     hw_status = await _resolve_hardware_status(
         db,
@@ -294,6 +308,7 @@ async def update_laptop(
     laptop_id: uuid.UUID,
     body: LaptopUpdate,
     _user: User = Depends(_writer),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)
@@ -371,6 +386,7 @@ async def update_laptop(
 async def delete_laptop(
     laptop_id: uuid.UUID,
     _user: User = Depends(_admin),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)
@@ -389,6 +405,7 @@ async def delete_laptop(
 async def archive_laptop(
     laptop_id: uuid.UUID,
     _user: User = Depends(_writer),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)
@@ -406,6 +423,7 @@ async def archive_laptop(
 async def unarchive_laptop(
     laptop_id: uuid.UUID,
     _user: User = Depends(_writer),
+    _hw: User = Depends(require_hardware_view),
     db: AsyncSession = Depends(get_audited_db),
 ):
     laptop = await db.get(Laptop, laptop_id)

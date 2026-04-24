@@ -79,7 +79,7 @@ function SectionHeader({ label, collapsed }: { label: string; collapsed: boolean
 }
 
 export function Sidebar() {
-  const { user, logout, canFinancialView } = useAuth();
+  const { user, logout, canFinancialView, canHardwareView } = useAuth();
   const { collapsed, toggle } = useSidebar();
   const isAdmin = user?.role === "admin";
   const initial = user?.email?.charAt(0).toUpperCase() ?? "?";
@@ -93,7 +93,9 @@ export function Sidebar() {
       label: "Inventory",
       items: [
         { name: "Services", to: "/services", icon: ServerStackIcon },
-        { name: "Hardware", to: "/hardware", icon: ComputerDesktopIcon },
+        ...(canHardwareView
+          ? [{ name: "Hardware", to: "/hardware", icon: ComputerDesktopIcon }]
+          : []),
       ],
     },
     {

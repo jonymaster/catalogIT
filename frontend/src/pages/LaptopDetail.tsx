@@ -40,7 +40,7 @@ export function LaptopDetail() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { canEdit, user } = useAuth();
+  const { canEdit, canFinancialView, user } = useAuth();
   const isAdmin = user?.role === "admin";
 
   const [laptop, setLaptop] = useState<Laptop | null>(null);
@@ -96,7 +96,9 @@ export function LaptopDetail() {
     setCostLoading(true);
     Promise.all([
       client.get<Laptop>(`/api/laptops/${id}`),
-      client.get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`),
+      canFinancialView
+        ? client.get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`)
+        : Promise.resolve({ data: null as CostRecord | null }),
     ])
       .then(([lapRes, costRes]) => {
         if (cancelled) return;
@@ -128,13 +130,15 @@ export function LaptopDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, canFinancialView]);
 
   const reloadAll = useCallback(async () => {
     if (!id) return;
     const [lapRes, costRes] = await Promise.all([
       client.get<Laptop>(`/api/laptops/${id}`),
-      client.get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`),
+      canFinancialView
+        ? client.get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`)
+        : Promise.resolve({ data: null as CostRecord | null }),
     ]);
     setLaptop(lapRes.data);
     const c = costRes.data;
@@ -147,7 +151,7 @@ export function LaptopDetail() {
       setCostAmount("");
       setDraft(mergeCostIntoDraft(toDraft(lapRes.data), null));
     }
-  }, [id]);
+  }, [id, canFinancialView]);
 
   const setDraftField = useCallback(
     <K extends keyof LaptopDraft>(key: K, value: LaptopDraft[K]) => {
@@ -186,14 +190,16 @@ export function LaptopDetail() {
     try {
       if (laptop.is_active) {
         await client.put<Laptop>(`/api/laptops/${id}`, draftToLaptopPayload(draft));
-        const pyRaw = draft.purchase_year.trim();
-        const py = pyRaw ? Number(pyRaw) : null;
-        const costRaw = draft.purchase_cost.trim();
-        const costAmt = costRaw ? Number(costRaw) : 0;
-        await client.put(`/api/laptops/${id}/hardware-cost`, {
-          amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
-          purchase_year: py != null && Number.isFinite(py) ? py : null,
-        });
+        if (canFinancialView) {
+          const pyRaw = draft.purchase_year.trim();
+          const py = pyRaw ? Number(pyRaw) : null;
+          const costRaw = draft.purchase_cost.trim();
+          const costAmt = costRaw ? Number(costRaw) : 0;
+          await client.put(`/api/laptops/${id}/hardware-cost`, {
+            amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
+            purchase_year: py != null && Number.isFinite(py) ? py : null,
+          });
+        }
       } else {
         await client.put<Laptop>(
           `/api/laptops/${id}`,
@@ -298,6 +304,7 @@ export function LaptopDetail() {
     purchaseYear,
     costAmount,
     costLoading,
+    canFinancialView,
     editing,
     setEditing,
     draft,

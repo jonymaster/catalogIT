@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
+from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_audited_db
 from app.models.cost_record import CostRecord
@@ -59,13 +60,15 @@ def _build_client(db: _ValidationDb, router) -> TestClient:
     app.include_router(router)
 
     async def override_current_user() -> SimpleNamespace:
-        return SimpleNamespace(id=uuid.uuid4(), role="editor")
+        # Admin bypasses financial_view / hardware_view permission lookups.
+        return SimpleNamespace(id=uuid.uuid4(), role="admin")
 
     async def override_db() -> AsyncGenerator[_ValidationDb, None]:
         yield db
 
     app.dependency_overrides[get_current_user] = override_current_user
     app.dependency_overrides[get_audited_db] = override_db
+    app.dependency_overrides[get_db] = override_db
     return TestClient(app, raise_server_exceptions=False)
 
 

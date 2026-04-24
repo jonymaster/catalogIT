@@ -35,6 +35,8 @@ async def record_global_audit_event(
         details,
         actor_user_id,
         entity_label=entity_label,
+        entity_table=entity_table,
+        entity_key=entity_key,
     )
     db.add(
         GlobalAuditEvent(
@@ -69,6 +71,8 @@ async def record_global_audit_event_committed(
             details,
             actor_user_id,
             entity_label=entity_label,
+            entity_table=entity_table,
+            entity_key=entity_key,
         )
         session.add(
             GlobalAuditEvent(

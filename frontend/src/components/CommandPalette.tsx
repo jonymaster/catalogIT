@@ -63,13 +63,15 @@ interface UserItem {
 
 type Item = NavItem | ServiceItem | LaptopItem | UserItem;
 
-function baseNav(canFinancialView: boolean, isAdmin: boolean): NavItem[] {
+function baseNav(canFinancialView: boolean, canHardwareView: boolean, isAdmin: boolean): NavItem[] {
   const items: NavItem[] = [
     { kind: "nav", id: "dashboard", label: "Dashboard", hint: "Overview", to: "/", icon: HomeIcon },
     { kind: "nav", id: "services", label: "Services", hint: "Inventory", to: "/services", icon: ServerStackIcon },
-    { kind: "nav", id: "hardware", label: "Hardware", hint: "Inventory", to: "/hardware", icon: ComputerDesktopIcon },
-    { kind: "nav", id: "calendar", label: "Renewals", hint: "Planning", to: "/calendar", icon: CalendarDaysIcon },
   ];
+  if (canHardwareView) {
+    items.push({ kind: "nav", id: "hardware", label: "Hardware", hint: "Inventory", to: "/hardware", icon: ComputerDesktopIcon });
+  }
+  items.push({ kind: "nav", id: "calendar", label: "Renewals", hint: "Planning", to: "/calendar", icon: CalendarDaysIcon });
   if (canFinancialView) {
     items.push({ kind: "nav", id: "costs", label: "Cost Report", hint: "Planning", to: "/costs", icon: BanknotesIcon });
   }
@@ -89,7 +91,7 @@ interface PaletteProps {
 
 function PaletteBody({ onClose }: PaletteProps) {
   const navigate = useNavigate();
-  const { user, canFinancialView } = useAuth();
+  const { user, canFinancialView, canHardwareView } = useAuth();
   const isAdmin = user?.role === "admin";
 
   const [query, setQuery] = useState("");
@@ -103,7 +105,9 @@ function PaletteBody({ onClose }: PaletteProps) {
   useEffect(() => {
     Promise.all([
       client.get<Service[]>("/api/services/").catch(() => ({ data: [] as Service[] })),
-      client.get<Laptop[]>("/api/laptops/").catch(() => ({ data: [] as Laptop[] })),
+      canHardwareView
+        ? client.get<Laptop[]>("/api/laptops/").catch(() => ({ data: [] as Laptop[] }))
+        : Promise.resolve({ data: [] as Laptop[] }),
       isAdmin
         ? client
             .get<{ items: User[] }>("/api/users/", { params: { per_page: 100 } })
@@ -117,7 +121,7 @@ function PaletteBody({ onClose }: PaletteProps) {
       setUsers(userList);
       setLoaded(true);
     });
-  }, [isAdmin]);
+  }, [isAdmin, canHardwareView]);
 
   useEffect(() => {
     const id = window.setTimeout(() => inputRef.current?.focus(), 10);
@@ -134,7 +138,7 @@ function PaletteBody({ onClose }: PaletteProps) {
   }, [onClose]);
 
   const all = useMemo<Item[]>(() => {
-    const nav = baseNav(canFinancialView, isAdmin);
+    const nav = baseNav(canFinancialView, canHardwareView, isAdmin);
     const s: ServiceItem[] = services.slice(0, 120).map((svc) => ({
       kind: "service",
       id: svc.id,
@@ -160,11 +164,11 @@ function PaletteBody({ onClose }: PaletteProps) {
         usr.display_name ??
         (`${usr.first_name} ${usr.last_name}`.trim() || usr.email),
       hint: usr.department ?? usr.email,
-      to: "/users",
+      to: `/users/${usr.id}`,
       icon: UsersIcon,
     }));
     return [...nav, ...s, ...l, ...u];
-  }, [services, laptops, users, canFinancialView, isAdmin]);
+  }, [services, laptops, users, canFinancialView, canHardwareView, isAdmin]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

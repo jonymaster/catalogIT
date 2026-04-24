@@ -117,6 +117,7 @@ interface LeftColumnProps {
   setField: ServiceDetailContext["setDraftField"];
   errors: ServiceValidationErrors;
   refData: RefData | null;
+  canFinancialView: boolean;
 }
 
 function LeftColumn({
@@ -127,6 +128,7 @@ function LeftColumn({
   setField,
   errors,
   refData,
+  canFinancialView,
 }: LeftColumnProps) {
   return (
     <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
@@ -342,29 +344,31 @@ function LeftColumn({
           )}
         </Row>
 
-        <Row
-          label="Yearly Cost"
-        >
-          {editing ? (
-            <Link
-              to={`/services/${service.id}/costs`}
-              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
-            >
-              {service.yearly_cost != null
-                ? `$${Number(service.yearly_cost).toLocaleString()}`
-                : "Costs page"}
-            </Link>
-          ) : (
-            <Link
-              to={`/services/${service.id}/costs`}
-              className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
-            >
-              {service.yearly_cost != null
-                ? `$${Number(service.yearly_cost).toLocaleString()}`
-                : "Costs page"}
-            </Link>
-          )}
-        </Row>
+        {canFinancialView && (
+          <Row
+            label="Yearly Cost"
+          >
+            {editing ? (
+              <Link
+                to={`/services/${service.id}/costs`}
+                className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                {service.yearly_cost != null
+                  ? `$${Number(service.yearly_cost).toLocaleString()}`
+                  : "Costs page"}
+              </Link>
+            ) : (
+              <Link
+                to={`/services/${service.id}/costs`}
+                className="inline-flex text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+              >
+                {service.yearly_cost != null
+                  ? `$${Number(service.yearly_cost).toLocaleString()}`
+                  : "Costs page"}
+              </Link>
+            )}
+          </Row>
+        )}
 
         <Row
           label="Number of seats"
@@ -541,7 +545,7 @@ function Toggle({
 
 export function ServiceOverview() {
   const ctx = useOutletContext<ServiceDetailContext>();
-  const { preferences } = useAuth();
+  const { preferences, canFinancialView } = useAuth();
   const refData = useRefData(ctx.editing);
   const { service, editing, draft, setDraftField, errors } = ctx;
 
@@ -563,6 +567,7 @@ export function ServiceOverview() {
             setField={setDraftField}
             errors={errors}
             refData={refData}
+            canFinancialView={canFinancialView}
           />
         </div>
         <div className="lg:col-span-1">

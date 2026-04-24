@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeSync } from "./components/ThemeSync";
 import { ToastProvider } from "./context/ToastContext";
-import { ProtectedRoute, RequireFinancialView } from "./components/ProtectedRoute";
+import { ProtectedRoute, RequireFinancialView, RequireHardwareView } from "./components/ProtectedRoute";
 import { Shell } from "./components/Shell";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
@@ -69,20 +69,69 @@ export default function App() {
                 <Route path="/services/new" element={<ServiceCreate />} />
                 <Route path="/services/:id" element={<ServiceDetail />}>
                   <Route index element={<ServiceOverview />} />
-                  <Route path="costs" element={<ServiceCosts />} />
+                  <Route
+                    path="costs"
+                    element={
+                      <RequireFinancialView>
+                        <ServiceCosts />
+                      </RequireFinancialView>
+                    }
+                  />
                   <Route path="assignments" element={<ServiceAssignments />} />
                   <Route path="attachments" element={<ServiceAttachments />} />
                   <Route path="notifications" element={<ServiceNotifications />} />
                 </Route>
-                <Route path="/services/:id/costs/new" element={<CostRecordCreate />} />
-                <Route path="/services/:id/costs/:costId/edit" element={<CostRecordEdit />} />
-                <Route path="/hardware" element={<Hardware />} />
-                <Route path="/hardware/new" element={<LaptopCreate />} />
-                <Route path="/hardware/:id" element={<LaptopDetail />}>
+                <Route
+                  path="/services/:id/costs/new"
+                  element={
+                    <RequireFinancialView>
+                      <CostRecordCreate />
+                    </RequireFinancialView>
+                  }
+                />
+                <Route
+                  path="/services/:id/costs/:costId/edit"
+                  element={
+                    <RequireFinancialView>
+                      <CostRecordEdit />
+                    </RequireFinancialView>
+                  }
+                />
+                <Route
+                  path="/hardware"
+                  element={
+                    <RequireHardwareView>
+                      <Hardware />
+                    </RequireHardwareView>
+                  }
+                />
+                <Route
+                  path="/hardware/new"
+                  element={
+                    <RequireHardwareView>
+                      <LaptopCreate />
+                    </RequireHardwareView>
+                  }
+                />
+                <Route
+                  path="/hardware/:id"
+                  element={
+                    <RequireHardwareView>
+                      <LaptopDetail />
+                    </RequireHardwareView>
+                  }
+                >
                   <Route index element={<LaptopOverview />} />
                   <Route path="attachments" element={<LaptopAttachments />} />
                 </Route>
-                <Route path="/hardware/:id/edit" element={<LaptopEditRedirect />} />
+                <Route
+                  path="/hardware/:id/edit"
+                  element={
+                    <RequireHardwareView>
+                      <LaptopEditRedirect />
+                    </RequireHardwareView>
+                  }
+                />
                 <Route path="/me/settings" element={<PersonalSettings />} />
               </Route>
             </Route>

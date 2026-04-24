@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import { PERMISSION_FINANCIAL_VIEW } from "../constants/permissions";
+import { PERMISSION_FINANCIAL_VIEW, PERMISSION_HARDWARE_VIEW } from "../constants/permissions";
 import type { UserPreferences } from "../types/models";
 
 export interface UserInfo {
@@ -20,6 +20,8 @@ export interface AuthContextValue {
   canEdit: boolean;
   /** Dashboard aggregate / IT Financial Report (/costs). Admins always true. */
   canFinancialView: boolean;
+  /** Hardware inventory + hardware reference data. Admins always true. */
+  canHardwareView: boolean;
   login: () => void;
   logout: () => void;
   setToken: (token: string) => void;
@@ -39,6 +41,12 @@ export function userHasFinancialView(user: UserInfo | null): boolean {
   if (!user?.role) return false;
   if (user.role === "admin") return true;
   return user.permissions?.includes(PERMISSION_FINANCIAL_VIEW) ?? false;
+}
+
+export function userHasHardwareView(user: UserInfo | null): boolean {
+  if (!user?.role) return false;
+  if (user.role === "admin") return true;
+  return user.permissions?.includes(PERMISSION_HARDWARE_VIEW) ?? false;
 }
 
 export function decodePayload(token: string): UserInfo | null {
