@@ -30,6 +30,7 @@ interface NavItem {
   id: string;
   label: string;
   hint: string;
+  searchText?: string;
   to: string;
   icon: IconComp;
 }
@@ -39,6 +40,7 @@ interface ServiceItem {
   id: string;
   label: string;
   hint: string;
+  searchText?: string;
   to: string;
   icon: IconComp;
 }
@@ -48,6 +50,7 @@ interface LaptopItem {
   id: string;
   label: string;
   hint: string;
+  searchText?: string;
   to: string;
   icon: IconComp;
 }
@@ -57,6 +60,7 @@ interface UserItem {
   id: string;
   label: string;
   hint: string;
+  searchText?: string;
   to: string;
   icon: IconComp;
 }
@@ -101,27 +105,49 @@ function PaletteBody({ onClose }: PaletteProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [loaded, setLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const laptopSearchSeq = useRef(0);
 
   useEffect(() => {
     Promise.all([
       client.get<Service[]>("/api/services/").catch(() => ({ data: [] as Service[] })),
-      canHardwareView
-        ? client.get<Laptop[]>("/api/laptops/").catch(() => ({ data: [] as Laptop[] }))
-        : Promise.resolve({ data: [] as Laptop[] }),
       isAdmin
         ? client
             .get<{ items: User[] }>("/api/users/", { params: { per_page: 100 } })
             .catch(() => ({ data: { items: [] as User[] } }))
         : Promise.resolve({ data: { items: [] as User[] } }),
-    ]).then(([sRes, lRes, uRes]) => {
+    ]).then(([sRes, uRes]) => {
       const rawUsers = uRes.data as User[] | { items: User[] };
       const userList = Array.isArray(rawUsers) ? rawUsers : (rawUsers?.items ?? []);
       setServices(Array.isArray(sRes.data) ? sRes.data : []);
-      setLaptops(Array.isArray(lRes.data) ? lRes.data : []);
       setUsers(userList);
       setLoaded(true);
     });
-  }, [isAdmin, canHardwareView]);
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!canHardwareView || !q) {
+      laptopSearchSeq.current += 1;
+      return;
+    }
+
+    const requestSeq = laptopSearchSeq.current + 1;
+    laptopSearchSeq.current = requestSeq;
+    const timeoutId = window.setTimeout(() => {
+      client
+        .get<Laptop[]>("/api/laptops/search", { params: { q, limit: 18 } })
+        .then((res) => {
+          if (laptopSearchSeq.current !== requestSeq) return;
+          setLaptops(Array.isArray(res.data) ? res.data : []);
+        })
+        .catch(() => {
+          if (laptopSearchSeq.current !== requestSeq) return;
+          setLaptops([]);
+        });
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [query, canHardwareView]);
 
   useEffect(() => {
     const id = window.setTimeout(() => inputRef.current?.focus(), 10);
@@ -147,16 +173,36 @@ function PaletteBody({ onClose }: PaletteProps) {
       to: `/services/${svc.id}`,
       icon: ServerStackIcon,
     }));
-    const l: LaptopItem[] = laptops.slice(0, 80).map((lp) => ({
-      kind: "laptop",
-      id: lp.id,
-      label: `${lp.model_name} · ${(lp.serial_number ?? "").slice(-6)}`,
-      hint: lp.assigned_to
-        ? `${lp.assigned_to.first_name} ${lp.assigned_to.last_name}`
-        : "Unassigned",
-      to: `/hardware/${lp.id}`,
-      icon: ComputerDesktopIcon,
-    }));
+    const searchableLaptops = canHardwareView && query.trim() ? laptops : [];
+    const l: LaptopItem[] = searchableLaptops.map((lp) => {
+      const assignedName = lp.assigned_to
+        ? (`${lp.assigned_to.first_name} ${lp.assigned_to.last_name}`.trim() ||
+          lp.assigned_to.email)
+        : "";
+      const serial = lp.serial_number ?? "";
+      return {
+        kind: "laptop",
+        id: lp.id,
+        label: lp.model_name,
+        hint: `S/N ${serial}${assignedName ? ` · ${assignedName}` : ""}`,
+        searchText: [
+          lp.model_name,
+          serial,
+          lp.cpu,
+          lp.ram,
+          lp.storage_size,
+          assignedName,
+          lp.assigned_to?.email,
+          lp.status,
+          lp.hardware_status?.name,
+          lp.hardware_location?.name,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        to: `/hardware/${lp.id}`,
+        icon: ComputerDesktopIcon,
+      };
+    });
     const u: UserItem[] = users.slice(0, 100).map((usr) => ({
       kind: "user",
       id: usr.id,
@@ -168,7 +214,7 @@ function PaletteBody({ onClose }: PaletteProps) {
       icon: UsersIcon,
     }));
     return [...nav, ...s, ...l, ...u];
-  }, [services, laptops, users, canFinancialView, canHardwareView, isAdmin]);
+  }, [services, laptops, users, query, canFinancialView, canHardwareView, isAdmin]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -177,7 +223,12 @@ function PaletteBody({ onClose }: PaletteProps) {
       .filter((it) => {
         const label = String(it.label ?? "");
         const hint = String(it.hint ?? "");
-        return label.toLowerCase().includes(q) || hint.toLowerCase().includes(q);
+        const searchText = String(it.searchText ?? "");
+        return (
+          label.toLowerCase().includes(q) ||
+          hint.toLowerCase().includes(q) ||
+          searchText.toLowerCase().includes(q)
+        );
       })
       .slice(0, 18);
   }, [query, all]);
