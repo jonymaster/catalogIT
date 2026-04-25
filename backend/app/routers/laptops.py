@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -245,6 +245,63 @@ async def put_laptop_hardware_cost(
         pm = await db.get(PaymentMethod, record.payment_method_id)
         item.payment_method_name = pm.name if pm else None
     return item
+
+
+def _searchable_text(column):
+    return func.lower(func.coalesce(column, ""))
+
+
+@router.get("/search", response_model=list[LaptopRead])
+async def search_laptops(
+    q: str = Query("", max_length=255),
+    archived: bool = Query(False),
+    limit: int = Query(20, ge=1, le=100),
+    _hw: User = Depends(require_hardware_view),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    term = q.strip()
+    if not term:
+        return []
+
+    needle = term.lower()
+    contains_pattern = f"%{needle}%"
+    prefix_pattern = f"{needle}%"
+
+    stmt = (
+        select(Laptop)
+        .outerjoin(Laptop.assigned_to)
+        .outerjoin(Laptop.hardware_status)
+        .outerjoin(Laptop.hardware_location)
+        .where(
+            Laptop.is_active.is_(not archived),
+            or_(
+                _searchable_text(Laptop.serial_number).like(contains_pattern),
+                _searchable_text(Laptop.model_name).like(contains_pattern),
+                _searchable_text(Laptop.cpu).like(contains_pattern),
+                _searchable_text(Laptop.ram).like(contains_pattern),
+                _searchable_text(Laptop.storage_size).like(contains_pattern),
+                _searchable_text(Laptop.status).like(contains_pattern),
+                _searchable_text(HardwareStatus.name).like(contains_pattern),
+                _searchable_text(HardwareLocation.name).like(contains_pattern),
+                _searchable_text(User.display_name).like(contains_pattern),
+                _searchable_text(User.first_name).like(contains_pattern),
+                _searchable_text(User.last_name).like(contains_pattern),
+                _searchable_text(User.email).like(contains_pattern),
+            ),
+        )
+        .order_by(
+            case(
+                (_searchable_text(Laptop.serial_number) == needle, 0),
+                (_searchable_text(Laptop.serial_number).like(prefix_pattern), 1),
+                (_searchable_text(Laptop.model_name).like(prefix_pattern), 2),
+                else_=3,
+            ),
+            Laptop.serial_number,
+        )
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 
 @router.get("/{laptop_id}", response_model=LaptopRead)
