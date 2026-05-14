@@ -2,6 +2,7 @@
 name = "catalogit-backend"
 version = "1.1.1"
 description = "CatalogIT API backend"
+license = { text = "MIT" }
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",

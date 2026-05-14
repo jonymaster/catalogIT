@@ -212,6 +212,4 @@ Contributions are welcome! To get started:
 
 ## License
 
-CatalogIT is licensed under the [GNU Affero General Public License v3.0](LICENSE).
-
-You are free to use, modify, and distribute CatalogIT. If you run a modified version as a network service, you must make the source code available to its users. See the [LICENSE](LICENSE) file for details.
+CatalogIT is licensed under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for details.
