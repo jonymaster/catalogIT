@@ -20,9 +20,12 @@ _DEFAULT_HTML_PATH = _RESOURCES / "renewal_default.html"
 
 DEFAULT_RENEWAL_SUBJECT = "Renewal in {{days_before}} days: {{service_name}}"
 DEFAULT_RENEWAL_TEXT = (
-    "Hi {{owner_name}},\n\n"
+    "Hi {{recipient_name}},\n\n"
     "The service {{service_name}} renews on {{renewal_date}} (in {{days_before}} days).\n\n"
-    "Please review licensing and budget in CatalogIT."
+    "Cost: {{cost_display}}\n"
+    "Owner: {{service_owners}}\n"
+    "Status: {{service_status}}\n\n"
+    "Open in CatalogIT: {{service_url}}"
 )
 
 
@@ -152,6 +155,13 @@ async def preview_notification_email(
     data.setdefault("days_before", "7")
     data.setdefault("owner_name", "Jane Doe")
     data.setdefault("recipient_name", "Jane Doe")
+    data.setdefault("service_url", "https://example.com/services/preview")
+    data.setdefault("service_status", "Active")
+    data.setdefault("service_owners", "Jane Doe, John Smith")
+    data.setdefault("renewal_frequency", "Annual")
+    data.setdefault("cost_amount", "$1,200.00")
+    data.setdefault("cost_period_label", "year")
+    data.setdefault("cost_display", "$1,200.00 / year")
     subj, html, text = render_templates(meta, data)
     for cid, object_key in resolved.inline_asset_keys.items():
         raw = await fetch_s3_bytes(object_key)
