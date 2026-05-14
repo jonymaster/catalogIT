@@ -12,6 +12,8 @@ from app.dependencies.auth import require_role
 from app.dependencies.db import get_audited_db
 from app.global_audit import record_global_audit_event
 from app.models.api_token import ApiToken
+from app.models.laptop import Laptop
+from app.models.service import service_assignments, service_owners
 from app.models.user import User
 from app.models.user_permission import UserPermission
 from app.permissions import ALLOWED_USER_PERMISSION_SLUGS
@@ -243,6 +245,34 @@ async def delete_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete the last admin",
             )
+
+    assignee_count = await db.scalar(
+        select(func.count())
+        .select_from(service_assignments)
+        .where(service_assignments.c.user_id == user_id)
+    ) or 0
+    owner_count = await db.scalar(
+        select(func.count())
+        .select_from(service_owners)
+        .where(service_owners.c.user_id == user_id)
+    ) or 0
+    laptop_count = await db.scalar(
+        select(func.count())
+        .select_from(Laptop)
+        .where(Laptop.assigned_to_id == user_id)
+    ) or 0
+    if assignee_count or owner_count or laptop_count:
+        parts: list[str] = []
+        if assignee_count:
+            parts.append(f"assigned to {assignee_count} service(s)")
+        if owner_count:
+            parts.append(f"owns {owner_count} service(s)")
+        if laptop_count:
+            parts.append(f"holds {laptop_count} laptop(s)")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete user: " + ", ".join(parts),
+        )
 
     await record_global_audit_event(
         db,

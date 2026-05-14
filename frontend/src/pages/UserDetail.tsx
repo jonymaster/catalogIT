@@ -470,7 +470,7 @@ function ServicesTable({
 }: {
   services: Service[];
   variant: "assigned" | "owned";
-  onRemove: () => void;
+  onRemove: (service: Service) => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -556,7 +556,7 @@ function ServicesTable({
                 >
                   <button
                     type="button"
-                    onClick={onRemove}
+                    onClick={() => onRemove(s)}
                     className="rounded-md px-2 py-1 text-[12px] font-medium text-danger transition-colors hover:bg-danger-soft"
                   >
                     Remove
@@ -576,7 +576,7 @@ function HardwareTable({
   onReassign,
 }: {
   laptops: Laptop[];
-  onReassign: () => void;
+  onReassign: (laptop: Laptop) => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -627,7 +627,7 @@ function HardwareTable({
                 >
                   <button
                     type="button"
-                    onClick={onReassign}
+                    onClick={() => onReassign(l)}
                     className="rounded-md border border-border px-2 py-1 text-[12px] font-medium text-fg-2 transition-colors hover:bg-surface-2"
                   >
                     Reassign
@@ -713,8 +713,60 @@ function ActivityTimeline({ user, services }: { user: User; services: Service[] 
   );
 }
 
+function DangerZonePanel({
+  assignedServicesCount,
+  ownedServicesCount,
+  assignedLaptopsCount,
+  onDelete,
+  isDeleting,
+}: {
+  assignedServicesCount: number;
+  ownedServicesCount: number;
+  assignedLaptopsCount: number;
+  onDelete: () => void;
+  isDeleting: boolean;
+}) {
+  const blockers: string[] = [];
+  if (assignedServicesCount > 0)
+    blockers.push(`Assigned to ${assignedServicesCount} service(s)`);
+  if (ownedServicesCount > 0)
+    blockers.push(`Owns ${ownedServicesCount} service(s)`);
+  if (assignedLaptopsCount > 0)
+    blockers.push(`Holds ${assignedLaptopsCount} laptop(s)`);
+  const canDelete = blockers.length === 0;
+  return (
+    <section className="mt-6 rounded-[10px] border border-danger bg-danger-soft p-5">
+      <h2 className="text-[13.5px] font-semibold text-danger">Danger zone</h2>
+      <p className="mt-1 text-[12.5px] text-danger">
+        Permanently delete this user. This action cannot be undone.
+      </p>
+      {!canDelete && (
+        <div className="mt-3 rounded-md border border-danger bg-surface px-3 py-2 text-[12.5px] text-danger">
+          <p className="font-medium">Cannot delete while user still has:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={!canDelete || isDeleting}
+          className="rounded-md bg-danger px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-danger-strong disabled:opacity-50"
+        >
+          Delete user
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function UserDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { canEdit } = useAuth();
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
@@ -734,6 +786,10 @@ export function UserDetail() {
   const [resetMustChange, setResetMustChange] = useState(true);
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -798,8 +854,83 @@ export function UserDetail() {
   const hue = hueFromString(user.email || user.id);
   const isLocal = user.provisioning_source === "local";
 
-  function notImplemented() {
-    alert("Not implemented yet");
+  async function handleRemoveAssignedService(service: Service) {
+    if (!user) return;
+    const confirmed = window.confirm(
+      `Remove ${displayName(user)} from "${service.name}"?`,
+    );
+    if (!confirmed) return;
+    try {
+      await client.delete(
+        `/api/services/${service.id}/assignees/${user.id}`,
+      );
+      setServices((prev) =>
+        prev.map((s) =>
+          s.id === service.id
+            ? { ...s, assignees: s.assignees.filter((a) => a.id !== user.id) }
+            : s,
+        ),
+      );
+      showToast({ type: "success", text: "Removed from service." });
+    } catch (err: unknown) {
+      showToast({ type: "error", text: formatApiError(err) });
+    }
+  }
+
+  async function handleRemoveOwnedService(service: Service) {
+    if (!user) return;
+    const confirmed = window.confirm(
+      `Remove ${displayName(user)} as owner of "${service.name}"?`,
+    );
+    if (!confirmed) return;
+    try {
+      await client.delete(
+        `/api/services/${service.id}/owners/${user.id}`,
+      );
+      setServices((prev) =>
+        prev.map((s) =>
+          s.id === service.id
+            ? { ...s, owners: s.owners.filter((o) => o.id !== user.id) }
+            : s,
+        ),
+      );
+      showToast({ type: "success", text: "Ownership removed." });
+    } catch (err: unknown) {
+      showToast({ type: "error", text: formatApiError(err) });
+    }
+  }
+
+  async function handleReassignLaptop(laptop: Laptop) {
+    const confirmed = window.confirm(
+      `Return "${laptop.model_name}" to stock? It will be unassigned.`,
+    );
+    if (!confirmed) return;
+    try {
+      const res = await client.put<Laptop>(`/api/laptops/${laptop.id}`, {
+        assigned_to_id: null,
+        status: "In Stock",
+      });
+      const updated = res.data;
+      setLaptops((prev) => prev.map((l) => (l.id === laptop.id ? updated : l)));
+      showToast({ type: "success", text: "Laptop returned to stock." });
+    } catch (err: unknown) {
+      showToast({ type: "error", text: formatApiError(err) });
+    }
+  }
+
+  async function handleDeleteUser() {
+    if (!user) return;
+    setDeleteSubmitting(true);
+    setDeleteError(null);
+    try {
+      await client.delete(`/api/settings/users/${user.id}`);
+      showToast({ type: "success", text: "User deleted." });
+      navigate("/users");
+    } catch (err: unknown) {
+      setDeleteError(formatApiError(err));
+    } finally {
+      setDeleteSubmitting(false);
+    }
   }
 
   function startEditing() {
@@ -1055,7 +1186,7 @@ export function UserDetail() {
             <ServicesTable
               services={assignedServices}
               variant="assigned"
-              onRemove={notImplemented}
+              onRemove={handleRemoveAssignedService}
             />
           ))}
         {tab === "owned" &&
@@ -1069,7 +1200,7 @@ export function UserDetail() {
             <ServicesTable
               services={ownedServices}
               variant="owned"
-              onRemove={notImplemented}
+              onRemove={handleRemoveOwnedService}
             />
           ))}
         {tab === "hardware" &&
@@ -1080,7 +1211,10 @@ export function UserDetail() {
               subtitle="Nothing to show."
             />
           ) : (
-            <HardwareTable laptops={assignedLaptops} onReassign={notImplemented} />
+            <HardwareTable
+              laptops={assignedLaptops}
+              onReassign={handleReassignLaptop}
+            />
           ))}
         {tab === "activity" && (
           <ActivityTimeline
@@ -1088,7 +1222,61 @@ export function UserDetail() {
             services={[...ownedServices, ...assignedServices]}
           />
         )}
+
+        <DangerZonePanel
+          assignedServicesCount={assignedServices.length}
+          ownedServicesCount={ownedServices.length}
+          assignedLaptopsCount={assignedLaptops.length}
+          onDelete={() => {
+            setDeleteError(null);
+            setDeleteOpen(true);
+          }}
+          isDeleting={deleteSubmitting}
+        />
       </div>
+
+      {deleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
+          <div
+            className="my-auto w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+          >
+            <h2 id="delete-user-title" className="text-lg font-medium text-fg">
+              Delete user?
+            </h2>
+            <p className="mt-1 text-sm text-fg-3">
+              {displayName(user)} will be permanently deleted. This cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="mt-4 rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm text-danger">
+                {deleteError}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(false)}
+                disabled={deleteSubmitting}
+                className="rounded-md border border-border px-3 py-1.5 text-sm text-fg-2 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDeleteUser();
+                }}
+                disabled={deleteSubmitting}
+                className="rounded-md bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger-strong disabled:opacity-60"
+              >
+                {deleteSubmitting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {resetOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">

@@ -573,3 +573,41 @@ async def unarchive_service(
     await db.flush()
     await db.refresh(service)
     return _scrub_financial(service, has_financial_view)
+
+
+@router.delete(
+    "/{service_id}/assignees/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_service_assignee(
+    service_id: uuid.UUID,
+    user_id: uuid.UUID,
+    _user: User = Depends(_writer),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    new_assignees = [a for a in service.assignees if a.id != user_id]
+    if len(new_assignees) != len(service.assignees):
+        service.assignees = new_assignees
+        await db.flush()
+
+
+@router.delete(
+    "/{service_id}/owners/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_service_owner(
+    service_id: uuid.UUID,
+    user_id: uuid.UUID,
+    _user: User = Depends(_writer),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    service = await db.get(Service, service_id)
+    if not service:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
+    new_owners = [o for o in service.owners if o.id != user_id]
+    if len(new_owners) != len(service.owners):
+        service.owners = new_owners
+        await db.flush()
