@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.global_audit import record_global_audit_event
 from app.integrations.config_helpers import merged_metadata
 from app.integrations.crypto import decrypt_json
@@ -40,6 +41,52 @@ def _today_in_timezone(tz_name: str) -> date:
         logger.warning("Unknown timezone %r, falling back to UTC", tz_name)
         tz = ZoneInfo("UTC")
     return datetime.now(tz).date()
+
+
+def _format_money(amount: Any) -> str:
+    if amount is None:
+        return "—"
+    return f"${amount:,.2f}"
+
+
+def _build_service_context(service: Service, frontend_url: str) -> dict[str, str]:
+    base = frontend_url.rstrip("/")
+    service_url = f"{base}/services/{service.id}"
+
+    rtype = (service.renewal_config or {}).get("type") or ""
+    if rtype == "monthly":
+        period_label = "month"
+        amount = (service.yearly_cost / 12) if service.yearly_cost is not None else None
+        frequency_label = "Monthly"
+    else:
+        period_label = "year"
+        amount = service.yearly_cost
+        frequency_label = "Annual"
+
+    cost_amount = _format_money(amount)
+    cost_display = (
+        f"{cost_amount} / {period_label}" if service.yearly_cost is not None else "Not set"
+    )
+
+    owners = [
+        (f"{o.first_name} {o.last_name}".strip() or o.email)
+        for o in service.owners
+        if o.is_active
+    ]
+    owners_display = ", ".join(owners) if owners else "Unassigned"
+
+    status_obj = service.service_status
+    status_display = (status_obj.name if status_obj else None) or service.status or "—"
+
+    return {
+        "service_url": service_url,
+        "service_status": status_display,
+        "service_owners": owners_display,
+        "renewal_frequency": frequency_label,
+        "cost_amount": cost_amount,
+        "cost_period_label": period_label,
+        "cost_display": cost_display,
+    }
 
 
 def _normalize_offsets(raw: list[int] | None) -> list[int]:
@@ -160,6 +207,9 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
             await session.flush()
         assert service.renewal_date is not None
 
+        frontend_url = get_settings().FRONTEND_URL
+        service_ctx = _build_service_context(service, frontend_url)
+
         # If the service has a configured offsets list but it's empty/invalid,
         # treat it as "inherit global offsets" rather than "send nothing".
         service_offsets = (
@@ -214,8 +264,9 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
                     "renewal_date": service.renewal_date.isoformat(),
                     "days_before": str(days_before),
                     "days_until_renewal": str(days_before),
-                    "owner_name": recipient_name,
                     "recipient_name": recipient_name,
+                    "owner_name": recipient_name,  # deprecated alias — kept so user-customized templates don't break
+                    **service_ctx,
                 }
 
                 try:
@@ -290,14 +341,18 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
             # one new email was sent; this keeps reruns idempotent.
             if sent_any_email_for_window and slack_token and slack_channel:
                 try:
+                    slack_text = "\n".join([
+                        f"*Renewal reminder:* <{service_ctx['service_url']}|{service.name}>",
+                        f"Renews on {service.renewal_date.isoformat()} "
+                        f"(in {days_before} day{'s' if days_before != 1 else ''})",
+                        f"Cost: {service_ctx['cost_display']} · "
+                        f"Owner: {service_ctx['service_owners']} · "
+                        f"Status: {service_ctx['service_status']}",
+                    ])
                     await post_message(
                         slack_token,
                         slack_channel,
-                        (
-                            f"Renewal reminder sent: {service.name} "
-                            f"renews on {service.renewal_date.isoformat()} "
-                            f"({days_before} day{'s' if days_before != 1 else ''} before)."
-                        ),
+                        slack_text,
                     )
                     result.slack_sent += 1
                     await record_global_audit_event(
@@ -339,14 +394,19 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
 
             if sent_any_email_for_window and telegram_token and telegram_chat_id:
                 try:
+                    telegram_text = (
+                        f"Renewal reminder: {service.name}\n"
+                        f"Renews on {service.renewal_date.isoformat()} "
+                        f"(in {days_before} day{'s' if days_before != 1 else ''})\n"
+                        f"Cost: {service_ctx['cost_display']} · "
+                        f"Owner: {service_ctx['service_owners']} · "
+                        f"Status: {service_ctx['service_status']}\n"
+                        f"{service_ctx['service_url']}"
+                    )
                     await send_message(
                         telegram_token,
                         telegram_chat_id,
-                        (
-                            f"Renewal reminder sent: {service.name} "
-                            f"renews on {service.renewal_date.isoformat()} "
-                            f"({days_before} day{'s' if days_before != 1 else ''} before)."
-                        ),
+                        telegram_text,
                     )
                     result.telegram_sent += 1
                     await record_global_audit_event(

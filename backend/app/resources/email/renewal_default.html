@@ -31,7 +31,7 @@
           </tr>
           <tr>
             <td style="padding:20px 28px 28px 28px;background-color:#ffffff;color:#334155;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:16px;line-height:1.65;">
-              <p style="margin:0 0 16px 0;color:#0f172a;font-size:17px;font-weight:600;">Hi {{owner_name}},</p>
+              <p style="margin:0 0 16px 0;color:#0f172a;font-size:17px;font-weight:600;">Hi {{recipient_name}},</p>
               <p style="margin:0 0 16px 0;">
                 The service
                 <span style="color:#4f46e5;font-weight:600;">{{service_name}}</span>
@@ -39,10 +39,31 @@
                 <strong style="color:#0f172a;">{{renewal_date}}</strong>
                 (in <strong style="color:#0f172a;">{{days_before}}</strong> days).
               </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0 4px 0;border-collapse:collapse;">
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#64748b;width:90px;">Cost</td>
+                  <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;">{{cost_display}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#64748b;">Owner</td>
+                  <td style="padding:6px 0;font-size:14px;color:#0f172a;">{{service_owners}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#64748b;">Status</td>
+                  <td style="padding:6px 0;font-size:14px;color:#0f172a;">{{service_status}}</td>
+                </tr>
+              </table>
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0;border-radius:8px;background-color:#f1f5f9;border:1px solid #e2e8f0;">
                 <tr>
                   <td style="padding:14px 16px;font-size:14px;color:#475569;line-height:1.6;">
                     Please review the licensing and budget details in CatalogIT. Also, make sure all invoices are paid and uploaded to the corresponding service record.
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:8px 0 4px 0;">
+                <tr>
+                  <td style="border-radius:6px;background-color:#4f46e5;">
+                    <a href="{{service_url}}" style="display:inline-block;padding:10px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">View service in CatalogIT</a>
                   </td>
                 </tr>
               </table>
