@@ -196,6 +196,13 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
     result.examined_services = len(services)
 
     for service in services:
+        # Build the context before any flush: `yearly_cost` is a column_property
+        # backed by subqueries, and `session.flush()` expires loaded attributes.
+        # Reading it post-flush would trigger an implicit sync lazy load against
+        # the asyncpg driver and raise MissingGreenlet.
+        frontend_url = get_settings().FRONTEND_URL
+        service_ctx = _build_service_context(service, frontend_url)
+
         # Ensure renewal_date is the next upcoming occurrence. If it's missing
         # or in the past, advance it from the renewal_config. Commit before the
         # send loop so dedup keys are stable for this run.
@@ -206,9 +213,6 @@ async def run_renewal_dispatch(session: AsyncSession) -> RenewalDispatchResult:
             service.renewal_date = next_renewal
             await session.flush()
         assert service.renewal_date is not None
-
-        frontend_url = get_settings().FRONTEND_URL
-        service_ctx = _build_service_context(service, frontend_url)
 
         # If the service has a configured offsets list but it's empty/invalid,
         # treat it as "inherit global offsets" rather than "send nothing".
