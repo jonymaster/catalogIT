@@ -1,4 +1,4 @@
-"""Ensure the user profile endpoint hides assigned_laptops when caller lacks hardware_view."""
+"""Ensure the user profile endpoint hides assigned_hardware_assets when caller lacks hardware_view."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def _fake_user(user_id: uuid.UUID) -> SimpleNamespace:
 
 
 class ProfileHardwareGateTest(unittest.TestCase):
-    def test_profile_hides_assigned_laptops_when_no_hardware_view(self) -> None:
+    def test_profile_hides_assigned_hardware_assets_when_no_hardware_view(self) -> None:
         async def run() -> None:
             user_id = uuid.uuid4()
             # Three execute() calls expected when hardware_view is False:
@@ -81,17 +81,18 @@ class ProfileHardwareGateTest(unittest.TestCase):
                 db=db,
             )
 
-            self.assertEqual(profile.assigned_laptops, [])
+            self.assertEqual(profile.assigned_hardware_assets, [])
 
         asyncio.run(run())
 
-    def test_profile_includes_assigned_laptops_when_has_hardware_view(self) -> None:
+    def test_profile_includes_assigned_hardware_assets_when_has_hardware_view(self) -> None:
         async def run() -> None:
             user_id = uuid.uuid4()
-            laptop = SimpleNamespace(
+            hardware = SimpleNamespace(
                 id=uuid.uuid4(),
                 model_name="ThinkPad",
-                serial_number="SN-42",
+                hardware_type="laptop", quantity=1,
+            serial_number="SN-42",
                 status="Assigned",
                 is_active=True,
                 hardware_location=SimpleNamespace(name="HQ"),
@@ -102,7 +103,7 @@ class ProfileHardwareGateTest(unittest.TestCase):
                     _FakeExecuteResult(scalar=_fake_user(user_id)),
                     _FakeExecuteResult(rows=[]),
                     _FakeExecuteResult(rows=[]),
-                    _FakeExecuteResult(rows=[laptop]),
+                    _FakeExecuteResult(rows=[hardware]),
                 ]
             )
 
@@ -113,8 +114,8 @@ class ProfileHardwareGateTest(unittest.TestCase):
                 db=db,
             )
 
-            self.assertEqual(len(profile.assigned_laptops), 1)
-            self.assertEqual(profile.assigned_laptops[0].serial_number, "SN-42")
+            self.assertEqual(len(profile.assigned_hardware_assets), 1)
+            self.assertEqual(profile.assigned_hardware_assets[0].serial_number, "SN-42")
 
         asyncio.run(run())
 

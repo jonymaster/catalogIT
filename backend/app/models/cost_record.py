@@ -16,8 +16,8 @@ class CostRecord(Base):
     service_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("services.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    laptop_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("laptops.id", ondelete="CASCADE"), nullable=True, index=True
+    hardware_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("hardware_assets.id", ondelete="CASCADE"), nullable=True, index=True
     )
     payment_method_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("payment_methods.id", ondelete="SET NULL"), nullable=True
@@ -33,5 +33,5 @@ class CostRecord(Base):
     )
 
     recorded_by: Mapped["User | None"] = relationship(lazy="selectin")  # noqa: F821
-    laptop: Mapped["Laptop | None"] = relationship(back_populates="cost_records", lazy="selectin")  # noqa: F821
+    hardware: Mapped["HardwareAsset | None"] = relationship(back_populates="cost_records", lazy="selectin")  # noqa: F821
     service: Mapped["Service | None"] = relationship(back_populates="cost_records", lazy="noload")  # noqa: F821

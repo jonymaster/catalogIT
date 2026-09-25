@@ -13,7 +13,7 @@ from app.models.tag import Tag
 from app.models.service import Service, service_assignments, service_owners, service_tags
 from app.models.cost_record import CostRecord
 from app.models.service_history import ServiceHistoryEntry
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.global_audit_event import GlobalAuditEvent
 from app.models.oidc_config import OidcConfig
 from app.models.api_token import ApiToken
@@ -41,7 +41,7 @@ __all__ = [
     "service_assignments",
     "CostRecord",
     "ServiceHistoryEntry",
-    "Laptop",
+    "HardwareAsset",
     "GlobalAuditEvent",
     "OidcConfig",
     "ApiToken",

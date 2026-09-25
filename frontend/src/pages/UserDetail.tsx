@@ -1,3 +1,4 @@
+import { hardwareTypeLabel } from "../hardware/hardwareTypes";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import client from "../api/client";
@@ -18,7 +19,7 @@ import { formatMoneyCompact, formatMoneyFull } from "../components/ui/money-form
 import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/useToast";
 import { PERMISSION_FINANCIAL_VIEW, PERMISSION_HARDWARE_VIEW } from "../constants/permissions";
-import type { Laptop, Service, User } from "../types/models";
+import type { HardwareAsset, Service, User } from "../types/models";
 
 const TABS = [
   { id: "assigned", label: "Assigned services" },
@@ -572,11 +573,11 @@ function ServicesTable({
 }
 
 function HardwareTable({
-  laptops,
+  hardware_assets,
   onReassign,
 }: {
-  laptops: Laptop[];
-  onReassign: (laptop: Laptop) => void;
+  hardware_assets: HardwareAsset[];
+  onReassign: (hardware: HardwareAsset) => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -584,7 +585,7 @@ function HardwareTable({
       <table className="min-w-full text-left">
         <thead>
           <tr className="border-b border-border bg-surface-2">
-            {["Device", "Serial", "CPU / RAM", "Purchased", "Warranty", ""].map((h, i) => (
+            {["Device", "Serial", "Type", "Quantity", "Location", ""].map((h, i) => (
               <th
                 key={i}
                 className="px-3 py-2 text-[11px] font-semibold uppercase text-fg-3"
@@ -596,8 +597,7 @@ function HardwareTable({
           </tr>
         </thead>
         <tbody>
-          {laptops.map((l) => {
-            const purchased = l.created_at ? l.created_at.slice(0, 10) : "—";
+          {hardware_assets.map((l) => {
             return (
               <tr
                 key={l.id}
@@ -614,13 +614,13 @@ function HardwareTable({
                   className="mono px-3 py-2.5 text-fg-3"
                   style={{ fontSize: 11.5 }}
                 >
-                  {l.serial_number}
+                  {l.serial_number || "—"}
                 </td>
                 <td className="px-3 py-2.5 text-fg-3">
-                  {[l.cpu, l.ram].filter(Boolean).join(" · ") || "—"}
+                  {hardwareTypeLabel(l.hardware_type)}
                 </td>
-                <td className="tnum px-3 py-2.5 text-fg-3">{purchased}</td>
-                <td className="tnum px-3 py-2.5 text-fg-3">—</td>
+                <td className="tnum px-3 py-2.5 text-fg-3">{l.quantity}</td>
+                <td className="tnum px-3 py-2.5 text-fg-3">{l.hardware_location?.name || "—"}</td>
                 <td
                   className="px-3 py-2.5 text-right"
                   onClick={(e) => e.stopPropagation()}
@@ -716,13 +716,13 @@ function ActivityTimeline({ user, services }: { user: User; services: Service[] 
 function DangerZonePanel({
   assignedServicesCount,
   ownedServicesCount,
-  assignedLaptopsCount,
+  assignedHardwareAssetsCount,
   onDelete,
   isDeleting,
 }: {
   assignedServicesCount: number;
   ownedServicesCount: number;
-  assignedLaptopsCount: number;
+  assignedHardwareAssetsCount: number;
   onDelete: () => void;
   isDeleting: boolean;
 }) {
@@ -731,8 +731,8 @@ function DangerZonePanel({
     blockers.push(`Assigned to ${assignedServicesCount} service(s)`);
   if (ownedServicesCount > 0)
     blockers.push(`Owns ${ownedServicesCount} service(s)`);
-  if (assignedLaptopsCount > 0)
-    blockers.push(`Holds ${assignedLaptopsCount} laptop(s)`);
+  if (assignedHardwareAssetsCount > 0)
+    blockers.push(`Holds ${assignedHardwareAssetsCount} hardware record(s)`);
   const canDelete = blockers.length === 0;
   return (
     <section className="mt-6 rounded-[10px] border border-danger bg-danger-soft p-5">
@@ -771,7 +771,7 @@ export function UserDetail() {
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [laptops, setLaptops] = useState<Laptop[]>([]);
+  const [hardware_assets, setHardwareAssets] = useState<HardwareAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<TabId>("assigned");
@@ -797,9 +797,9 @@ export function UserDetail() {
     Promise.all([
       client.get<User[]>("/api/settings/users/"),
       client.get<Service[]>("/api/services/"),
-      client.get<Laptop[]>("/api/laptops/"),
+      client.get<HardwareAsset[]>("/api/hardware/"),
     ])
-      .then(([usersRes, servicesRes, laptopsRes]) => {
+      .then(([usersRes, servicesRes, hardware_assetsRes]) => {
         if (cancelled) return;
         const match = usersRes.data.find((u) => u.id === id);
         if (!match) {
@@ -809,7 +809,7 @@ export function UserDetail() {
         setUser(match);
         setDraft(toDraft(match));
         setServices(servicesRes.data);
-        setLaptops(laptopsRes.data);
+        setHardwareAssets(hardware_assetsRes.data);
       })
       .catch(() => {
         if (!cancelled) setNotFound(true);
@@ -834,9 +834,9 @@ export function UserDetail() {
       user ? services.filter((s) => s.owners.some((o) => o.id === user.id)) : [],
     [services, user],
   );
-  const assignedLaptops = useMemo(
-    () => (user ? laptops.filter((l) => l.assigned_to_id === user.id) : []),
-    [laptops, user],
+  const assignedHardwareAssets = useMemo(
+    () => (user ? hardware_assets.filter((l) => l.assigned_to_id === user.id) : []),
+    [hardware_assets, user],
   );
 
   const seatCost = useMemo(() => {
@@ -900,19 +900,19 @@ export function UserDetail() {
     }
   }
 
-  async function handleReassignLaptop(laptop: Laptop) {
+  async function handleReassignHardwareAsset(hardware: HardwareAsset) {
     const confirmed = window.confirm(
-      `Return "${laptop.model_name}" to stock? It will be unassigned.`,
+      `Return "${hardware.model_name}" to stock? It will be unassigned.`,
     );
     if (!confirmed) return;
     try {
-      const res = await client.put<Laptop>(`/api/laptops/${laptop.id}`, {
+      const res = await client.put<HardwareAsset>(`/api/hardware/${hardware.id}`, {
         assigned_to_id: null,
         status: "In Stock",
       });
       const updated = res.data;
-      setLaptops((prev) => prev.map((l) => (l.id === laptop.id ? updated : l)));
-      showToast({ type: "success", text: "Laptop returned to stock." });
+      setHardwareAssets((prev) => prev.map((l) => (l.id === hardware.id ? updated : l)));
+      showToast({ type: "success", text: "Hardware asset returned to stock." });
     } catch (err: unknown) {
       showToast({ type: "error", text: formatApiError(err) });
     }
@@ -1131,8 +1131,8 @@ export function UserDetail() {
             onClick={() => setTab("owned")}
           />
           <StatCard
-            label="Laptops assigned"
-            value={assignedLaptops.length}
+            label="Hardware records assigned"
+            value={assignedHardwareAssets.length}
             onClick={() => setTab("hardware")}
           />
           <StatCard
@@ -1151,7 +1151,7 @@ export function UserDetail() {
                   : t.id === "owned"
                     ? ownedServices.length
                     : t.id === "hardware"
-                      ? assignedLaptops.length
+                      ? assignedHardwareAssets.length
                       : null;
               const active = tab === t.id;
               return (
@@ -1204,16 +1204,16 @@ export function UserDetail() {
             />
           ))}
         {tab === "hardware" &&
-          (assignedLaptops.length === 0 ? (
+          (assignedHardwareAssets.length === 0 ? (
             <EmptyState
               icon={ComputerDesktopIcon}
-              title="No laptops assigned"
+              title="No hardware assigned"
               subtitle="Nothing to show."
             />
           ) : (
             <HardwareTable
-              laptops={assignedLaptops}
-              onReassign={handleReassignLaptop}
+              hardware_assets={assignedHardwareAssets}
+              onReassign={handleReassignHardwareAsset}
             />
           ))}
         {tab === "activity" && (
@@ -1226,7 +1226,7 @@ export function UserDetail() {
         <DangerZonePanel
           assignedServicesCount={assignedServices.length}
           ownedServicesCount={ownedServices.length}
-          assignedLaptopsCount={assignedLaptops.length}
+          assignedHardwareAssetsCount={assignedHardwareAssets.length}
           onDelete={() => {
             setDeleteError(null);
             setDeleteOpen(true);

@@ -20,12 +20,12 @@ import { ServiceNotifications } from "./pages/ServiceNotifications";
 import { CostRecordCreate } from "./pages/CostRecordCreate";
 import { CostRecordEdit } from "./pages/CostRecordEdit";
 import { Hardware } from "./pages/Hardware";
-import { LaptopDetail } from "./pages/LaptopDetail";
-import { LaptopOverview } from "./pages/LaptopOverview";
-import { LaptopAttachments } from "./pages/LaptopAttachments";
+import { HardwareAssetDetail } from "./pages/HardwareAssetDetail";
+import { HardwareAssetOverview } from "./pages/HardwareAssetOverview";
+import { HardwareAssetAttachments } from "./pages/HardwareAssetAttachments";
 import { ServiceCreate } from "./pages/ServiceCreate";
-import { LaptopCreate } from "./pages/LaptopCreate";
-import { LaptopEditRedirect } from "./pages/LaptopEditRedirect";
+import { HardwareAssetCreate } from "./pages/HardwareAssetCreate";
+import { HardwareAssetEditRedirect } from "./pages/HardwareAssetEditRedirect";
 import { PersonalSettings } from "./pages/PersonalSettings";
 import { Users } from "./pages/Users";
 import { UserDetail } from "./pages/UserDetail";
@@ -109,7 +109,7 @@ export default function App() {
                   path="/hardware/new"
                   element={
                     <RequireHardwareView>
-                      <LaptopCreate />
+                      <HardwareAssetCreate />
                     </RequireHardwareView>
                   }
                 />
@@ -117,18 +117,18 @@ export default function App() {
                   path="/hardware/:id"
                   element={
                     <RequireHardwareView>
-                      <LaptopDetail />
+                      <HardwareAssetDetail />
                     </RequireHardwareView>
                   }
                 >
-                  <Route index element={<LaptopOverview />} />
-                  <Route path="attachments" element={<LaptopAttachments />} />
+                  <Route index element={<HardwareAssetOverview />} />
+                  <Route path="attachments" element={<HardwareAssetAttachments />} />
                 </Route>
                 <Route
                   path="/hardware/:id/edit"
                   element={
                     <RequireHardwareView>
-                      <LaptopEditRedirect />
+                      <HardwareAssetEditRedirect />
                     </RequireHardwareView>
                   }
                 />

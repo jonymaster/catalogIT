@@ -8,7 +8,7 @@ from app.audit_enrichment import (
     entity_audit_context_sync,
     finalize_details_sync,
 )
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
 
 
@@ -52,7 +52,7 @@ class AuditEntityContextTest(unittest.TestCase):
             __tablename__="cost_records",
             id=record_id,
             service_id=service_id,
-            laptop_id=None,
+            hardware_id=None,
             fiscal_year=2026,
             purchase_year=None,
             record_type="actual",
@@ -73,10 +73,10 @@ class AuditEntityContextTest(unittest.TestCase):
         self.assertNotIn("label", entity["parent"])
 
     def test_cost_record_context_includes_parent_hardware(self) -> None:
-        laptop_id = uuid.uuid4()
-        laptop = SimpleNamespace(
-            __tablename__="laptops",
-            id=laptop_id,
+        hardware_id = uuid.uuid4()
+        hardware = SimpleNamespace(
+            __tablename__="hardware_assets",
+            id=hardware_id,
             model_name="MacBook Pro",
             serial_number="C02TEST",
             status="Assigned",
@@ -85,7 +85,7 @@ class AuditEntityContextTest(unittest.TestCase):
             __tablename__="cost_records",
             id=uuid.uuid4(),
             service_id=None,
-            laptop_id=laptop_id,
+            hardware_id=hardware_id,
             fiscal_year=2026,
             purchase_year=2026,
             record_type="actual",
@@ -93,7 +93,7 @@ class AuditEntityContextTest(unittest.TestCase):
         )
 
         entity = entity_audit_context_sync(
-            _FakeSession({(Laptop, laptop_id): laptop}),
+            _FakeSession({(HardwareAsset, hardware_id): hardware}),
             record,
         )
 

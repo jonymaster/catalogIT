@@ -11,7 +11,7 @@ from app.schemas.user import UserRead
 
 
 class AuditLogRead(BaseModel):
-    """Per-record history row (compatible with existing service/laptop timeline UI)."""
+    """Per-record history row (compatible with existing service/hardware timeline UI)."""
 
     id: uuid.UUID
     table_name: str

@@ -12,7 +12,7 @@ from sqlalchemy.exc import NoInspectionAvailable
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
 from app.models.user import User
 from app.models.vendor import Vendor
@@ -75,7 +75,7 @@ _ENTITY_TYPES = {
     "hardware_locations": "hardware_location",
     "hardware_statuses": "hardware_status",
     "integration_config": "integration",
-    "laptops": "hardware",
+    "hardware_assets": "hardware",
     "notification_global_settings": "notification_settings",
     "oidc_config": "oidc_config",
     "payment_methods": "payment_method",
@@ -115,7 +115,7 @@ def entity_display_label(instance: Any) -> str | None:
         action_date = getattr(instance, "action_date", None)
         if action_type or action_date:
             return " ".join(str(x) for x in (action_type, action_date) if x)
-    if table == "laptops":
+    if table == "hardware_assets":
         model = getattr(instance, "model_name", None)
         serial = getattr(instance, "serial_number", None)
         if model and serial:
@@ -197,7 +197,7 @@ def _related_entity_from_instance(instance: Any) -> dict[str, Any] | None:
     entity = _compact_entity(table=table, key=key, label=label)
     if table == "services":
         _add_if_present(entity, instance, ("name", "status"))
-    elif table == "laptops":
+    elif table == "hardware_assets":
         _add_if_present(entity, instance, ("model_name", "serial_number", "status"))
     elif table == "users":
         _add_if_present(entity, instance, ("email", "display_name", "department", "role"))
@@ -232,7 +232,7 @@ def entity_audit_context_sync(
 
     if table == "services":
         _add_if_present(entity, instance, ("name", "status"))
-    elif table == "laptops":
+    elif table == "hardware_assets":
         _add_if_present(entity, instance, ("model_name", "serial_number", "status"))
     elif table == "users":
         _add_if_present(entity, instance, ("email", "display_name", "department", "role"))
@@ -242,11 +242,11 @@ def entity_audit_context_sync(
         _add_if_present(
             entity,
             instance,
-            ("service_id", "laptop_id", "fiscal_year", "purchase_year", "record_type", "amount"),
+            ("service_id", "hardware_id", "fiscal_year", "purchase_year", "record_type", "amount"),
         )
         service = _load_related_sync(session, Service, getattr(instance, "service_id", None))
-        laptop = _load_related_sync(session, Laptop, getattr(instance, "laptop_id", None))
-        parent = _related_entity_from_instance(service or laptop)
+        hardware = _load_related_sync(session, HardwareAsset, getattr(instance, "hardware_id", None))
+        parent = _related_entity_from_instance(service or hardware)
         if parent:
             entity["parent"] = parent
     elif table == "attachments":
@@ -256,7 +256,7 @@ def entity_audit_context_sync(
             ("entity_type", "entity_id", "filename", "original_filename", "content_type"),
         )
         target_type = getattr(instance, "entity_type", None)
-        model = Service if target_type == "service" else Laptop if target_type == "laptop" else None
+        model = Service if target_type == "service" else HardwareAsset if target_type == "hardware" else None
         parent = _related_entity_from_instance(
             _load_related_sync(session, model, getattr(instance, "entity_id", None)) if model else None
         )

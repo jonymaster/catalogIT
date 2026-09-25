@@ -28,7 +28,7 @@ type LineItemRow = DashboardCostRecord & { id: string };
 
 function lineItemDetailPath(r: DashboardCostRecord): string | null {
   if (r.source === "service" && r.service_id) return `/services/${r.service_id}/costs`;
-  if (r.source === "hardware" && r.laptop_id) return `/hardware/${r.laptop_id}`;
+  if (r.source === "hardware" && r.hardware_id) return `/hardware/${r.hardware_id}`;
   return null;
 }
 import { buildCsv, downloadCsvFile } from "../utils/csv";
@@ -693,7 +693,7 @@ export function CostsReport() {
         const key = [
           record.source,
           record.service_id ?? "",
-          record.laptop_id ?? "",
+          record.hardware_id ?? "",
           record.service_name,
           record.classification ?? "",
           record.category_name ?? "",
@@ -953,7 +953,7 @@ export function CostsReport() {
       }
     >();
     drillRecords.forEach((r) => {
-      const idKey = r.service_id ?? r.laptop_id ?? r.service_name;
+      const idKey = r.service_id ?? r.hardware_id ?? r.service_name;
       const existing = map.get(idKey);
       if (existing) {
         existing.amount += r.amount;
@@ -986,7 +986,7 @@ export function CostsReport() {
     () =>
       displayedDetail.map((r, idx) => ({
         ...r,
-        id: `line-${idx}-${r.source}-${r.service_id ?? "s"}-${r.laptop_id ?? "l"}-${r.fiscal_year}-${r.record_type}-${r.amount}`,
+        id: `line-${idx}-${r.source}-${r.service_id ?? "s"}-${r.hardware_id ?? "l"}-${r.fiscal_year}-${r.record_type}-${r.amount}`,
       })),
     [displayedDetail],
   );

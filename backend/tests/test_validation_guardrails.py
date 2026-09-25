@@ -7,15 +7,15 @@ from types import SimpleNamespace
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.payment_method import PaymentMethod
 from app.models.service import Service
 from app.models.user import User
 from app.routers.cost_records import create_cost_record, to_cost_record_read
-from app.routers.laptops import create_laptop
+from app.routers.hardware_assets import create_hardware
 from app.routers.services import create_service
 from app.schemas.cost_record import CostRecordCreate
-from app.schemas.laptop import LaptopCreate
+from app.schemas.hardware import HardwareAssetCreate
 from app.schemas.service import ServiceCreate
 
 
@@ -49,12 +49,12 @@ class _FakeDb:
 
 
 class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
-    def test_laptop_model_uses_case_insensitive_serial_unique_index(self) -> None:
+    def test_hardware_model_uses_case_insensitive_serial_unique_index(self) -> None:
         index = next(
             (
                 candidate
-                for candidate in Laptop.__table__.indexes
-                if candidate.name == "uq_laptops_serial_number_lower"
+                for candidate in HardwareAsset.__table__.indexes
+                if candidate.name == "uq_hardware_assets_serial_number_lower"
             ),
             None,
         )
@@ -178,13 +178,13 @@ class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(db.added, [])
 
-    async def test_laptop_create_rejects_unknown_assignee(self) -> None:
+    async def test_hardware_create_rejects_unknown_assignee(self) -> None:
         assignee_id = uuid.uuid4()
         db = _FakeDb()
 
         with self.assertRaises(HTTPException) as exc:
-            await create_laptop(
-                LaptopCreate(
+            await create_hardware(
+                HardwareAssetCreate(
                     serial_number="SN-404",
                     model_name="ThinkPad X1",
                     assigned_to_id=assignee_id,
@@ -197,12 +197,12 @@ class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.detail, "Assigned user not found")
         self.assertEqual(db.added, [])
 
-    async def test_laptop_create_rejects_unknown_status_name(self) -> None:
+    async def test_hardware_create_rejects_unknown_status_name(self) -> None:
         db = _FakeDb()
 
         with self.assertRaises(HTTPException) as exc:
-            await create_laptop(
-                LaptopCreate(
+            await create_hardware(
+                HardwareAssetCreate(
                     serial_number="SN-405",
                     model_name="ThinkPad X1",
                     status="Not A Real Status",
@@ -215,20 +215,20 @@ class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.detail, "Hardware status not found")
         self.assertEqual(db.added, [])
 
-    async def test_laptop_create_maps_duplicate_serial_integrity_error_to_400(self) -> None:
+    async def test_hardware_create_maps_duplicate_serial_integrity_error_to_400(self) -> None:
         db = _FakeDb(
             flush_error=IntegrityError(
-                "INSERT INTO laptops ...",
+                "INSERT INTO hardware_assets ...",
                 {},
                 Exception(
-                    'duplicate key value violates unique constraint "uq_laptops_serial_number_lower"',
+                    'duplicate key value violates unique constraint "uq_hardware_assets_serial_number_lower"',
                 ),
             ),
         )
 
         with self.assertRaises(HTTPException) as exc:
-            await create_laptop(
-                LaptopCreate(
+            await create_hardware(
+                HardwareAssetCreate(
                     serial_number="SN-404",
                     model_name="ThinkPad X1",
                 ),
@@ -239,7 +239,7 @@ class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 400)
         self.assertEqual(
             exc.exception.detail,
-            "A laptop with this serial number already exists",
+            "A hardware asset with this serial number already exists",
         )
 
     async def test_cost_record_create_rejects_unknown_payment_method(self) -> None:
@@ -272,7 +272,7 @@ class ApiValidationGuardrailsTest(unittest.IsolatedAsyncioTestCase):
         record = SimpleNamespace(
             id=uuid.uuid4(),
             service_id=uuid.uuid4(),
-            laptop_id=None,
+            hardware_id=None,
             payment_method_id=None,
             fiscal_year=2025,
             purchase_year=2024,

@@ -16,10 +16,12 @@ from app.database import async_session
 from app.models.service import Service
 from app.models.user import User
 from app.dependencies.storage import ensure_bucket
+from fastapi import APIRouter
+
 from app.routers import (
     admin_export, api_tokens, attachments, auth, categories, cost_centers, cost_records, dashboard,
-    hardware_locations, hardware_statuses, history, integrations, internal, laptop_cost_records,
-    laptops, me, payment_methods, reference_data, service_classifications, service_statuses, services,
+    hardware_locations, hardware_statuses, history, integrations, internal, hardware_cost_records,
+    hardware_assets, me, payment_methods, reference_data, service_classifications, service_statuses, services,
     scim, settings, tags, user_directory, users, vendors,
 )
 from scripts.seed_from_json import SEED_DIR, seed_database
@@ -141,7 +143,18 @@ def create_app() -> FastAPI:
     app.include_router(user_directory.router)
     app.include_router(scim.router)
     app.include_router(services.router)
-    app.include_router(laptops.router)
+    app.include_router(hardware_assets.router)
+    # Transitional URL aliases share the same handlers and permission checks.
+    legacy_hardware = APIRouter()
+    for source in (hardware_assets.router, hardware_cost_records.router):
+        for route in source.routes:
+            legacy_hardware.add_api_route(
+                route.path.replace("/api/hardware", "/api/laptops", 1),
+                route.endpoint, methods=list(route.methods),
+                response_model=route.response_model, status_code=route.status_code,
+                deprecated=True, tags=["legacy-laptops"],
+            )
+    app.include_router(legacy_hardware)
     app.include_router(history.router)
     app.include_router(settings.router)
     app.include_router(internal.router)
@@ -161,7 +174,7 @@ def create_app() -> FastAPI:
     app.include_router(tags.router)
     app.include_router(reference_data.router)
     app.include_router(cost_records.router)
-    app.include_router(laptop_cost_records.router)
+    app.include_router(hardware_cost_records.router)
     app.include_router(dashboard.router)
     app.include_router(admin_export.router)
 

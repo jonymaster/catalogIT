@@ -41,7 +41,7 @@ class _FakeDb:
 class DashboardReportingPayloadTest(unittest.TestCase):
     def test_dashboard_rows_include_stable_ids_and_existing_dimensions(self) -> None:
         service_id = uuid.uuid4()
-        laptop_id = uuid.uuid4()
+        hardware_id = uuid.uuid4()
         category_id = uuid.uuid4()
         vendor_id = uuid.uuid4()
         cost_center_id = uuid.uuid4()
@@ -53,7 +53,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         service_record = SimpleNamespace(
             id=service_record_id,
             service_id=service_id,
-            laptop_id=None,
+            hardware_id=None,
             fiscal_year=2026,
             purchase_year=2025,
             amount=1450.75,
@@ -63,7 +63,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         hardware_record = SimpleNamespace(
             id=hardware_record_id,
             service_id=None,
-            laptop_id=laptop_id,
+            hardware_id=hardware_id,
             fiscal_year=2025,
             purchase_year=2024,
             amount=2200,
@@ -84,8 +84,8 @@ class DashboardReportingPayloadTest(unittest.TestCase):
             environment="Production",
             owners=[SimpleNamespace(id=owner_id, department="IT Operations")],
         )
-        laptop = SimpleNamespace(
-            id=laptop_id,
+        hardware = SimpleNamespace(
+            id=hardware_id,
             model_name="MacBook Pro",
             serial_number="SN-42",
             operating_system="macOS",
@@ -95,7 +95,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
             [
                 [service_record, hardware_record],
                 [service],
-                [laptop],
+                [hardware],
                 [category],
             ]
         )
@@ -109,7 +109,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
             row for row in payload.cost_records if row.cost_record_id == str(service_record_id)
         )
         self.assertEqual(service_row.service_id, str(service_id))
-        self.assertIsNone(service_row.laptop_id)
+        self.assertIsNone(service_row.hardware_id)
         self.assertEqual(service_row.purchase_year, 2025)
         self.assertEqual(service_row.vendor_id, str(vendor_id))
         self.assertEqual(service_row.vendor_name, "Microsoft")
@@ -128,7 +128,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
             row for row in payload.cost_records if row.cost_record_id == str(hardware_record_id)
         )
         self.assertIsNone(hardware_row.service_id)
-        self.assertEqual(hardware_row.laptop_id, str(laptop_id))
+        self.assertEqual(hardware_row.hardware_id, str(hardware_id))
         self.assertEqual(hardware_row.purchase_year, 2024)
         self.assertEqual(hardware_row.category_name, "Hardware")
         self.assertEqual(hardware_row.classification, "hardware")
@@ -146,7 +146,7 @@ class DashboardReportingPayloadTest(unittest.TestCase):
         service_record = SimpleNamespace(
             id=service_record_id,
             service_id=service_id,
-            laptop_id=None,
+            hardware_id=None,
             fiscal_year=2026,
             purchase_year=2025,
             amount=900,

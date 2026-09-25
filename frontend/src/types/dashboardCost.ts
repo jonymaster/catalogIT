@@ -15,7 +15,7 @@ export interface DashboardCostRecord {
   cost_record_id: string;
   source: DashboardCostSource;
   service_id: string | null;
-  laptop_id: string | null;
+  hardware_id: string | null;
   service_name: string;
   purchase_year: number | null;
   vendor_id: string | null;

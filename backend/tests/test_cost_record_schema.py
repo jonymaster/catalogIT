@@ -4,8 +4,8 @@ from pydantic import ValidationError
 
 from app.schemas.cost_record import CostRecordCreate, CostRecordUpdate
 from app.schemas.service import ServiceCreate, ServiceUpdate
-from app.schemas.laptop import LaptopCreate, LaptopUpdate
-from app.schemas.laptop_hardware_cost import LaptopHardwareCostPut
+from app.schemas.hardware import HardwareAssetCreate, HardwareAssetUpdate
+from app.schemas.hardware_cost import HardwareCostPut
 
 
 class CostRecordSchemaTest(unittest.TestCase):
@@ -71,21 +71,21 @@ class CostRecordSchemaTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             CostRecordUpdate(record_type=None)
 
-    def test_laptop_hardware_cost_put_allows_zero(self) -> None:
-        m = LaptopHardwareCostPut(amount=0)
+    def test_hardware_hardware_cost_put_allows_zero(self) -> None:
+        m = HardwareCostPut(amount=0)
         self.assertEqual(m.amount, 0)
 
-    def test_laptop_hardware_cost_put_year_range(self) -> None:
+    def test_hardware_hardware_cost_put_year_range(self) -> None:
         with self.assertRaises(ValidationError):
-            LaptopHardwareCostPut(amount=100, purchase_year=1800)
+            HardwareCostPut(amount=100, purchase_year=1800)
 
-    def test_laptop_hardware_cost_put_rejects_negative_amount(self) -> None:
+    def test_hardware_hardware_cost_put_rejects_negative_amount(self) -> None:
         with self.assertRaises(ValidationError):
-            LaptopHardwareCostPut(amount=-0.01)
+            HardwareCostPut(amount=-0.01)
 
-    def test_laptop_hardware_cost_put_rejects_invalid_fiscal_year(self) -> None:
+    def test_hardware_hardware_cost_put_rejects_invalid_fiscal_year(self) -> None:
         with self.assertRaises(ValidationError):
-            LaptopHardwareCostPut(amount=100, fiscal_year=2200)
+            HardwareCostPut(amount=100, fiscal_year=2200)
 
 
 class ServiceSchemaValidationTest(unittest.TestCase):
@@ -102,19 +102,19 @@ class ServiceSchemaValidationTest(unittest.TestCase):
             ServiceUpdate(criticality="Urgent")
 
 
-class LaptopSchemaValidationTest(unittest.TestCase):
-    def test_laptop_create_rejects_blank_serial_number(self) -> None:
+class HardwareAssetSchemaValidationTest(unittest.TestCase):
+    def test_hardware_create_rejects_blank_serial_number(self) -> None:
         with self.assertRaises(ValidationError):
-            LaptopCreate(serial_number="   ", model_name="MacBook Pro")
+            HardwareAssetCreate(serial_number="   ", model_name="MacBook Pro")
 
-    def test_laptop_create_rejects_blank_model_name(self) -> None:
+    def test_hardware_create_rejects_blank_model_name(self) -> None:
         with self.assertRaises(ValidationError):
-            LaptopCreate(serial_number="SN-100", model_name="   ")
+            HardwareAssetCreate(serial_number="SN-100", model_name="   ")
 
-    def test_laptop_update_rejects_null_serial_number(self) -> None:
-        with self.assertRaises(ValidationError):
-            LaptopUpdate(serial_number=None)
+    def test_hardware_update_allows_clearing_optional_serial_number(self) -> None:
+        # Requiredness depends on the resulting asset type and is checked by the route.
+        self.assertIsNone(HardwareAssetUpdate(serial_number=None).serial_number)
 
-    def test_laptop_update_rejects_null_model_name(self) -> None:
+    def test_hardware_update_rejects_null_model_name(self) -> None:
         with self.assertRaises(ValidationError):
-            LaptopUpdate(model_name=None)
+            HardwareAssetUpdate(model_name=None)

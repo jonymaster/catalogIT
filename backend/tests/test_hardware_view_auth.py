@@ -1,4 +1,4 @@
-"""Unit tests for hardware inventory access (/api/laptops/, hardware ref data)."""
+"""Unit tests for hardware inventory access (/api/hardware/, hardware ref data)."""
 
 from __future__ import annotations
 

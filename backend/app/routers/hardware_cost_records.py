@@ -9,43 +9,45 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import require_financial_view, require_hardware_view, require_role
 from app.dependencies.db import get_audited_db
 from app.models.cost_record import CostRecord
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.payment_method import PaymentMethod
 from app.models.user import User
 from app.routers.cost_records import _ensure_payment_method, to_cost_record_read
 from app.schemas.cost_record import CostRecordCreate, CostRecordRead, CostRecordUpdate
 
 router = APIRouter(
-    prefix="/api/laptops/{laptop_id}/cost-records",
-    tags=["laptop-cost-records"],
+    prefix="/api/hardware/{hardware_id}/cost-records",
+    tags=["hardware-cost-records"],
 )
 
+# Finish the transaction before sending a response; the UI immediately follows writes
+# with cost requests and detail reloads.
 _writer = require_role("admin", "editor")
 
 
-async def _get_laptop(laptop_id: uuid.UUID, db: AsyncSession, *, for_write: bool = False) -> Laptop:
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
-    if for_write and laptop.is_active is False:
+async def _get_hardware(hardware_id: uuid.UUID, db: AsyncSession, *, for_write: bool = False) -> HardwareAsset:
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
+    if for_write and hardware.is_active is False:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Archived hardware is read-only for cost records",
         )
-    return laptop
+    return hardware
 
 
 @router.get("/", response_model=list[CostRecordRead])
-async def list_laptop_cost_records(
-    laptop_id: uuid.UUID,
+async def list_hardware_cost_records(
+    hardware_id: uuid.UUID,
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    await _get_laptop(laptop_id, db)
+    await _get_hardware(hardware_id, db)
     result = await db.execute(
         select(CostRecord)
-        .where(CostRecord.laptop_id == laptop_id)
+        .where(CostRecord.hardware_id == hardware_id)
         .order_by(CostRecord.fiscal_year.desc(), CostRecord.recorded_at.desc())
     )
     records = result.scalars().all()
@@ -65,16 +67,16 @@ async def list_laptop_cost_records(
 
 
 @router.get("/{record_id}", response_model=CostRecordRead)
-async def get_laptop_cost_record(
-    laptop_id: uuid.UUID,
+async def get_hardware_cost_record(
+    hardware_id: uuid.UUID,
     record_id: uuid.UUID,
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    await _get_laptop(laptop_id, db)
+    await _get_hardware(hardware_id, db)
     record = await db.get(CostRecord, record_id)
-    if not record or record.laptop_id != laptop_id:
+    if not record or record.hardware_id != hardware_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
 
     item = to_cost_record_read(record)
@@ -85,19 +87,19 @@ async def get_laptop_cost_record(
 
 
 @router.post("/", response_model=CostRecordRead, status_code=status.HTTP_201_CREATED)
-async def create_laptop_cost_record(
-    laptop_id: uuid.UUID,
+async def create_hardware_cost_record(
+    hardware_id: uuid.UUID,
     body: CostRecordCreate,
     user: User = Depends(_writer),
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    await _get_laptop(laptop_id, db, for_write=True)
+    await _get_hardware(hardware_id, db, for_write=True)
     payment_method_id = await _ensure_payment_method(db, body.payment_method_id)
     record = CostRecord(
         service_id=None,
-        laptop_id=laptop_id,
+        hardware_id=hardware_id,
         payment_method_id=payment_method_id,
         fiscal_year=body.fiscal_year,
         purchase_year=body.purchase_year,
@@ -118,18 +120,18 @@ async def create_laptop_cost_record(
 
 
 @router.put("/{record_id}", response_model=CostRecordRead)
-async def update_laptop_cost_record(
-    laptop_id: uuid.UUID,
+async def update_hardware_cost_record(
+    hardware_id: uuid.UUID,
     record_id: uuid.UUID,
     body: CostRecordUpdate,
     _user: User = Depends(_writer),
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    await _get_laptop(laptop_id, db, for_write=True)
+    await _get_hardware(hardware_id, db, for_write=True)
     record = await db.get(CostRecord, record_id)
-    if not record or record.laptop_id != laptop_id:
+    if not record or record.hardware_id != hardware_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
 
     update_data = body.model_dump(exclude_unset=True)
@@ -153,16 +155,16 @@ async def update_laptop_cost_record(
 
 
 @router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_laptop_cost_record(
-    laptop_id: uuid.UUID,
+async def delete_hardware_cost_record(
+    hardware_id: uuid.UUID,
     record_id: uuid.UUID,
     _user: User = Depends(_writer),
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    await _get_laptop(laptop_id, db, for_write=True)
+    await _get_hardware(hardware_id, db, for_write=True)
     record = await db.get(CostRecord, record_id)
-    if not record or record.laptop_id != laptop_id:
+    if not record or record.hardware_id != hardware_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cost record not found")
     await db.delete(record)

@@ -21,7 +21,7 @@ class ServiceYearlyCostDerivedTest(unittest.TestCase):
         self.assertIn("cost_records", sql)
         self.assertIn("fiscal_year", sql)
         self.assertIn("recorded_at", sql)
-        self.assertIn("laptop_id", sql)
+        self.assertIn("hardware_id", sql)
         self.assertIn("record_type", sql)
         self.assertIn("actual", sql)
         self.assertIn("estimated", sql)

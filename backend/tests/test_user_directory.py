@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.dialects import postgresql
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, get_hardware_view_flag
 from app.dependencies.db import get_audited_db
 from app.routers import user_directory
 from app.routers.user_directory import _directory_search_filter, get_user_profile
@@ -103,6 +103,7 @@ class UserProfileRouteTest(unittest.TestCase):
         async def override_db() -> AsyncGenerator[SimpleNamespace, None]:
             yield SimpleNamespace()
 
+        app.dependency_overrides[get_hardware_view_flag] = lambda: False
         app.dependency_overrides[get_current_user] = override_current_user
         app.dependency_overrides[get_audited_db] = override_db
         client = TestClient(app)
@@ -112,7 +113,7 @@ class UserProfileRouteTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         client.close()
 
-    def test_profile_includes_owned_services_assigned_services_and_laptops(self) -> None:
+    def test_profile_includes_owned_services_assigned_services_and_hardware_assets(self) -> None:
         async def run() -> None:
             user_id = uuid.uuid4()
             user = SimpleNamespace(
@@ -147,10 +148,11 @@ class UserProfileRouteTest(unittest.TestCase):
                 is_active=True,
                 category_rel=None,
             )
-            assigned_laptop = SimpleNamespace(
+            assigned_hardware = SimpleNamespace(
                 id=uuid.uuid4(),
                 model_name="ThinkPad X1",
-                serial_number="SN-100",
+                hardware_type="laptop", quantity=1,
+            serial_number="SN-100",
                 status="Assigned",
                 is_active=True,
                 hardware_location=SimpleNamespace(name="HQ"),
@@ -160,7 +162,7 @@ class UserProfileRouteTest(unittest.TestCase):
                     _FakeExecuteResult(scalar=user),
                     _FakeExecuteResult(rows=[owned_service]),
                     _FakeExecuteResult(rows=[assigned_service]),
-                    _FakeExecuteResult(rows=[assigned_laptop]),
+                    _FakeExecuteResult(rows=[assigned_hardware]),
                 ]
             )
 
@@ -177,8 +179,8 @@ class UserProfileRouteTest(unittest.TestCase):
             self.assertEqual(profile.owned_services[0].category_name, "Core SaaS")
             self.assertEqual(profile.assigned_services[0].name, "Support Desk")
             self.assertIsNone(profile.assigned_services[0].category_name)
-            self.assertEqual(profile.assigned_laptops[0].serial_number, "SN-100")
-            self.assertEqual(profile.assigned_laptops[0].hardware_location_name, "HQ")
+            self.assertEqual(profile.assigned_hardware_assets[0].serial_number, "SN-100")
+            self.assertEqual(profile.assigned_hardware_assets[0].hardware_location_name, "HQ")
 
         asyncio.run(run())
 

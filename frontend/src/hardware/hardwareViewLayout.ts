@@ -1,4 +1,4 @@
-export type LaptopFieldKey =
+export type HardwareAssetFieldKey =
   | "status"
   | "assigned_to"
   | "location"
@@ -9,10 +9,10 @@ export type LaptopFieldKey =
   | "purchase_cost"
   | "notes";
 
-export const LAPTOP_VIEW_SECTIONS: readonly {
+export const HARDWARE_VIEW_SECTIONS: readonly {
   id: string;
   title: string;
-  fields: readonly LaptopFieldKey[];
+  fields: readonly HardwareAssetFieldKey[];
 }[] = [
   {
     id: "overview",
@@ -31,7 +31,7 @@ export const LAPTOP_VIEW_SECTIONS: readonly {
   },
 ] as const;
 
-export const LAPTOP_FIELD_LABELS: Record<LaptopFieldKey, string> = {
+export const HARDWARE_FIELD_LABELS: Record<HardwareAssetFieldKey, string> = {
   status: "Status",
   assigned_to: "Assigned To",
   location: "Location",

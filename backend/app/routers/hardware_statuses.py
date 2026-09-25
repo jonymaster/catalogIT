@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import require_hardware_view, require_role
 from app.dependencies.db import get_audited_db
 from app.models.hardware_status import HardwareStatus
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.user import User
 from app.routers.reference_data_utils import (
     ReferenceDeleteDependency,
@@ -31,9 +31,9 @@ router = APIRouter(prefix="/api/hardware-statuses", tags=["hardware-statuses"])
 _admin = require_role("admin")
 _delete_dependencies = [
     ReferenceDeleteDependency(
-        label="laptops",
+        label="hardware_assets",
         query_factory=lambda row: count_rows(
-            Laptop, Laptop.hardware_status_id == row.id
+            HardwareAsset, HardwareAsset.hardware_status_id == row.id
         ),
     ),
 ]

@@ -69,7 +69,7 @@ export function UserOverview() {
             Assigned Assets
           </p>
           <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-gray-100">
-            {profile.assigned_laptops.length}
+            {profile.assigned_hardware_assets.length}
           </p>
         </Link>
       </div>

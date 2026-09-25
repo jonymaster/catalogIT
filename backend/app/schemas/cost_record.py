@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 ALLOWED_COST_RECORD_TYPES = {"actual", "estimated", "budget"}
 
@@ -74,9 +74,14 @@ class CostRecordUpdate(BaseModel):
 
 
 class CostRecordRead(BaseModel):
+    @computed_field(deprecated="Use hardware_id")
+    @property
+    def laptop_id(self) -> uuid.UUID | None:
+        return self.hardware_id
+
     id: uuid.UUID
     service_id: uuid.UUID | None = None
-    laptop_id: uuid.UUID | None = None
+    hardware_id: uuid.UUID | None = None
     payment_method_id: uuid.UUID | None
     payment_method_name: str | None = None
     fiscal_year: int

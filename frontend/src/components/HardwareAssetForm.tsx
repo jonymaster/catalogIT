@@ -2,77 +2,65 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
 import {
-  LAPTOP_FIELD_LABELS,
-  LAPTOP_VIEW_SECTIONS,
-  type LaptopFieldKey,
-} from "../hardware/laptopViewLayout";
+  HARDWARE_FIELD_LABELS,
+  HARDWARE_VIEW_SECTIONS,
+  type HardwareAssetFieldKey,
+} from "../hardware/hardwareViewLayout";
 import { OsIcon } from "./ui/OsIcon";
 import { Button } from "./ui/Button";
-import { OS_OPTIONS } from "../utils/operatingSystem";
+import { HardwareTypeFields } from "./HardwareTypeFields";
+import { isSimpleHardware, osOptionsForType } from "../hardware/hardwareTypes";
+import { useAuth } from "../context/useAuth";
+import { toDraft, draftToHardwareAssetPayload, validateDraft, type HardwareAssetDraft } from "../service/hardwareDetailContext";
 import type {
   CostRecord,
   HardwareLocation,
   HardwareStatus,
-  Laptop,
+  HardwareAsset,
   OperatingSystem,
   User,
 } from "../types/models";
 
 interface Props {
-  initial?: Laptop;
+  initial?: HardwareAsset;
 }
 
-interface FormData {
-  serial_number: string;
-  model_name: string;
-  operating_system: string;
-  cpu: string;
-  ram: string;
-  storage_size: string;
-  status: string;
-  hardware_status_id: string;
-  hardware_location_id: string;
-  assigned_to_id: string;
-  notes: string;
-  mdm_connected: boolean;
-  purchase_year: string;
-  purchase_cost: string;
-}
+type FormData = HardwareAssetDraft;
+type HardwareAssetFieldErrorKey = keyof HardwareAssetDraft;
 
-type LaptopFieldErrorKey =
-  | "serial_number"
-  | "model_name"
-  | "purchase_year"
-  | "purchase_cost";
-
-function toFormData(l?: Laptop): FormData {
+function toFormData(l?: HardwareAsset): FormData {
+  if (l) return toDraft(l);
   return {
-    serial_number: l?.serial_number ?? "",
-    model_name: l?.model_name ?? "",
-    operating_system: l?.operating_system ?? "",
-    cpu: l?.cpu ?? "",
-    ram: l?.ram ?? "",
-    storage_size: l?.storage_size ?? "",
-    status: l?.status ?? "In Stock",
-    hardware_status_id: l?.hardware_status_id ?? "",
-    hardware_location_id: l?.hardware_location_id ?? "",
-    assigned_to_id: l?.assigned_to_id ?? "",
-    notes: l?.notes ?? "",
-    mdm_connected: l?.mdm_connected ?? false,
+    hardware_type: "laptop",
+    quantity: 1,
+    os_version: "", imei: "", imei2: "", phone_number: "",
+    serial_number: "",
+    model_name: "",
+    operating_system: "",
+    cpu: "",
+    ram: "",
+    storage_size: "",
+    status: "In Stock",
+    hardware_status_id: "",
+    hardware_location_id: "",
+    assigned_to_id: "",
+    notes: "",
+    mdm_connected: false,
     purchase_year: "",
     purchase_cost: "",
   };
 }
 
-export function LaptopForm({ initial }: Props = {}) {
+export function HardwareAssetForm({ initial }: Props = {}) {
   const navigate = useNavigate();
+  const { canFinancialView } = useAuth();
   const isEdit = Boolean(initial?.id);
 
   const [form, setForm] = useState<FormData>(() => toFormData(initial));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<LaptopFieldErrorKey, string>>
+    Partial<Record<HardwareAssetFieldErrorKey, string>>
   >({});
   const [users, setUsers] = useState<User[]>([]);
   const [hardwareStatuses, setHardwareStatuses] = useState<HardwareStatus[]>(
@@ -126,9 +114,9 @@ export function LaptopForm({ initial }: Props = {}) {
   }, [hardwareStatuses, isEdit]);
 
   useEffect(() => {
-    if (!initial?.id || !initial.is_active) return;
+    if (!initial?.id || !initial.is_active || !canFinancialView) return;
     client
-      .get<CostRecord | null>(`/api/laptops/${initial.id}/hardware-cost`)
+      .get<CostRecord | null>(`/api/hardware/${initial.id}/hardware-cost`)
       .then((r) => {
         const cost = r.data;
         if (cost) {
@@ -141,14 +129,14 @@ export function LaptopForm({ initial }: Props = {}) {
         }
       })
       .catch(() => {});
-  }, [initial?.id, initial?.is_active]);
+  }, [initial?.id, initial?.is_active, canFinancialView]);
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (key in fieldErrors) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        delete next[key as LaptopFieldErrorKey];
+        delete next[key as HardwareAssetFieldErrorKey];
         return next;
       });
     }
@@ -158,11 +146,11 @@ export function LaptopForm({ initial }: Props = {}) {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const nextErrors: Partial<Record<LaptopFieldErrorKey, string>> = {};
+    const nextErrors = validateDraft(form, true);
     const trimmedSerial = form.serial_number.trim();
     const trimmedModel = form.model_name.trim();
 
-    if (!trimmedSerial) {
+    if (!isSimpleHardware(form.hardware_type) && !trimmedSerial) {
       nextErrors.serial_number = "Serial number is required.";
     }
     if (!trimmedModel) {
@@ -200,44 +188,29 @@ export function LaptopForm({ initial }: Props = {}) {
 
     setFieldErrors({});
 
-    const payload = {
-      serial_number: trimmedSerial,
-      model_name: trimmedModel,
-      operating_system: form.operating_system
-        ? (form.operating_system as OperatingSystem)
-        : null,
-      cpu: form.cpu,
-      ram: form.ram,
-      storage_size: form.storage_size,
-      status: form.status,
-      hardware_status_id: form.hardware_status_id || null,
-      hardware_location_id: form.hardware_location_id || null,
-      assigned_to_id: form.assigned_to_id || null,
-      notes: form.notes || null,
-      mdm_connected: form.mdm_connected,
-    };
+    const payload = draftToHardwareAssetPayload(form);
 
     try {
       if (isEdit && initial) {
-        await client.put(`/api/laptops/${initial.id}`, payload);
-        if (initial.is_active) {
-          await client.put(`/api/laptops/${initial.id}/hardware-cost`, {
+        await client.put(`/api/hardware/${initial.id}`, payload);
+        if (initial.is_active && canFinancialView) {
+          await client.put(`/api/hardware/${initial.id}/hardware-cost`, {
             amount: purchaseCost,
             purchase_year: purchaseYear,
           });
         }
         navigate(`/hardware/${initial.id}`);
       } else {
-        const res = await client.post<Laptop>("/api/laptops/", payload);
-        const laptopId = res.data.id;
-        await client.put(`/api/laptops/${laptopId}/hardware-cost`, {
+        const res = await client.post<HardwareAsset>("/api/hardware/", payload);
+        const hardwareId = res.data.id;
+        if (canFinancialView) await client.put(`/api/hardware/${hardwareId}/hardware-cost`, {
           amount: purchaseCost,
           purchase_year: purchaseYear,
         });
-        navigate(`/hardware/${laptopId}`);
+        navigate(`/hardware/${hardwareId}`);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to save laptop";
+      const msg = err instanceof Error ? err.message : "Failed to save hardware";
       setError(msg);
     } finally {
       setSaving(false);
@@ -247,7 +220,7 @@ export function LaptopForm({ initial }: Props = {}) {
   const inputCls =
     "block w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
   const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-200";
-  const withError = (key: LaptopFieldErrorKey) =>
+  const withError = (key: HardwareAssetFieldErrorKey) =>
     [
       inputCls,
       fieldErrors[key] ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "",
@@ -259,14 +232,14 @@ export function LaptopForm({ initial }: Props = {}) {
 
   const rowGridCls = "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3";
 
-  const showPurchaseFields = !isEdit || (initial?.is_active ?? false);
+  const showPurchaseFields = canFinancialView && (!isEdit || (initial?.is_active ?? false));
 
-  function renderFieldControl(key: LaptopFieldKey) {
+  function renderFieldControl(key: HardwareAssetFieldKey) {
     switch (key) {
       case "status":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.status}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.status}</label>
             <select
               className={inputCls}
               value={form.hardware_status_id}
@@ -296,7 +269,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "assigned_to":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.assigned_to}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.assigned_to}</label>
             <select
               className={inputCls}
               value={form.assigned_to_id}
@@ -314,7 +287,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "location":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.location}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.location}</label>
             <select
               className={inputCls}
               value={form.hardware_location_id}
@@ -332,7 +305,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "cpu":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.cpu}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.cpu}</label>
             <input
               className={inputCls}
               value={form.cpu}
@@ -343,7 +316,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "ram":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.ram}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.ram}</label>
             <input
               className={inputCls}
               value={form.ram}
@@ -354,7 +327,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "storage_size":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.storage_size}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.storage_size}</label>
             <input
               className={inputCls}
               value={form.storage_size}
@@ -365,7 +338,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "purchase_year":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.purchase_year}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.purchase_year}</label>
             <input
               type="number"
               min={1900}
@@ -383,7 +356,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "purchase_cost":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.purchase_cost}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.purchase_cost}</label>
             <input
               type="number"
               step="0.01"
@@ -401,7 +374,7 @@ export function LaptopForm({ initial }: Props = {}) {
       case "notes":
         return (
           <div>
-            <label className={labelCls}>{LAPTOP_FIELD_LABELS.notes}</label>
+            <label className={labelCls}>{HARDWARE_FIELD_LABELS.notes}</label>
             <textarea
               className={inputCls}
               rows={3}
@@ -422,11 +395,13 @@ export function LaptopForm({ initial }: Props = {}) {
       )}
 
       <div className={sectionCardCls}>
+        <HardwareTypeFields value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} />
+        {(["quantity", "imei", "imei2"] as const).map((key) => fieldErrors[key] && <p key={key} className="mt-2 text-sm text-danger">{fieldErrors[key]}</p>)}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label className={labelCls}>Serial Number *</label>
+            <label className={labelCls}>Serial Number{isSimpleHardware(form.hardware_type) ? " (optional)" : " *"}</label>
             <input
-              required
+              required={!isSimpleHardware(form.hardware_type)}
               className={withError("serial_number")}
               value={form.serial_number}
               onChange={(e) => set("serial_number", e.target.value)}
@@ -449,7 +424,7 @@ export function LaptopForm({ initial }: Props = {}) {
             )}
           </div>
 
-          <div>
+          {!isSimpleHardware(form.hardware_type) && <div>
             <label className={labelCls}>Operating system</label>
             <div className="flex items-center gap-2">
               <OsIcon
@@ -466,17 +441,17 @@ export function LaptopForm({ initial }: Props = {}) {
                 onChange={(e) => set("operating_system", e.target.value)}
               >
                 <option value="">— Unknown —</option>
-                {OS_OPTIONS.map((o) => (
+                {osOptionsForType(form.hardware_type).map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
+          </div>}
         </div>
 
-        <div className="mt-4 flex items-center">
+        {!isSimpleHardware(form.hardware_type) && <div className="mt-4 flex items-center">
           <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
             <input
               type="checkbox"
@@ -486,11 +461,12 @@ export function LaptopForm({ initial }: Props = {}) {
             />
             MDM Connected
           </label>
-        </div>
+        </div>}
       </div>
 
-      {LAPTOP_VIEW_SECTIONS.map((section) => {
+      {HARDWARE_VIEW_SECTIONS.map((section) => {
         const visibleFields = section.fields.filter((key) => {
+          if (isSimpleHardware(form.hardware_type) && ["cpu", "ram", "storage_size"].includes(key)) return false;
           if (key === "purchase_year" || key === "purchase_cost") {
             return showPurchaseFields;
           }
@@ -522,7 +498,7 @@ export function LaptopForm({ initial }: Props = {}) {
 
       <div className="flex gap-3">
         <Button type="submit" disabled={saving}>
-          {saving ? "Saving..." : isEdit ? "Save Changes" : "Create Laptop"}
+          {saving ? "Saving..." : isEdit ? "Save Changes" : "Create hardware asset"}
         </Button>
         <button
           type="button"
