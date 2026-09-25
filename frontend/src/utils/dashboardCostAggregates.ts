@@ -365,8 +365,8 @@ export function topSpendersForYear(
     .filter((r) => r.fiscal_year === fiscalYear)
     .forEach((r) => {
       const k =
-        r.source === "hardware" && r.laptop_id
-          ? `h:${r.laptop_id}`
+        r.source === "hardware" && r.hardware_id
+          ? `h:${r.hardware_id}`
           : r.service_id
             ? `s:${r.service_id}`
             : "";

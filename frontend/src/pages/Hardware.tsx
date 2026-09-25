@@ -1,3 +1,4 @@
+import { HARDWARE_TYPES, hardwareTypeLabel } from "../hardware/hardwareTypes";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client";
@@ -18,7 +19,7 @@ import { useAuth } from "../context/useAuth";
 import { useColumnPrefs } from "../hooks/useColumnPrefs";
 import { OsIcon } from "../components/ui/OsIcon";
 import { operatingSystemLabel } from "../utils/operatingSystem";
-import type { Laptop } from "../types/models";
+import type { HardwareAsset } from "../types/models";
 import { buildCsv, downloadCsvFile } from "../utils/csv";
 
 type FilterType = "text" | "select";
@@ -28,10 +29,10 @@ interface HardwareColumnDefinition {
   label: string;
   filterType: FilterType;
   filterPlaceholder?: string;
-  getFilterValue: (laptop: Laptop) => string;
-  getSortValue: (laptop: Laptop) => string | number | boolean | null;
-  getFilterOptions?: (laptops: Laptop[]) => string[];
-  render?: (laptop: Laptop) => ReactNode;
+  getFilterValue: (hardware: HardwareAsset) => string;
+  getSortValue: (hardware: HardwareAsset) => string | number | boolean | null;
+  getFilterOptions?: (hardware_assets: HardwareAsset[]) => string[];
+  render?: (hardware: HardwareAsset) => ReactNode;
 }
 
 type HardwareFilters = Record<string, string | string[]>;
@@ -50,14 +51,14 @@ interface HardwareListState {
 
 const LIST_STATE_STORAGE_KEY = "catalogit:hardware:list-state";
 
-function getAssigneeName(laptop: Laptop) {
-  return laptop.assigned_to
-    ? `${laptop.assigned_to.first_name} ${laptop.assigned_to.last_name}`
+function getAssigneeName(hardware: HardwareAsset) {
+  return hardware.assigned_to
+    ? `${hardware.assigned_to.first_name} ${hardware.assigned_to.last_name}`
     : "--";
 }
 
-function getHardwareStatusDisplayLabel(laptop: Laptop): string {
-  return laptop.hardware_status?.name ?? laptop.status;
+function getHardwareStatusDisplayLabel(hardware: HardwareAsset): string {
+  return hardware.hardware_status?.name ?? hardware.status;
 }
 
 function getHardwareSortValue(
@@ -96,17 +97,34 @@ function getUniqueOptions(values: string[]) {
 
 const columnDefinitions: HardwareColumnDefinition[] = [
   {
+    key: "hardware_type", label: "Type", filterType: "select",
+    getFilterValue: (hardware) => hardwareTypeLabel(hardware.hardware_type),
+    getSortValue: (hardware) => hardwareTypeLabel(hardware.hardware_type),
+    render: (hardware) => hardwareTypeLabel(hardware.hardware_type),
+    getFilterOptions: (assets) => getUniqueOptions(assets.map((asset) => hardwareTypeLabel(asset.hardware_type))),
+  },
+  {
+    key: "quantity", label: "Quantity", filterType: "text",
+    getFilterValue: (hardware) => String(hardware.quantity),
+    getSortValue: (hardware) => hardware.quantity,
+  },
+  ...(["imei", "imei2", "phone_number"] as const).map((key): HardwareColumnDefinition => ({
+    key, label: { imei: "IMEI", imei2: "Second IMEI", phone_number: "Phone number" }[key], filterType: "text",
+    getFilterValue: (hardware) => hardware[key] ?? "",
+    getSortValue: (hardware) => hardware[key] ?? "",
+  })),
+  {
     key: "serial_number",
     label: "Serial Number",
     filterType: "text",
     filterPlaceholder: "Filter by serial number...",
-    getFilterValue: (laptop) => laptop.serial_number,
-    getSortValue: (laptop) => laptop.serial_number,
-    render: (laptop) => (
+    getFilterValue: (hardware) => hardware.serial_number ?? "",
+    getSortValue: (hardware) => hardware.serial_number,
+    render: (hardware) => (
       <div className="flex min-w-0 items-center gap-2.5">
-        <OsIcon operatingSystem={laptop.operating_system} />
-        <Link to={`/hardware/${laptop.id}`} className="hlink truncate text-fg">
-          {laptop.serial_number}
+        <OsIcon operatingSystem={hardware.operating_system} hardwareType={hardware.hardware_type} />
+        <Link to={`/hardware/${hardware.id}`} className="hlink truncate text-fg">
+          {hardware.serial_number || hardware.model_name}
         </Link>
       </div>
     ),
@@ -116,19 +134,19 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     label: "Model",
     filterType: "text",
     filterPlaceholder: "Filter by model...",
-    getFilterValue: (laptop) => laptop.model_name,
-    getSortValue: (laptop) => laptop.model_name,
+    getFilterValue: (hardware) => hardware.model_name,
+    getSortValue: (hardware) => hardware.model_name,
   },
   {
     key: "operating_system",
     label: "OS",
     filterType: "select",
-    getFilterValue: (laptop) => operatingSystemLabel(laptop.operating_system),
-    getSortValue: (laptop) => laptop.operating_system ?? "",
-    getFilterOptions: (laptops) =>
-      getUniqueOptions(laptops.map((l) => operatingSystemLabel(l.operating_system))),
-    render: (laptop) => (
-      <span className="truncate text-fg">{operatingSystemLabel(laptop.operating_system)}</span>
+    getFilterValue: (hardware) => operatingSystemLabel(hardware.operating_system),
+    getSortValue: (hardware) => hardware.operating_system ?? "",
+    getFilterOptions: (hardware_assets) =>
+      getUniqueOptions(hardware_assets.map((l) => operatingSystemLabel(l.operating_system))),
+    render: (hardware) => (
+      <span className="truncate text-fg">{operatingSystemLabel(hardware.operating_system)}</span>
     ),
   },
   {
@@ -136,68 +154,68 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     label: "Status",
     filterType: "select",
     getFilterValue: getHardwareStatusDisplayLabel,
-    getSortValue: (laptop) => getHardwareStatusDisplayLabel(laptop),
-    getFilterOptions: (laptops) =>
-      getUniqueOptions(laptops.map((laptop) => getHardwareStatusDisplayLabel(laptop))),
-    render: (laptop) =>
-      laptop.hardware_status ? (
+    getSortValue: (hardware) => getHardwareStatusDisplayLabel(hardware),
+    getFilterOptions: (hardware_assets) =>
+      getUniqueOptions(hardware_assets.map((hardware) => getHardwareStatusDisplayLabel(hardware))),
+    render: (hardware) =>
+      hardware.hardware_status ? (
         <ColoredReferenceBadge
-          label={laptop.hardware_status.name}
-          color={laptop.hardware_status.color}
+          label={hardware.hardware_status.name}
+          color={hardware.hardware_status.color}
         />
       ) : (
-        <StatusBadge status={laptop.status} />
+        <StatusBadge status={hardware.status} />
       ),
   },
   {
     key: "hardware_location",
     label: "Location",
     filterType: "select",
-    getFilterValue: (laptop) =>
-      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
-    getSortValue: (laptop) =>
-      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "",
-    getFilterOptions: (laptops) =>
+    getFilterValue: (hardware) =>
+      hardware.hardware_location?.name?.trim() ? hardware.hardware_location.name : "—",
+    getSortValue: (hardware) =>
+      hardware.hardware_location?.name?.trim() ? hardware.hardware_location.name : "",
+    getFilterOptions: (hardware_assets) =>
       getUniqueOptions(
-        laptops.map((laptop) =>
-          laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+        hardware_assets.map((hardware) =>
+          hardware.hardware_location?.name?.trim() ? hardware.hardware_location.name : "—",
         ),
       ),
-    render: (laptop) =>
-      laptop.hardware_location?.name?.trim() ? laptop.hardware_location.name : "—",
+    render: (hardware) =>
+      hardware.hardware_location?.name?.trim() ? hardware.hardware_location.name : "—",
   },
   {
     key: "mdm_connected",
     label: "MDM Connected",
     filterType: "select",
-    getFilterValue: (laptop) => (laptop.mdm_connected ? "Yes" : "No"),
-    getSortValue: (laptop) => laptop.mdm_connected,
+    getFilterValue: (hardware) => (hardware.mdm_connected ? "Yes" : "No"),
+    getSortValue: (hardware) => hardware.mdm_connected,
     getFilterOptions: () => ["No", "Yes"],
-    render: (laptop) => <BooleanYesNoBadge value={laptop.mdm_connected} />,
+    render: (hardware) => <BooleanYesNoBadge value={hardware.mdm_connected} />,
   },
   {
     key: "cpu",
     label: "CPU",
     filterType: "text",
     filterPlaceholder: "Filter by CPU...",
-    getFilterValue: (laptop) => laptop.cpu,
-    getSortValue: (laptop) => laptop.cpu,
+    getFilterValue: (hardware) => hardware.cpu,
+    getSortValue: (hardware) => hardware.cpu,
   },
   {
     key: "ram",
     label: "RAM",
     filterType: "text",
     filterPlaceholder: "Filter by RAM...",
-    getFilterValue: (laptop) => laptop.ram,
-    getSortValue: (laptop) => laptop.ram,
+    getFilterValue: (hardware) => hardware.ram,
+    getSortValue: (hardware) => hardware.ram,
   },
   {
     key: "storage_size",
     label: "Storage",
     filterType: "text",
     filterPlaceholder: "Filter by storage...",
-    getFilterValue: (laptop) => laptop.storage_size,
-    getSortValue: (laptop) => laptop.storage_size,
+    getFilterValue: (hardware) => hardware.storage_size,
+    getSortValue: (hardware) => hardware.storage_size,
   },
   {
     key: "assigned_to",
@@ -206,8 +224,8 @@ const columnDefinitions: HardwareColumnDefinition[] = [
     filterPlaceholder: "Filter by assignee...",
     getFilterValue: getAssigneeName,
     getSortValue: getAssigneeName,
-    render: (laptop) =>
-      laptop.assigned_to ? <UserLink user={laptop.assigned_to} /> : "--",
+    render: (hardware) =>
+      hardware.assigned_to ? <UserLink user={hardware.assigned_to} /> : "--",
   },
 ];
 
@@ -279,7 +297,7 @@ function todayFilenameDate(): string {
 
 export function Hardware() {
   const persistedState = useMemo(() => loadListState(), []);
-  const [laptops, setLaptops] = useState<Laptop[]>([]);
+  const [hardware_assets, setHardwareAssets] = useState<HardwareAsset[]>([]);
   const [view, setView] = useState<"active" | "archived">(
     persistedState?.view ?? "active",
   );
@@ -300,10 +318,10 @@ export function Hardware() {
   useEffect(() => {
     let cancelled = false;
     client
-      .get<Laptop[]>("/api/laptops/", { params: { archived: view === "archived" } })
+      .get<HardwareAsset[]>("/api/hardware/", { params: { archived: view === "archived" } })
       .then((r) => {
         if (!cancelled) {
-          setLaptops(r.data);
+          setHardwareAssets(r.data);
           setLoadedView(view);
         }
       })
@@ -332,25 +350,28 @@ export function Hardware() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    const nextRows = laptops.filter((laptop) => {
-      const locName = laptop.hardware_location?.name?.trim() ?? "";
+    const nextRows = hardware_assets.filter((hardware) => {
+      const locName = hardware.hardware_location?.name?.trim() ?? "";
       const matchesSearch =
         !q ||
-        laptop.serial_number.toLowerCase().includes(q) ||
-        laptop.model_name.toLowerCase().includes(q) ||
-        laptop.cpu.toLowerCase().includes(q) ||
-        laptop.status.toLowerCase().includes(q) ||
-        (laptop.hardware_status?.name ?? "").toLowerCase().includes(q) ||
+        (hardware.serial_number ?? "").toLowerCase().includes(q) ||
+        hardware.model_name.toLowerCase().includes(q) ||
+        hardwareTypeLabel(hardware.hardware_type).toLowerCase().includes(q) ||
+        (hardware.imei ?? "").includes(q) || (hardware.imei2 ?? "").includes(q) ||
+        (hardware.phone_number ?? "").includes(q) ||
+        hardware.cpu.toLowerCase().includes(q) ||
+        hardware.status.toLowerCase().includes(q) ||
+        (hardware.hardware_status?.name ?? "").toLowerCase().includes(q) ||
         locName.toLowerCase().includes(q) ||
-        getAssigneeName(laptop).toLowerCase().includes(q) ||
-        operatingSystemLabel(laptop.operating_system).toLowerCase().includes(q);
+        getAssigneeName(hardware).toLowerCase().includes(q) ||
+        operatingSystemLabel(hardware.operating_system).toLowerCase().includes(q);
 
       if (!matchesSearch) {
         return false;
       }
 
       return columnDefinitions.every((column) => {
-        const cellValue = column.getFilterValue(laptop);
+        const cellValue = column.getFilterValue(hardware);
         if (column.filterType === "select") {
           const selected = filters[column.key];
           const values = Array.isArray(selected) ? selected : [];
@@ -387,7 +408,7 @@ export function Hardware() {
       const comparison = compareHardwareValues(leftValue, rightValue);
       return sortState.direction === "asc" ? comparison : -comparison;
     });
-  }, [filters, laptops, search, sortState]);
+  }, [filters, hardware_assets, search, sortState]);
 
   const handleExportCsv = useCallback(() => {
     const known = new Set(columnDefinitions.map((column) => column.key));
@@ -399,10 +420,10 @@ export function Hardware() {
       const def = columnDefinitions.find((column) => column.key === key);
       return def?.label ?? key;
     });
-    const rows = filtered.map((laptop) =>
+    const rows = filtered.map((hardware) =>
       keysInOrder.map((key) => {
         const def = columnDefinitions.find((column) => column.key === key);
-        return def ? def.getFilterValue(laptop) : "";
+        return def ? def.getFilterValue(hardware) : "";
       }),
     );
     downloadCsvFile(
@@ -426,7 +447,7 @@ export function Hardware() {
     setSortState({ key: null, direction: null });
   }, []);
 
-  const columns = useMemo<Column<Laptop>[]>(() => {
+  const columns = useMemo<Column<HardwareAsset>[]>(() => {
     return columnDefinitions.map((column) => {
       const sortDirection =
         sortState.key === column.key ? sortState.direction : null;
@@ -440,7 +461,7 @@ export function Hardware() {
             <ColumnHeaderMenu
               label={column.label}
               filterType="select"
-              filterOptions={column.getFilterOptions?.(laptops) ?? []}
+              filterOptions={column.getFilterOptions?.(hardware_assets) ?? []}
               selectedValues={
                 Array.isArray(filters[column.key])
                   ? (filters[column.key] as string[])
@@ -489,7 +510,7 @@ export function Hardware() {
           ),
       };
     });
-  }, [filters, laptops, sortState]);
+  }, [filters, hardware_assets, sortState]);
 
   return (
     <PageTransition>
@@ -538,7 +559,7 @@ export function Hardware() {
               className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-150 hover:bg-brand-700"
             >
               <PlusIcon className="h-4 w-4" />
-              New Laptop
+              New hardware asset
             </Link>
           )}
         </div>
@@ -556,9 +577,16 @@ export function Hardware() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Search hardware..."
+                placeholder="Search name, serial, IMEI, assignee…"
               />
             </div>
+            <select aria-label="Filter hardware type" className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
+              value={Array.isArray(filters.hardware_type) && filters.hardware_type.length === 1 ? filters.hardware_type[0] : Array.isArray(filters.hardware_type) && filters.hardware_type.length > 1 ? "__multiple" : ""}
+              onChange={(event) => setFilters((current) => ({ ...current, hardware_type: event.target.value ? [event.target.value] : [] }))}>
+              <option value="">All hardware types</option>
+              {Array.isArray(filters.hardware_type) && filters.hardware_type.length > 1 && <option value="__multiple" disabled>Multiple types</option>}
+              {HARDWARE_TYPES.map((type) => <option key={type.value} value={type.label}>{type.label}</option>)}
+            </select>
             <div className="flex-1" />
             {hasActiveFilters && (
               <button
@@ -573,12 +601,12 @@ export function Hardware() {
               {hasActiveFilters ? (
                 <>
                   <span className="font-medium text-fg">{filtered.length}</span>
-                  <span className="text-fg-3"> / {laptops.length} </span>
-                  {laptops.length === 1 ? "laptop" : "laptops"}
+                  <span className="text-fg-3"> / {hardware_assets.length} </span>
+                  {hardware_assets.length === 1 ? "asset" : "assets"}
                 </>
               ) : (
                 <>
-                  {laptops.length} {laptops.length === 1 ? "laptop" : "laptops"}
+                  {hardware_assets.length} {hardware_assets.length === 1 ? "asset" : "assets"}
                 </>
               )}
             </p>

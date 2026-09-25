@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
 import client from "../../api/client";
 import { PageTransition } from "../../components/PageTransition";
-import type { Laptop, Service } from "../../types/models";
+import type { HardwareAsset, Service } from "../../types/models";
 
 export function SettingsRecordDeletion() {
   const [services, setServices] = useState<Service[]>([]);
-  const [laptops, setLaptops] = useState<Laptop[]>([]);
+  const [hardware_assets, setHardwareAssets] = useState<HardwareAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   async function loadArchived() {
     setLoading(true);
     try {
-      const [servicesResp, laptopsResp] = await Promise.all([
+      const [servicesResp, hardware_assetsResp] = await Promise.all([
         client.get<Service[]>("/api/services/", { params: { archived: true } }),
-        client.get<Laptop[]>("/api/laptops/", { params: { archived: true } }),
+        client.get<HardwareAsset[]>("/api/hardware/", { params: { archived: true } }),
       ]);
       setServices(servicesResp.data);
-      setLaptops(laptopsResp.data);
+      setHardwareAssets(hardware_assetsResp.data);
     } finally {
       setLoading(false);
     }
@@ -41,15 +41,15 @@ export function SettingsRecordDeletion() {
     }
   }
 
-  async function deleteLaptop(laptop: Laptop) {
-    if (!window.confirm(`Permanently delete archived laptop "${laptop.serial_number}"?`)) {
+  async function deleteHardwareAsset(hardware: HardwareAsset) {
+    if (!window.confirm(`Permanently delete archived hardware "${hardware.serial_number}"?`)) {
       return;
     }
-    const key = `laptop:${laptop.id}`;
+    const key = `hardware:${hardware.id}`;
     setBusyKey(key);
     try {
-      await client.delete(`/api/laptops/${laptop.id}`);
-      setLaptops((current) => current.filter((item) => item.id !== laptop.id));
+      await client.delete(`/api/hardware/${hardware.id}`);
+      setHardwareAssets((current) => current.filter((item) => item.id !== hardware.id));
     } finally {
       setBusyKey(null);
     }
@@ -112,7 +112,7 @@ export function SettingsRecordDeletion() {
 
       <section className="space-y-3">
         <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">Archived Hardware</h3>
-        {laptops.length === 0 ? (
+        {hardware_assets.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No archived hardware records available.</p>
         ) : (
           <div className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -125,18 +125,18 @@ export function SettingsRecordDeletion() {
                 </tr>
               </thead>
               <tbody>
-                {laptops.map((laptop) => {
-                  const key = `laptop:${laptop.id}`;
+                {hardware_assets.map((hardware) => {
+                  const key = `hardware:${hardware.id}`;
                   const deleting = busyKey === key;
                   return (
-                    <tr key={laptop.id} className="border-t border-gray-200 dark:border-gray-700">
-                      <td className="px-4 py-2">{laptop.serial_number}</td>
-                      <td className="px-4 py-2">{laptop.model_name}</td>
+                    <tr key={hardware.id} className="border-t border-gray-200 dark:border-gray-700">
+                      <td className="px-4 py-2">{hardware.serial_number}</td>
+                      <td className="px-4 py-2">{hardware.model_name}</td>
                       <td className="px-4 py-2 text-right">
                         <button
                           type="button"
                           disabled={deleting}
-                          onClick={() => void deleteLaptop(laptop)}
+                          onClick={() => void deleteHardwareAsset(hardware)}
                           className="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
                         >
                           {deleting ? "Deleting..." : "Delete Permanently"}

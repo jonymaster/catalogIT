@@ -12,12 +12,12 @@ from sqlalchemy.orm import selectinload
 
 from app.dependencies.auth import get_current_user, get_hardware_view_flag, require_role
 from app.dependencies.db import get_audited_db
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
 from app.models.user import User
 from app.schemas.user import UserDirectoryPage, UserRead, user_read_from_orm
 from app.schemas.user_profile import (
-    UserLaptopLinkRead,
+    UserHardwareAssetLinkRead,
     UserProfileRead,
     UserServiceLinkRead,
 )
@@ -123,15 +123,15 @@ async def get_user_profile(
         .order_by(Service.name)
     )
     if has_hardware_view:
-        assigned_laptops_result = await db.execute(
-            select(Laptop)
-            .options(selectinload(Laptop.hardware_location))
-            .where(Laptop.assigned_to_id == user.id)
-            .order_by(Laptop.serial_number)
+        assigned_hardware_assets_result = await db.execute(
+            select(HardwareAsset)
+            .options(selectinload(HardwareAsset.hardware_location))
+            .where(HardwareAsset.assigned_to_id == user.id)
+            .order_by(HardwareAsset.serial_number)
         )
-        assigned_laptops_rows = list(assigned_laptops_result.scalars().all())
+        assigned_hardware_assets_rows = list(assigned_hardware_assets_result.scalars().all())
     else:
-        assigned_laptops_rows = []
+        assigned_hardware_assets_rows = []
 
     def to_service_link(service: Service) -> UserServiceLinkRead:
         return UserServiceLinkRead(
@@ -142,15 +142,17 @@ async def get_user_profile(
             category_name=service.category_rel.name if service.category_rel else None,
         )
 
-    def to_laptop_link(laptop: Laptop) -> UserLaptopLinkRead:
-        return UserLaptopLinkRead(
-            id=laptop.id,
-            model_name=laptop.model_name,
-            serial_number=laptop.serial_number,
-            status=laptop.status,
-            is_active=laptop.is_active,
+    def to_hardware_link(hardware: HardwareAsset) -> UserHardwareAssetLinkRead:
+        return UserHardwareAssetLinkRead(
+            id=hardware.id,
+            model_name=hardware.model_name,
+            hardware_type=hardware.hardware_type,
+            quantity=hardware.quantity,
+            serial_number=hardware.serial_number,
+            status=hardware.status,
+            is_active=hardware.is_active,
             hardware_location_name=(
-                laptop.hardware_location.name if laptop.hardware_location else None
+                hardware.hardware_location.name if hardware.hardware_location else None
             ),
         )
 
@@ -163,5 +165,5 @@ async def get_user_profile(
         assigned_services=[
             to_service_link(service) for service in assigned_services_result.scalars().all()
         ],
-        assigned_laptops=[to_laptop_link(laptop) for laptop in assigned_laptops_rows],
+        assigned_hardware_assets=[to_hardware_link(hardware) for hardware in assigned_hardware_assets_rows],
     )

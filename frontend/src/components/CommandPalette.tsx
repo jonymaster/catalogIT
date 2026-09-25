@@ -1,3 +1,4 @@
+import { hardwareTypeLabel } from "../hardware/hardwareTypes";
 import {
   useEffect,
   useMemo,
@@ -9,7 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import client from "../api/client";
 import { useAuth } from "../context/useAuth";
-import type { Laptop, Service, User } from "../types/models";
+import type { HardwareAsset, Service, User } from "../types/models";
 import {
   MagnifyingGlassIcon,
   HomeIcon,
@@ -45,8 +46,8 @@ interface ServiceItem {
   icon: IconComp;
 }
 
-interface LaptopItem {
-  kind: "laptop";
+interface HardwareAssetItem {
+  kind: "hardware";
   id: string;
   label: string;
   hint: string;
@@ -65,7 +66,7 @@ interface UserItem {
   icon: IconComp;
 }
 
-type Item = NavItem | ServiceItem | LaptopItem | UserItem;
+type Item = NavItem | ServiceItem | HardwareAssetItem | UserItem;
 
 function baseNav(canFinancialView: boolean, canHardwareView: boolean, isAdmin: boolean): NavItem[] {
   const items: NavItem[] = [
@@ -101,11 +102,11 @@ function PaletteBody({ onClose }: PaletteProps) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [services, setServices] = useState<Service[]>([]);
-  const [laptops, setLaptops] = useState<Laptop[]>([]);
+  const [hardware_assets, setHardwareAssets] = useState<HardwareAsset[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loaded, setLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const laptopSearchSeq = useRef(0);
+  const hardwareSearchSeq = useRef(0);
 
   useEffect(() => {
     Promise.all([
@@ -127,22 +128,22 @@ function PaletteBody({ onClose }: PaletteProps) {
   useEffect(() => {
     const q = query.trim();
     if (!canHardwareView || !q) {
-      laptopSearchSeq.current += 1;
+      hardwareSearchSeq.current += 1;
       return;
     }
 
-    const requestSeq = laptopSearchSeq.current + 1;
-    laptopSearchSeq.current = requestSeq;
+    const requestSeq = hardwareSearchSeq.current + 1;
+    hardwareSearchSeq.current = requestSeq;
     const timeoutId = window.setTimeout(() => {
       client
-        .get<Laptop[]>("/api/laptops/search", { params: { q, limit: 18 } })
+        .get<HardwareAsset[]>("/api/hardware/search", { params: { q, limit: 18 } })
         .then((res) => {
-          if (laptopSearchSeq.current !== requestSeq) return;
-          setLaptops(Array.isArray(res.data) ? res.data : []);
+          if (hardwareSearchSeq.current !== requestSeq) return;
+          setHardwareAssets(Array.isArray(res.data) ? res.data : []);
         })
         .catch(() => {
-          if (laptopSearchSeq.current !== requestSeq) return;
-          setLaptops([]);
+          if (hardwareSearchSeq.current !== requestSeq) return;
+          setHardwareAssets([]);
         });
     }, 120);
 
@@ -173,20 +174,20 @@ function PaletteBody({ onClose }: PaletteProps) {
       to: `/services/${svc.id}`,
       icon: ServerStackIcon,
     }));
-    const searchableLaptops = canHardwareView && query.trim() ? laptops : [];
-    const l: LaptopItem[] = searchableLaptops.map((lp) => {
+    const searchableHardwareAssets = canHardwareView && query.trim() ? hardware_assets : [];
+    const l: HardwareAssetItem[] = searchableHardwareAssets.map((lp) => {
       const assignedName = lp.assigned_to
         ? (`${lp.assigned_to.first_name} ${lp.assigned_to.last_name}`.trim() ||
           lp.assigned_to.email)
         : "";
       const serial = lp.serial_number ?? "";
       return {
-        kind: "laptop",
+        kind: "hardware",
         id: lp.id,
         label: lp.model_name,
-        hint: `S/N ${serial}${assignedName ? ` · ${assignedName}` : ""}`,
+        hint: `${hardwareTypeLabel(lp.hardware_type)}${serial ? ` · S/N ${serial}` : ""}${assignedName ? ` · ${assignedName}` : ""}`,
         searchText: [
-          lp.model_name,
+          lp.model_name, lp.hardware_type, lp.operating_system, lp.imei, lp.imei2, lp.phone_number,
           serial,
           lp.cpu,
           lp.ram,
@@ -214,7 +215,7 @@ function PaletteBody({ onClose }: PaletteProps) {
       icon: UsersIcon,
     }));
     return [...nav, ...s, ...l, ...u];
-  }, [services, laptops, users, query, canFinancialView, canHardwareView, isAdmin]);
+  }, [services, hardware_assets, users, query, canFinancialView, canHardwareView, isAdmin]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -258,7 +259,7 @@ function PaletteBody({ onClose }: PaletteProps) {
             setQuery(e.target.value);
             setSelected(0);
           }}
-          placeholder="Jump to a service, laptop, person, or page…"
+          placeholder="Jump to a service, hardware, person, or page…"
           className="flex-1 bg-transparent text-sm text-fg placeholder:text-fg-4 outline-none"
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {

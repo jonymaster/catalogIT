@@ -3,8 +3,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator
 
 
-class LaptopHardwareCostPut(BaseModel):
-    """Single hardware purchase cost; stored as one cost_records row per laptop."""
+class HardwareCostPut(BaseModel):
+    """Single hardware purchase cost; stored as one cost_records row per hardware."""
 
     amount: float = Field(ge=0, description="Use 0 to remove the cost record")
     purchase_year: int | None = None

@@ -130,8 +130,9 @@ class AdminExportSeedJsonTest(unittest.TestCase):
             point_of_contact=None,
             notes=None,
         )
-        laptop = SimpleNamespace(
+        hardware = SimpleNamespace(
             id=uuid.uuid4(),
+            hardware_type="laptop", quantity=1, os_version=None, imei=None, imei2=None, phone_number=None,
             serial_number="SN-100",
             model_name="ThinkPad",
             cpu="M3",
@@ -163,7 +164,7 @@ class AdminExportSeedJsonTest(unittest.TestCase):
         # execute() call order follows build_seed_json_files queries:
         # vendors, categories, payment methods, cost centers, service statuses,
         # service classifications, hardware statuses, hardware locations, users,
-        # services, laptops, cost records, history
+        # services, hardware_assets, cost records, history
         db = _FakeDb(
             [
                 [],
@@ -176,7 +177,7 @@ class AdminExportSeedJsonTest(unittest.TestCase):
                 [hardware_location],
                 [],
                 [service],
-                [laptop],
+                [hardware],
                 [],
                 [],
             ]
@@ -186,7 +187,7 @@ class AdminExportSeedJsonTest(unittest.TestCase):
         services = json.loads(files["data/seed-json/services.json"])
         hardware_statuses = json.loads(files["data/seed-json/hardware_statuses.json"])
         hardware_locations = json.loads(files["data/seed-json/hardware_locations.json"])
-        laptops = json.loads(files["data/seed-json/laptops.json"])
+        hardware_assets = json.loads(files["data/seed-json/hardware_assets.json"])
 
         self.assertEqual(len(services), 1)
         exported = services[0]
@@ -197,10 +198,10 @@ class AdminExportSeedJsonTest(unittest.TestCase):
         self.assertEqual(exported["deprecated_at"], "2026-03-15T10:00:00")
         self.assertEqual(hardware_statuses[0]["id"], str(hardware_status_id))
         self.assertEqual(hardware_locations[0]["id"], str(hardware_location_id))
-        self.assertEqual(laptops[0]["hardware_status_id"], str(hardware_status_id))
-        self.assertEqual(laptops[0]["hardware_location_id"], str(hardware_location_id))
-        self.assertEqual(laptops[0]["operating_system"], "macos")
-        self.assertTrue(laptops[0]["mdm_connected"])
+        self.assertEqual(hardware_assets[0]["hardware_status_id"], str(hardware_status_id))
+        self.assertEqual(hardware_assets[0]["hardware_location_id"], str(hardware_location_id))
+        self.assertEqual(hardware_assets[0]["operating_system"], "macos")
+        self.assertTrue(hardware_assets[0]["mdm_connected"])
 
 
 class AdminExportAuthTest(unittest.TestCase):

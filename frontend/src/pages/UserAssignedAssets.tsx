@@ -1,20 +1,23 @@
+import { hardwareTypeLabel } from "../hardware/hardwareTypes";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import { BooleanYesNoBadge } from "../components/Badge";
 import type { Column } from "../components/DataTable";
 import { DataTable } from "../components/DataTable";
 import { StatusBadge } from "../components/StatusBadge";
-import type { UserDetailOutletContext, UserLaptopLink } from "../types/userProfile";
+import type { UserDetailOutletContext, UserHardwareAssetLink } from "../types/userProfile";
 
-const columns: Column<UserLaptopLink>[] = [
+const columns: Column<UserHardwareAssetLink>[] = [
+  { key: "hardware_type", header: "Type", render: (asset) => hardwareTypeLabel(asset.hardware_type) },
+  { key: "quantity", header: "Quantity", render: (asset) => asset.quantity },
   {
     key: "model_name",
     header: "Model",
-    render: (laptop) => (
+    render: (hardware) => (
       <Link
-        to={`/hardware/${laptop.id}`}
+        to={`/hardware/${hardware.id}`}
         className="text-brand-700 hover:text-brand-800 hover:underline dark:text-brand-300 dark:hover:text-brand-200"
       >
-        {laptop.model_name}
+        {hardware.model_name}
       </Link>
     ),
   },
@@ -25,17 +28,17 @@ const columns: Column<UserLaptopLink>[] = [
   {
     key: "status",
     header: "Status",
-    render: (laptop) => <StatusBadge status={laptop.status} />,
+    render: (hardware) => <StatusBadge status={hardware.status} />,
   },
   {
     key: "hardware_location_name",
     header: "Location",
-    render: (laptop) => laptop.hardware_location_name ?? "—",
+    render: (hardware) => hardware.hardware_location_name ?? "—",
   },
   {
     key: "is_active",
     header: "Active",
-    render: (laptop) => <BooleanYesNoBadge value={laptop.is_active} />,
+    render: (hardware) => <BooleanYesNoBadge value={hardware.is_active} />,
   },
 ];
 
@@ -50,8 +53,8 @@ export function UserAssignedAssets() {
       </p>
       <DataTable
         columns={columns}
-        data={profile.assigned_laptops}
-        onRowClick={(laptop) => navigate(`/hardware/${laptop.id}`)}
+        data={profile.assigned_hardware_assets}
+        onRowClick={(hardware) => navigate(`/hardware/${hardware.id}`)}
         primaryColumnKey="model_name"
       />
     </div>

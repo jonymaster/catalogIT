@@ -1,6 +1,9 @@
 import type { OperatingSystem } from "../types/models";
 
 export const OS_OPTIONS: { value: OperatingSystem; label: string }[] = [
+  { value: "android", label: "Android" },
+  { value: "ios", label: "iOS" },
+  { value: "ipados", label: "iPadOS" },
   { value: "macos", label: "macOS" },
   { value: "linux", label: "Linux" },
   { value: "windows", label: "Windows" },

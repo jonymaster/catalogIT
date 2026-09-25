@@ -154,7 +154,7 @@ export interface Contract {
 export interface CostRecord {
   id: string;
   service_id: string | null;
-  laptop_id: string | null;
+  hardware_id: string | null;
   payment_method_id: string | null;
   payment_method_name: string | null;
   fiscal_year: number;
@@ -231,11 +231,18 @@ export interface Service {
   updated_at: string;
 }
 
-export type OperatingSystem = "macos" | "linux" | "windows";
+export type OperatingSystem = "macos" | "linux" | "windows" | "android" | "ios" | "ipados";
+export type HardwareType = "laptop" | "phone" | "tablet" | "accessory" | "peripheral";
 
-export interface Laptop {
+export interface HardwareAsset {
+  hardware_type: HardwareType;
+  quantity: number;
+  os_version: string | null;
+  imei: string | null;
+  imei2: string | null;
+  phone_number: string | null;
   id: string;
-  serial_number: string;
+  serial_number: string | null;
   model_name: string;
   cpu: string;
   ram: string;

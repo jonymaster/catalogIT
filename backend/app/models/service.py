@@ -75,7 +75,7 @@ class Service(Base):
         select(func.max(CostRecord.fiscal_year))
         .where(
             CostRecord.service_id == id,
-            CostRecord.laptop_id.is_(None),
+            CostRecord.hardware_id.is_(None),
         )
         .correlate_except(CostRecord)
         .scalar_subquery()
@@ -84,7 +84,7 @@ class Service(Base):
         select(CostRecord.amount)
         .where(
             CostRecord.service_id == id,
-            CostRecord.laptop_id.is_(None),
+            CostRecord.hardware_id.is_(None),
             CostRecord.fiscal_year == _latest_service_cost_year,
             CostRecord.record_type == "actual",
         )
@@ -97,7 +97,7 @@ class Service(Base):
         select(CostRecord.amount)
         .where(
             CostRecord.service_id == id,
-            CostRecord.laptop_id.is_(None),
+            CostRecord.hardware_id.is_(None),
             CostRecord.fiscal_year == _latest_service_cost_year,
             CostRecord.record_type == "estimated",
         )

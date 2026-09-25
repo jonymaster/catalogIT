@@ -13,22 +13,22 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_audited_db
 from app.models.cost_record import CostRecord
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
-from app.routers import cost_records, laptop_cost_records, laptops, services
+from app.routers import cost_records, hardware_cost_records, hardware_assets, services
 
 
 class _ValidationDb:
     def __init__(
         self,
         *,
-        laptop: SimpleNamespace | None = None,
+        hardware: SimpleNamespace | None = None,
         service: SimpleNamespace | None = None,
         cost_record: SimpleNamespace | None = None,
     ) -> None:
         self._rows: dict[tuple[type[object], uuid.UUID], object] = {}
-        if laptop is not None:
-            self._rows[(Laptop, laptop.id)] = laptop
+        if hardware is not None:
+            self._rows[(HardwareAsset, hardware.id)] = hardware
         if service is not None:
             self._rows[(Service, service.id)] = service
         if cost_record is not None:
@@ -73,34 +73,40 @@ def _build_client(db: _ValidationDb, router) -> TestClient:
 
 
 class UpdatePayloadValidationTest(unittest.TestCase):
-    def test_laptop_update_rejects_null_serial_number(self) -> None:
-        laptop_id = uuid.uuid4()
+    def test_hardware_update_rejects_null_serial_number(self) -> None:
+        hardware_id = uuid.uuid4()
         db = _ValidationDb(
-            laptop=SimpleNamespace(
-                id=laptop_id,
+            hardware=SimpleNamespace(
+                id=hardware_id,
                 is_active=True,
+                model_name="Laptop",
+                hardware_type="laptop",
+                serial_number="SN-100",
                 status="In Stock",
             )
         )
-        client = _build_client(db, laptops.router)
+        client = _build_client(db, hardware_assets.router)
 
-        response = client.put(f"/api/laptops/{laptop_id}", json={"serial_number": None})
+        response = client.put(f"/api/hardware/{hardware_id}", json={"serial_number": None})
 
         self.assertEqual(response.status_code, 422)
         client.close()
 
-    def test_laptop_update_rejects_null_model_name(self) -> None:
-        laptop_id = uuid.uuid4()
+    def test_hardware_update_rejects_null_model_name(self) -> None:
+        hardware_id = uuid.uuid4()
         db = _ValidationDb(
-            laptop=SimpleNamespace(
-                id=laptop_id,
+            hardware=SimpleNamespace(
+                id=hardware_id,
                 is_active=True,
+                model_name="Laptop",
+                hardware_type="laptop",
+                serial_number="SN-100",
                 status="In Stock",
             )
         )
-        client = _build_client(db, laptops.router)
+        client = _build_client(db, hardware_assets.router)
 
-        response = client.put(f"/api/laptops/{laptop_id}", json={"model_name": None})
+        response = client.put(f"/api/hardware/{hardware_id}", json={"model_name": None})
 
         self.assertEqual(response.status_code, 422)
         client.close()
@@ -116,7 +122,7 @@ class UpdatePayloadValidationTest(unittest.TestCase):
             cost_record=SimpleNamespace(
                 id=record_id,
                 service_id=service_id,
-                laptop_id=None,
+                hardware_id=None,
                 fiscal_year=2025,
                 amount=150.0,
                 record_type="actual",
@@ -138,25 +144,28 @@ class UpdatePayloadValidationTest(unittest.TestCase):
 
         client.close()
 
-    def test_laptop_cost_record_update_rejects_null_non_nullable_fields(self) -> None:
-        laptop_id = uuid.uuid4()
+    def test_hardware_cost_record_update_rejects_null_non_nullable_fields(self) -> None:
+        hardware_id = uuid.uuid4()
         record_id = uuid.uuid4()
         db = _ValidationDb(
-            laptop=SimpleNamespace(
-                id=laptop_id,
+            hardware=SimpleNamespace(
+                id=hardware_id,
                 is_active=True,
+                model_name="Laptop",
+                hardware_type="laptop",
+                serial_number="SN-100",
                 status="In Stock",
             ),
             cost_record=SimpleNamespace(
                 id=record_id,
                 service_id=None,
-                laptop_id=laptop_id,
+                hardware_id=hardware_id,
                 fiscal_year=2025,
                 amount=150.0,
                 record_type="actual",
             ),
         )
-        client = _build_client(db, laptop_cost_records.router)
+        client = _build_client(db, hardware_cost_records.router)
 
         for payload in (
             {"fiscal_year": None},
@@ -165,7 +174,7 @@ class UpdatePayloadValidationTest(unittest.TestCase):
         ):
             with self.subTest(payload=payload):
                 response = client.put(
-                    f"/api/laptops/{laptop_id}/cost-records/{record_id}",
+                    f"/api/hardware/{hardware_id}/cost-records/{record_id}",
                     json=payload,
                 )
                 self.assertEqual(response.status_code, 422)

@@ -20,7 +20,7 @@ from app.dependencies.storage import get_s3_client
 from app.models.attachment import Attachment
 from app.models.category import Category
 from app.models.cost_record import CostRecord
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
 from app.reference_data_registry import REFERENCE_DATA_RESOURCES
 from app.database import async_session
@@ -92,8 +92,8 @@ async def _load_cost_record_rows(db) -> tuple[list[str], list[list[Any]]]:
     )
     services = {str(s.id): s for s in svc_result.scalars().all()}
 
-    lap_result = await db.execute(select(Laptop))
-    laptops = {str(l.id): l for l in lap_result.scalars().all()}
+    lap_result = await db.execute(select(HardwareAsset))
+    hardware_assets = {str(l.id): l for l in lap_result.scalars().all()}
 
     cat_result = await db.execute(select(Category))
     categories = {str(c.id): c.name for c in cat_result.scalars().all()}
@@ -102,7 +102,7 @@ async def _load_cost_record_rows(db) -> tuple[list[str], list[list[Any]]]:
         "id",
         "source",
         "service_id",
-        "laptop_id",
+        "hardware_id",
         "service_name",
         "classification",
         "category_name",
@@ -150,17 +150,17 @@ async def _load_cost_record_rows(db) -> tuple[list[str], list[list[Any]]]:
                     pm,
                 ]
             )
-        elif r.laptop_id is not None:
-            lap = laptops.get(str(r.laptop_id))
+        elif r.hardware_id is not None:
+            lap = hardware_assets.get(str(r.hardware_id))
             if not lap:
                 continue
-            label = f"{lap.model_name} ({lap.serial_number})"
+            label = f"{lap.model_name} ({lap.serial_number})" if lap.serial_number else lap.model_name
             rows_out.append(
                 [
                     rid,
                     "hardware",
                     "",
-                    str(r.laptop_id),
+                    str(r.hardware_id),
                     label,
                     "hardware",
                     "Hardware",
@@ -268,20 +268,21 @@ async def _load_service_rows(db) -> tuple[list[str], list[list[Any]]]:
     return headers, rows
 
 
-async def _load_laptop_rows(db) -> tuple[list[str], list[list[Any]]]:
+async def _load_hardware_rows(db) -> tuple[list[str], list[list[Any]]]:
     result = await db.execute(
-        select(Laptop)
+        select(HardwareAsset)
         .options(
-            selectinload(Laptop.hardware_status),
-            selectinload(Laptop.hardware_location),
-            selectinload(Laptop.assigned_to),
+            selectinload(HardwareAsset.hardware_status),
+            selectinload(HardwareAsset.hardware_location),
+            selectinload(HardwareAsset.assigned_to),
         )
-        .order_by(Laptop.serial_number)
+        .order_by(HardwareAsset.serial_number)
     )
-    laptops = list(result.scalars().all())
+    hardware_assets = list(result.scalars().all())
 
     headers = [
         "id",
+        "hardware_type", "quantity", "os_version", "imei", "imei2", "phone_number",
         "serial_number",
         "model_name",
         "cpu",
@@ -300,10 +301,11 @@ async def _load_laptop_rows(db) -> tuple[list[str], list[list[Any]]]:
         "updated_at",
     ]
     rows: list[list[Any]] = []
-    for l in laptops:
+    for l in hardware_assets:
         rows.append(
             [
                 str(l.id),
+                l.hardware_type, l.quantity, l.os_version, l.imei, l.imei2, l.phone_number,
                 l.serial_number,
                 l.model_name,
                 l.cpu,
@@ -356,13 +358,13 @@ async def build_export_zip_bytes(
 
     async with async_session() as db:
         sh, srows = await _load_service_rows(db)
-        lh, lrows = await _load_laptop_rows(db)
+        lh, lrows = await _load_hardware_rows(db)
         ch, crows = await _load_cost_record_rows(db)
         att_parts = await _attachment_file_tuples(db, include_attachments)
         seed_json_files = await build_seed_json_files(db)
 
     services_csv = _csv_text(srows, sh)
-    laptops_csv = _csv_text(lrows, lh)
+    hardware_assets_csv = _csv_text(lrows, lh)
     costs_csv = _csv_text(crows, ch)
 
     buf = io.BytesIO()
@@ -370,7 +372,7 @@ async def build_export_zip_bytes(
         zf.writestr("metadata/openapi.json", openapi_json)
         zf.writestr("metadata/reference-data-registry.json", ref_json)
         zf.writestr("csv/services.csv", services_csv)
-        zf.writestr("csv/laptops.csv", laptops_csv)
+        zf.writestr("csv/hardware_assets.csv", hardware_assets_csv)
         zf.writestr("csv/cost-records.csv", costs_csv)
         for path, content in seed_json_files.items():
             zf.writestr(path, content)

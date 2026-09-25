@@ -25,7 +25,7 @@ from app.reference_data_colors import coerce_badge_preset_value, pick_random_bad
 from app.models import (
     Category,
     CostRecord,
-    Laptop,
+    HardwareAsset,
     PaymentMethod,
     Service,
     ServiceClassification,
@@ -68,7 +68,7 @@ def _uuid(table: str, seed_id: int) -> uuid.UUID:
     return uuid.uuid5(NS, f"{table}:{seed_id}")
 
 
-def _laptop_id(serial_number: str) -> uuid.UUID:
+def _hardware_id(serial_number: str) -> uuid.UUID:
     return uuid.uuid5(NS, f"laptop:{serial_number.strip()}")
 
 
@@ -399,20 +399,22 @@ async def _seed_service_history(session: AsyncSession) -> None:
     print(f"  service_history: {len(rows)} processed")
 
 
-async def _seed_laptops(session: AsyncSession) -> None:
-    rows = _load("laptops.json")
+async def _seed_hardware_assets(session: AsyncSession) -> None:
+    rows = _load("hardware_assets.json") if (SEED_DIR / "hardware_assets.json").exists() else _load("laptops.json")
     if not rows:
-        print("  laptops: 0 processed")
+        print("  hardware_assets: 0 processed")
         return
     user_rows = _load("users.json")
     user_email_by_seed_id = {u["id"]: u["email"] for u in user_rows}
     for r in rows:
-        serial = str(r["serial_number"]).strip()
-        if not serial:
+        serial = str(r.get("serial_number") or "").strip() or None
+        asset_id = uuid.UUID(r["id"]) if isinstance(r.get("id"), str) else (_hardware_id(serial) if serial else _uuid("hardware", r["id"]))
+        if await session.get(HardwareAsset, asset_id):
             continue
-        result = await session.execute(select(Laptop).where(Laptop.serial_number == serial))
-        if result.scalar_one_or_none():
-            continue
+        if serial:
+            result = await session.execute(select(HardwareAsset).where(HardwareAsset.serial_number == serial))
+            if result.scalar_one_or_none():
+                continue
         assigned_to_id = None
         seed_uid = r.get("assigned_to_user_seed_id")
         if seed_uid is not None:
@@ -424,12 +426,16 @@ async def _seed_laptops(session: AsyncSession) -> None:
                     assigned_to_id = u.id
         os_raw = r.get("operating_system")
         operating_system = str(os_raw).strip().lower() if os_raw not in (None, "") else None
-        if operating_system not in (None, "macos", "linux", "windows"):
+        if operating_system not in (None, "macos", "linux", "windows", "android", "ios", "ipados"):
             operating_system = None
-        session.add(Laptop(
-            id=_laptop_id(serial),
+        session.add(HardwareAsset(
+            id=asset_id,
+            hardware_type=r.get("hardware_type", "laptop"),
+            quantity=r.get("quantity", 1),
+            os_version=r.get("os_version"),
+            imei=r.get("imei"), imei2=r.get("imei2"), phone_number=r.get("phone_number"),
             serial_number=serial,
-            model_name=str(r.get("model_name") or "Laptop"),
+            model_name=str(r.get("model_name") or "Hardware asset"),
             cpu=str(r.get("cpu") or ""),
             ram=str(r.get("ram") or ""),
             storage_size=str(r.get("storage_size") or ""),
@@ -440,20 +446,20 @@ async def _seed_laptops(session: AsyncSession) -> None:
             mdm_connected=bool(r.get("mdm_connected", False)),
         ))
     await session.flush()
-    print(f"  laptops: {len(rows)} processed")
+    print(f"  hardware_assets: {len(rows)} processed")
 
 
-async def _seed_laptop_cost_records(session: AsyncSession) -> None:
+async def _seed_hardware_cost_records(session: AsyncSession) -> None:
     rows = _load("laptop_cost_records.json")
     for r in rows:
         serial = str(r["serial_number"]).strip()
         if not serial:
             continue
-        lap_id = _laptop_id(serial)
-        lap = await session.get(Laptop, lap_id)
+        lap_id = _hardware_id(serial)
+        lap = await session.get(HardwareAsset, lap_id)
         if not lap:
             continue
-        existing = await session.execute(select(CostRecord).where(CostRecord.laptop_id == lap_id))
+        existing = await session.execute(select(CostRecord).where(CostRecord.hardware_id == lap_id))
         if existing.scalar_one_or_none():
             continue
         pm_id = None
@@ -461,7 +467,7 @@ async def _seed_laptop_cost_records(session: AsyncSession) -> None:
             pm_id = _uuid("payment_method", int(r["payment_method_id"]))
         session.add(CostRecord(
             service_id=None,
-            laptop_id=lap_id,
+            hardware_id=lap_id,
             payment_method_id=pm_id,
             fiscal_year=int(r["fiscal_year"]),
             purchase_year=r.get("purchase_year"),
@@ -470,7 +476,7 @@ async def _seed_laptop_cost_records(session: AsyncSession) -> None:
             notes=r.get("notes"),
         ))
     await session.flush()
-    print(f"  laptop_cost_records: {len(rows)} processed")
+    print(f"  hardware_cost_records: {len(rows)} processed")
 
 
 async def seed_database() -> None:
@@ -486,8 +492,8 @@ async def seed_database() -> None:
             await _seed_services(session)
             await _seed_cost_records(session)
             await _seed_service_history(session)
-            await _seed_laptops(session)
-            await _seed_laptop_cost_records(session)
+            await _seed_hardware_assets(session)
+            await _seed_hardware_cost_records(session)
             await session.commit()
             print("Done.")
         except Exception:

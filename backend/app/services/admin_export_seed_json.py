@@ -13,7 +13,7 @@ from app.models.cost_center import CostCenter
 from app.models.cost_record import CostRecord
 from app.models.hardware_location import HardwareLocation
 from app.models.hardware_status import HardwareStatus
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.payment_method import PaymentMethod
 from app.models.service import Service
 from app.models.service_classification import ServiceClassification
@@ -205,21 +205,27 @@ async def build_seed_json_files(db) -> dict[str, str]:
         }
         services_out.append(row)
 
-    laptops = (
+    hardware_assets = (
         await db.execute(
-            select(Laptop)
+            select(HardwareAsset)
             .options(
-                selectinload(Laptop.hardware_status),
-                selectinload(Laptop.hardware_location),
-                selectinload(Laptop.assigned_to),
+                selectinload(HardwareAsset.hardware_status),
+                selectinload(HardwareAsset.hardware_location),
+                selectinload(HardwareAsset.assigned_to),
             )
-            .order_by(Laptop.serial_number)
+            .order_by(HardwareAsset.serial_number)
         )
     ).scalars().all()
-    laptops_out = [
+    hardware_assets_out = [
         {
             "id": str(l.id),
             "serial_number": l.serial_number,
+            "hardware_type": l.hardware_type,
+            "quantity": l.quantity,
+            "os_version": l.os_version,
+            "imei": l.imei,
+            "imei2": l.imei2,
+            "phone_number": l.phone_number,
             "model_name": l.model_name,
             "cpu": l.cpu,
             "ram": l.ram,
@@ -238,7 +244,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             "created_at": l.created_at.isoformat() if l.created_at else None,
             "updated_at": l.updated_at.isoformat() if l.updated_at else None,
         }
-        for l in laptops
+        for l in hardware_assets
     ]
 
     cost_rows = (
@@ -246,7 +252,7 @@ async def build_seed_json_files(db) -> dict[str, str]:
             select(CostRecord).order_by(
                 CostRecord.fiscal_year,
                 CostRecord.service_id,
-                CostRecord.laptop_id,
+                CostRecord.hardware_id,
             )
         )
     ).scalars().all()
@@ -266,10 +272,10 @@ async def build_seed_json_files(db) -> dict[str, str]:
             item["service_id"] = str(r.service_id)
         else:
             item["service_id"] = None
-        if r.laptop_id is not None:
-            item["laptop_id"] = str(r.laptop_id)
+        if r.hardware_id is not None:
+            item["hardware_id"] = str(r.hardware_id)
         else:
-            item["laptop_id"] = None
+            item["hardware_id"] = None
         cost_records_out.append(item)
 
     history_rows = (
@@ -313,7 +319,7 @@ same zip remain the canonical tabular export.
         f"{prefix}hardware_locations.json": _dumps(hardware_locations_out),
         f"{prefix}users.json": _dumps(users_out),
         f"{prefix}services.json": _dumps(services_out),
-        f"{prefix}laptops.json": _dumps(laptops_out),
+        f"{prefix}hardware_assets.json": _dumps(hardware_assets_out),
         f"{prefix}cost_records.json": _dumps(cost_records_out),
         f"{prefix}service_history.json": _dumps(service_history_out),
     }

@@ -6,7 +6,7 @@ import { useAuth } from "../context/useAuth";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import type {
   Service,
-  Laptop,
+  HardwareAsset,
   GlobalAuditEventRow,
   PaginatedGlobalAudit,
 } from "../types/models";
@@ -47,7 +47,7 @@ type WidgetId =
 
 interface WidgetCtx {
   services: Service[];
-  laptops: Laptop[];
+  hardware_assets: HardwareAsset[];
   records: { category_name: string | null; amount: number; fiscal_year: number; vendor_name?: string | null }[];
   fiscalYears: number[];
   costByYear: Record<number, number>;
@@ -58,7 +58,7 @@ interface WidgetCtx {
   hasCostData: boolean;
   upcoming30: number;
   upcoming90: number;
-  laptopsInUse: number;
+  hardware_assetsInUse: number;
   ssoPct: number;
   ssoCount: number;
   activeServices: number;
@@ -260,8 +260,8 @@ function KpiStrip({ ctx }: { ctx: WidgetCtx }) {
     services,
     upcoming30,
     upcoming90,
-    laptopsInUse,
-    laptops,
+    hardware_assetsInUse,
+    hardware_assets,
     canFinancialView,
     hasCostData,
     costByYear,
@@ -286,9 +286,9 @@ function KpiStrip({ ctx }: { ctx: WidgetCtx }) {
         onClick={() => navigate("/calendar")}
       />
       <Kpi
-        label="Laptops deployed"
-        value={laptopsInUse}
-        sub={`of ${laptops.length}`}
+        label="Hardware units deployed"
+        value={hardware_assetsInUse}
+        sub={`of ${hardware_assets.reduce((sum, asset) => sum + asset.quantity, 0)} units}`}
         onClick={() => navigate("/hardware")}
       />
       {canFinancialView && hasCostData && (
@@ -937,15 +937,15 @@ function TopVendors({ services }: { services: Service[] }) {
   );
 }
 
-function HardwareSnapshot({ laptops }: { laptops: Laptop[] }) {
+function HardwareSnapshot({ hardware_assets }: { hardware_assets: HardwareAsset[] }) {
   const byStatus = useMemo(() => {
     const m = new Map<string, number>();
-    laptops.forEach((l) => {
+    hardware_assets.forEach((l) => {
       const key = l.hardware_status?.name ?? l.status ?? "—";
-      m.set(key, (m.get(key) ?? 0) + 1);
+      m.set(key, (m.get(key) ?? 0) + l.quantity);
     });
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
-  }, [laptops]);
+  }, [hardware_assets]);
 
   const max = byStatus[0]?.[1] ?? 0;
   const toneFor = (name: string): "accent" | "info" | "purple" | "success" | "warn" | "danger" => {
@@ -964,9 +964,9 @@ function HardwareSnapshot({ laptops }: { laptops: Laptop[] }) {
           className="tnum text-fg"
           style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em" }}
         >
-          {laptops.length}
+          {hardware_assets.reduce((sum, asset) => sum + asset.quantity, 0)}
         </div>
-        <div className="text-[12px] text-fg-3">laptops tracked</div>
+        <div className="text-[12px] text-fg-3">units tracked</div>
       </div>
       <div className="flex flex-col gap-1.5">
         {byStatus.map(([name, n]) => (
@@ -1240,7 +1240,7 @@ const WIDGETS: WidgetDef[] = [
     title: "Hardware snapshot",
     span: 6,
     requiresHardware: true,
-    render: (ctx) => <HardwareSnapshot laptops={ctx.laptops} />,
+    render: (ctx) => <HardwareSnapshot hardware_assets={ctx.hardware_assets} />,
   },
   {
     id: "coverage",
@@ -1413,7 +1413,7 @@ export function Dashboard() {
   const isAdmin = user?.role === "admin";
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [services, setServices] = useState<Service[]>([]);
-  const [laptops, setLaptops] = useState<Laptop[]>([]);
+  const [hardware_assets, setHardwareAssets] = useState<HardwareAsset[]>([]);
   const { records, fiscalYears, loading: costLoading } = useDashboardCostData();
   const [dashYearOverride, setDashYearOverride] = useState<number | null>(null);
   const [spendChartScale, setSpendChartScale] = useState<ChartYScaleMode>(
@@ -1448,13 +1448,13 @@ export function Dashboard() {
       client.get<Service[]>("/api/services/"),
       canHardwareView
         ? client
-            .get<Laptop[]>("/api/laptops/")
-            .catch(() => ({ data: [] as Laptop[] }))
-        : Promise.resolve({ data: [] as Laptop[] }),
+            .get<HardwareAsset[]>("/api/hardware/")
+            .catch(() => ({ data: [] as HardwareAsset[] }))
+        : Promise.resolve({ data: [] as HardwareAsset[] }),
     ])
       .then(([sRes, lRes]) => {
         setServices(sRes.data);
-        setLaptops(lRes.data);
+        setHardwareAssets(lRes.data);
       })
       .finally(() => setInventoryLoading(false));
   }, [canHardwareView]);
@@ -1527,19 +1527,19 @@ export function Dashboard() {
     [services, today],
   );
 
-  const laptopsInUse = useMemo(() => {
-    return laptops.filter((l) => {
+  const hardware_assetsInUse = useMemo(() => {
+    return hardware_assets.filter((l) => {
       const n = (l.hardware_status?.name ?? l.status ?? "").toLowerCase();
       return n.includes("assigned") || n.includes("use");
-    }).length;
-  }, [laptops]);
+    }).reduce((sum, asset) => sum + asset.quantity, 0);
+  }, [hardware_assets]);
 
-  const laptopsInStock = useMemo(() => {
-    return laptops.filter((l) => {
+  const hardware_assetsInStock = useMemo(() => {
+    return hardware_assets.filter((l) => {
       const n = (l.hardware_status?.name ?? l.status ?? "").toLowerCase();
       return n.includes("stock");
-    }).length;
-  }, [laptops]);
+    }).reduce((sum, asset) => sum + asset.quantity, 0);
+  }, [hardware_assets]);
 
   const activeServices = useMemo(
     () => services.filter((s) => s.is_active).length,
@@ -1652,7 +1652,7 @@ export function Dashboard() {
   const ctx: WidgetCtx = useMemo(
     () => ({
       services,
-      laptops,
+      hardware_assets,
       records,
       fiscalYears,
       costByYear,
@@ -1663,7 +1663,7 @@ export function Dashboard() {
       hasCostData,
       upcoming30,
       upcoming90,
-      laptopsInUse,
+      hardware_assetsInUse,
       ssoPct,
       ssoCount,
       activeServices,
@@ -1674,7 +1674,7 @@ export function Dashboard() {
     }),
     [
       services,
-      laptops,
+      hardware_assets,
       records,
       fiscalYears,
       costByYear,
@@ -1685,7 +1685,7 @@ export function Dashboard() {
       hasCostData,
       upcoming30,
       upcoming90,
-      laptopsInUse,
+      hardware_assetsInUse,
       ssoPct,
       ssoCount,
       activeServices,
@@ -1789,8 +1789,8 @@ export function Dashboard() {
               <div className="mt-1 text-[14px] text-fg-3">
                 <span className="text-fg-2 font-medium">{upcoming30}</span>{" "}
                 renewal{upcoming30 === 1 ? "" : "s"} in the next 30 days ·{" "}
-                <span className="text-fg-2 font-medium">{laptopsInStock}</span>{" "}
-                laptop{laptopsInStock === 1 ? "" : "s"} in stock
+                <span className="text-fg-2 font-medium">{hardware_assetsInStock}</span>{" "}
+                hardware units in stock
               </div>
             </div>
             <div className="flex items-center gap-2">

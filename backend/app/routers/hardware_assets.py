@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
+
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,35 +15,37 @@ from app.dependencies.db import get_audited_db
 from app.models.cost_record import CostRecord
 from app.models.hardware_location import HardwareLocation
 from app.models.hardware_status import HardwareStatus
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.payment_method import PaymentMethod
 from app.models.user import User
 from app.routers.attachments import delete_entity_attachments
 from app.routers.cost_records import to_cost_record_read
 from app.schemas.cost_record import CostRecordRead
-from app.schemas.laptop import LaptopCreate, LaptopRead, LaptopUpdate
-from app.schemas.laptop_hardware_cost import LaptopHardwareCostPut
+from app.schemas.hardware import HardwareAssetCreate, HardwareAssetRead, HardwareAssetUpdate, HardwareType
+from app.schemas.hardware_cost import HardwareCostPut
 
-router = APIRouter(prefix="/api/laptops", tags=["laptops"])
+router = APIRouter(prefix="/api/hardware", tags=["hardware_assets"])
 
+# Finish the transaction before sending a response; the UI immediately follows writes
+# with cost requests and detail reloads.
 _writer = require_role("admin", "editor")
 _admin = require_role("admin")
-_ARCHIVED_LAPTOP_EDITABLE_FIELDS = {
+_ARCHIVED_HARDWARE_EDITABLE_FIELDS = {
     "notes",
     "status",
     "hardware_status_id",
     "hardware_location_id",
     "mdm_connected",
 }
-_DUPLICATE_SERIAL_NUMBER_DETAIL = "A laptop with this serial number already exists"
+_DUPLICATE_SERIAL_NUMBER_DETAIL = "A hardware asset with this serial number already exists"
 
 
-def _validate_archived_laptop_update_fields(update_data: dict[str, object]) -> None:
-    disallowed_fields = set(update_data.keys()) - _ARCHIVED_LAPTOP_EDITABLE_FIELDS
+def _validate_archived_hardware_update_fields(update_data: dict[str, object]) -> None:
+    disallowed_fields = set(update_data.keys()) - _ARCHIVED_HARDWARE_EDITABLE_FIELDS
     if disallowed_fields:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Archived laptops only allow updates to notes, status, location, and MDM connected; unarchive to change other fields",
+            detail="Archived hardware assets only allow updates to notes, status, location, and MDM connected; unarchive to change other fields",
         )
 
 
@@ -108,17 +112,19 @@ async def _get_assigned_user(
 
 async def _ensure_unique_serial_number(
     db: AsyncSession,
-    serial_number: str,
+    serial_number: str | None,
     *,
     current_id: uuid.UUID | None = None,
 ) -> None:
+    if not serial_number:
+        return
     row = await db.scalar(
-        select(Laptop).where(
-            func.lower(Laptop.serial_number) == serial_number.lower(),
+        select(HardwareAsset).where(
+            func.lower(HardwareAsset.serial_number) == serial_number.lower(),
             *(
                 []
                 if current_id is None
-                else [Laptop.id != current_id]
+                else [HardwareAsset.id != current_id]
             ),
         )
     )
@@ -132,7 +138,7 @@ async def _ensure_unique_serial_number(
 def _raise_duplicate_serial_number_http_error(exc: IntegrityError) -> None:
     message = str(exc.orig).lower()
     if (
-        "uq_laptops_serial_number_lower" in message
+        "uq_hardware_assets_serial_number_lower" in message
         or "serial_number" in message
     ):
         raise HTTPException(
@@ -142,30 +148,33 @@ def _raise_duplicate_serial_number_http_error(exc: IntegrityError) -> None:
     raise exc
 
 
-@router.get("/", response_model=list[LaptopRead])
-async def list_laptops(
+@router.get("/", response_model=list[HardwareAssetRead])
+async def list_hardware_assets(
     archived: bool = Query(False),
+    hardware_type: HardwareType | None = None,
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    stmt = select(Laptop).where(Laptop.is_active.is_(not archived)).order_by(Laptop.serial_number)
+    stmt = select(HardwareAsset).where(HardwareAsset.is_active.is_(not archived)).order_by(HardwareAsset.serial_number)
+    if hardware_type is not None:
+        stmt = stmt.where(HardwareAsset.hardware_type == hardware_type)
     result = await db.execute(stmt)
     return result.scalars().all()
 
 
-@router.get("/{laptop_id}/hardware-cost", response_model=CostRecordRead | None)
-async def get_laptop_hardware_cost(
-    laptop_id: uuid.UUID,
+@router.get("/{hardware_id}/hardware-cost", response_model=CostRecordRead | None)
+async def get_hardware_hardware_cost(
+    hardware_id: uuid.UUID,
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
     result = await db.execute(
         select(CostRecord)
-        .where(CostRecord.laptop_id == laptop_id)
+        .where(CostRecord.hardware_id == hardware_id)
         .order_by(CostRecord.recorded_at.desc())
         .limit(1)
     )
@@ -179,25 +188,25 @@ async def get_laptop_hardware_cost(
     return item
 
 
-@router.put("/{laptop_id}/hardware-cost", response_model=CostRecordRead | None)
-async def put_laptop_hardware_cost(
-    laptop_id: uuid.UUID,
-    body: LaptopHardwareCostPut,
+@router.put("/{hardware_id}/hardware-cost", response_model=CostRecordRead | None)
+async def put_hardware_hardware_cost(
+    hardware_id: uuid.UUID,
+    body: HardwareCostPut,
     user: User = Depends(_writer),
     _fin: User = Depends(require_financial_view),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
-    if laptop.is_active is False:
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
+    if hardware.is_active is False:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Archived hardware is read-only for cost",
         )
 
-    result = await db.execute(select(CostRecord).where(CostRecord.laptop_id == laptop_id))
+    result = await db.execute(select(CostRecord).where(CostRecord.hardware_id == hardware_id))
     rows = list(result.scalars().all())
 
     if body.amount == 0:
@@ -226,7 +235,7 @@ async def put_laptop_hardware_cost(
     else:
         record = CostRecord(
             service_id=None,
-            laptop_id=laptop_id,
+            hardware_id=hardware_id,
             payment_method_id=None,
             fiscal_year=fiscal_year,
             purchase_year=body.purchase_year,
@@ -251,13 +260,13 @@ def _searchable_text(column):
     return func.lower(func.coalesce(column, ""))
 
 
-@router.get("/search", response_model=list[LaptopRead])
-async def search_laptops(
+@router.get("/search", response_model=list[HardwareAssetRead])
+async def search_hardware_assets(
     q: str = Query("", max_length=255),
     archived: bool = Query(False),
     limit: int = Query(20, ge=1, le=100),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
     term = q.strip()
     if not term:
@@ -268,19 +277,24 @@ async def search_laptops(
     prefix_pattern = f"{needle}%"
 
     stmt = (
-        select(Laptop)
-        .outerjoin(Laptop.assigned_to)
-        .outerjoin(Laptop.hardware_status)
-        .outerjoin(Laptop.hardware_location)
+        select(HardwareAsset)
+        .outerjoin(HardwareAsset.assigned_to)
+        .outerjoin(HardwareAsset.hardware_status)
+        .outerjoin(HardwareAsset.hardware_location)
         .where(
-            Laptop.is_active.is_(not archived),
+            HardwareAsset.is_active.is_(not archived),
             or_(
-                _searchable_text(Laptop.serial_number).like(contains_pattern),
-                _searchable_text(Laptop.model_name).like(contains_pattern),
-                _searchable_text(Laptop.cpu).like(contains_pattern),
-                _searchable_text(Laptop.ram).like(contains_pattern),
-                _searchable_text(Laptop.storage_size).like(contains_pattern),
-                _searchable_text(Laptop.status).like(contains_pattern),
+                _searchable_text(HardwareAsset.serial_number).like(contains_pattern),
+                _searchable_text(HardwareAsset.model_name).like(contains_pattern),
+                _searchable_text(HardwareAsset.hardware_type).like(contains_pattern),
+                _searchable_text(HardwareAsset.operating_system).like(contains_pattern),
+                _searchable_text(HardwareAsset.imei).like(contains_pattern),
+                _searchable_text(HardwareAsset.imei2).like(contains_pattern),
+                _searchable_text(HardwareAsset.phone_number).like(contains_pattern),
+                _searchable_text(HardwareAsset.cpu).like(contains_pattern),
+                _searchable_text(HardwareAsset.ram).like(contains_pattern),
+                _searchable_text(HardwareAsset.storage_size).like(contains_pattern),
+                _searchable_text(HardwareAsset.status).like(contains_pattern),
                 _searchable_text(HardwareStatus.name).like(contains_pattern),
                 _searchable_text(HardwareLocation.name).like(contains_pattern),
                 _searchable_text(User.display_name).like(contains_pattern),
@@ -291,12 +305,12 @@ async def search_laptops(
         )
         .order_by(
             case(
-                (_searchable_text(Laptop.serial_number) == needle, 0),
-                (_searchable_text(Laptop.serial_number).like(prefix_pattern), 1),
-                (_searchable_text(Laptop.model_name).like(prefix_pattern), 2),
+                (_searchable_text(HardwareAsset.serial_number) == needle, 0),
+                (_searchable_text(HardwareAsset.serial_number).like(prefix_pattern), 1),
+                (_searchable_text(HardwareAsset.model_name).like(prefix_pattern), 2),
                 else_=3,
             ),
-            Laptop.serial_number,
+            HardwareAsset.serial_number,
         )
         .limit(limit)
     )
@@ -304,24 +318,24 @@ async def search_laptops(
     return result.scalars().all()
 
 
-@router.get("/{laptop_id}", response_model=LaptopRead)
-async def get_laptop(
-    laptop_id: uuid.UUID,
+@router.get("/{hardware_id}", response_model=HardwareAssetRead)
+async def get_hardware(
+    hardware_id: uuid.UUID,
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
-    return laptop
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
+    return hardware
 
 
-@router.post("/", response_model=LaptopRead, status_code=status.HTTP_201_CREATED)
-async def create_laptop(
-    body: LaptopCreate,
+@router.post("/", response_model=HardwareAssetRead, status_code=status.HTTP_201_CREATED)
+async def create_hardware(
+    body: HardwareAssetCreate,
     _user: User = Depends(_writer),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
     await _ensure_unique_serial_number(db, body.serial_number)
     hw_status = await _resolve_hardware_status(
@@ -337,7 +351,13 @@ async def create_laptop(
     hw_location = await _get_hardware_location(db, body.hardware_location_id)
     assigned_user = await _get_assigned_user(db, body.assigned_to_id)
 
-    laptop = Laptop(
+    hardware = HardwareAsset(
+        hardware_type=body.hardware_type,
+        quantity=body.quantity,
+        os_version=body.os_version,
+        imei=body.imei,
+        imei2=body.imei2,
+        phone_number=body.phone_number,
         serial_number=body.serial_number,
         model_name=body.model_name,
         cpu=body.cpu,
@@ -351,30 +371,39 @@ async def create_laptop(
         notes=body.notes,
         mdm_connected=body.mdm_connected,
     )
-    db.add(laptop)
+    db.add(hardware)
     try:
         await db.flush()
     except IntegrityError as exc:
         _raise_duplicate_serial_number_http_error(exc)
-    await db.refresh(laptop)
-    return laptop
+    await db.refresh(hardware)
+    return hardware
 
 
-@router.put("/{laptop_id}", response_model=LaptopRead)
-async def update_laptop(
-    laptop_id: uuid.UUID,
-    body: LaptopUpdate,
+@router.put("/{hardware_id}", response_model=HardwareAssetRead)
+async def update_hardware(
+    hardware_id: uuid.UUID,
+    body: HardwareAssetUpdate,
     _user: User = Depends(_writer),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
 
     update_data = body.model_dump(exclude_unset=True)
-    if laptop.is_active is False:
-        _validate_archived_laptop_update_fields(update_data)
+    if hardware.is_active is False:
+        _validate_archived_hardware_update_fields(update_data)
+
+    # Validate the complete resulting asset, including partial updates and type changes.
+    merged = {field: getattr(hardware, field, field_info.default)
+              for field, field_info in HardwareAssetCreate.model_fields.items()}
+    merged.update(update_data)
+    try:
+        HardwareAssetCreate.model_validate(merged)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors(include_url=False, include_context=False, include_input=False)) from exc
 
     hardware_location_id = (
         update_data.pop("hardware_location_id", None) if "hardware_location_id" in update_data else ...
@@ -389,106 +418,106 @@ async def update_laptop(
 
     if hardware_location_id is not ...:
         if hardware_location_id is None:
-            laptop.hardware_location_id = None
+            hardware.hardware_location_id = None
         else:
             loc = await _get_hardware_location(db, hardware_location_id)
-            laptop.hardware_location_id = loc.id
+            hardware.hardware_location_id = loc.id
 
     if hardware_status_id is not ...:
         if hardware_status_id is None:
-            laptop.hardware_status_id = None
+            hardware.hardware_status_id = None
         else:
             hw_status = await _resolve_hardware_status(
                 db,
                 hardware_status_id=hardware_status_id,
                 status_name=None,
             )
-            laptop.hardware_status_id = hw_status.id
-            laptop.status = hw_status.name
+            hardware.hardware_status_id = hw_status.id
+            hardware.status = hw_status.name
 
     if status_name is not ... and not (hardware_status_id is not ... and hardware_status_id is not None):
         if status_name is not None:
             matched = await _find_hardware_status_by_name(status_name, db)
-            if matched is None and status_name != laptop.status:
+            if matched is None and status_name != hardware.status:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Hardware status not found",
                 )
-            laptop.status = status_name
-            laptop.hardware_status_id = matched.id if matched else None
+            hardware.status = status_name
+            hardware.hardware_status_id = matched.id if matched else None
 
     if assigned_to_id is not ...:
         assigned_user = await _get_assigned_user(db, assigned_to_id)
-        laptop.assigned_to_id = assigned_user.id if assigned_user else None
+        hardware.assigned_to_id = assigned_user.id if assigned_user else None
 
     if serial_number is not ...:
-        await _ensure_unique_serial_number(db, serial_number, current_id=laptop.id)
-        laptop.serial_number = serial_number
+        await _ensure_unique_serial_number(db, serial_number, current_id=hardware.id)
+        hardware.serial_number = serial_number
 
     if model_name is not ...:
-        laptop.model_name = model_name
+        hardware.model_name = model_name
 
     for field, value in update_data.items():
-        setattr(laptop, field, value)
+        setattr(hardware, field, value)
 
     try:
         await db.flush()
     except IntegrityError as exc:
         _raise_duplicate_serial_number_http_error(exc)
-    await db.refresh(laptop)
-    return laptop
+    await db.refresh(hardware)
+    return hardware
 
 
-@router.delete("/{laptop_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_laptop(
-    laptop_id: uuid.UUID,
+@router.delete("/{hardware_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_hardware(
+    hardware_id: uuid.UUID,
     _user: User = Depends(_admin),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
-    if laptop.is_active:
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
+    if hardware.is_active:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Laptop must be archived before it can be deleted",
+            detail="Hardware asset must be archived before it can be deleted",
         )
-    await delete_entity_attachments("laptop", laptop_id, db)
-    await db.delete(laptop)
+    await delete_entity_attachments("hardware", hardware_id, db)
+    await db.delete(hardware)
 
 
-@router.post("/{laptop_id}/archive", response_model=LaptopRead)
-async def archive_laptop(
-    laptop_id: uuid.UUID,
+@router.post("/{hardware_id}/archive", response_model=HardwareAssetRead)
+async def archive_hardware(
+    hardware_id: uuid.UUID,
     _user: User = Depends(_writer),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
-    if laptop.is_active:
-        laptop.is_active = False
-        laptop.archived_at = datetime.utcnow()
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
+    if hardware.is_active:
+        hardware.is_active = False
+        hardware.archived_at = datetime.utcnow()
     await db.flush()
-    await db.refresh(laptop)
-    return laptop
+    await db.refresh(hardware)
+    return hardware
 
 
-@router.post("/{laptop_id}/unarchive", response_model=LaptopRead)
-async def unarchive_laptop(
-    laptop_id: uuid.UUID,
+@router.post("/{hardware_id}/unarchive", response_model=HardwareAssetRead)
+async def unarchive_hardware(
+    hardware_id: uuid.UUID,
     _user: User = Depends(_writer),
     _hw: User = Depends(require_hardware_view),
-    db: AsyncSession = Depends(get_audited_db),
+    db: AsyncSession = Depends(get_audited_db, scope="function"),
 ):
-    laptop = await db.get(Laptop, laptop_id)
-    if not laptop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Laptop not found")
-    if laptop.is_active is False:
-        laptop.is_active = True
-        laptop.archived_at = None
+    hardware = await db.get(HardwareAsset, hardware_id)
+    if not hardware:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hardware asset not found")
+    if hardware.is_active is False:
+        hardware.is_active = True
+        hardware.archived_at = None
     await db.flush()
-    await db.refresh(laptop)
-    return laptop
+    await db.refresh(hardware)
+    return hardware

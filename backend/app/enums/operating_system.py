@@ -1,4 +1,4 @@
-"""Allowed laptop operating_system values (stored as lowercase strings in DB)."""
+"""Allowed hardware operating_system values (stored as lowercase strings in DB)."""
 
 from __future__ import annotations
 
@@ -9,3 +9,7 @@ class OperatingSystem(StrEnum):
     MACOS = "macos"
     LINUX = "linux"
     WINDOWS = "windows"
+
+    ANDROID = "android"
+    IOS = "ios"
+    IPADOS = "ipados"

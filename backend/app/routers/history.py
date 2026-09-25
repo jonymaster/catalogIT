@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies.db import get_audited_db
+from app.dependencies.auth import get_current_user, ensure_hardware_view_access
+from app.models.user import User
 from app.history_display import humanize_audit_values
 from app.models.global_audit_event import GlobalAuditEvent
 from app.schemas.audit import AuditLogRead, PaginatedHistoryResponse
@@ -16,7 +18,7 @@ router = APIRouter(prefix="/api/history", tags=["history"])
 
 
 def _history_filters(table_name: str, record_id: uuid.UUID):
-    """Service/laptop asset timelines include their attachment rows (see audit linked_entity_*)."""
+    """Service/hardware asset timelines include their attachment rows (see audit linked_entity_*)."""
     key = str(record_id)
     base = GlobalAuditEvent.category == "data_change"
 
@@ -36,17 +38,18 @@ def _history_filters(table_name: str, record_id: uuid.UUID):
             ),
         )
 
-    if table_name == "laptops":
+    if table_name in ("hardware_assets", "laptops"):
+        # Historical events remain immutable and are read alongside new events.
         return and_(
             base,
             or_(
                 and_(
-                    GlobalAuditEvent.entity_table == "laptops",
+                    GlobalAuditEvent.entity_table.in_(["hardware_assets", "laptops"]),
                     GlobalAuditEvent.entity_key == key,
                 ),
                 and_(
                     GlobalAuditEvent.entity_table == "attachments",
-                    GlobalAuditEvent.details["linked_entity_type"].astext == "laptop",
+                    GlobalAuditEvent.details["linked_entity_type"].astext.in_(["hardware", "laptop"]),
                     GlobalAuditEvent.details["linked_entity_id"].astext == key,
                 ),
             ),
@@ -66,7 +69,10 @@ async def get_history(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_audited_db),
+    user: User = Depends(get_current_user),
 ):
+    if table_name in ("hardware_assets", "laptops"):
+        await ensure_hardware_view_access(user, db)
     scope = _history_filters(table_name, record_id)
 
     count_stmt = select(func.count()).select_from(GlobalAuditEvent).where(scope)

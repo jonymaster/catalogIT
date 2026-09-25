@@ -24,29 +24,29 @@ import {
 } from "../components/Icons";
 import { useAuth } from "../context/useAuth";
 import {
-  draftFromLaptopAndCostStrings,
-  draftToArchivedLaptopPayload,
-  draftToLaptopPayload,
+  draftFromHardwareAssetAndCostStrings,
+  draftToArchivedHardwareAssetPayload,
+  draftToHardwareAssetPayload,
   mergeCostIntoDraft,
   toDraft,
   validateDraft,
-  type LaptopDetailContext,
-  type LaptopDraft,
-  type LaptopValidationErrors,
-} from "../service/laptopDetailContext";
-import type { CostRecord, Laptop } from "../types/models";
+  type HardwareAssetDetailContext,
+  type HardwareAssetDraft,
+  type HardwareAssetValidationErrors,
+} from "../service/hardwareDetailContext";
+import type { CostRecord, HardwareAsset } from "../types/models";
 
-export function LaptopDetail() {
+export function HardwareAssetDetail() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const { canEdit, canFinancialView, user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const [laptop, setLaptop] = useState<Laptop | null>(null);
-  const [draft, setDraft] = useState<LaptopDraft | null>(null);
+  const [hardware, setHardwareAsset] = useState<HardwareAsset | null>(null);
+  const [draft, setDraft] = useState<HardwareAssetDraft | null>(null);
   const [editing, setEditingState] = useState(false);
-  const [errors, setErrors] = useState<LaptopValidationErrors>({});
+  const [errors, setErrors] = useState<HardwareAssetValidationErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<
@@ -84,7 +84,7 @@ export function LaptopDetail() {
 
   useEffect(() => {
     if (!id) {
-      setLaptop(null);
+      setHardwareAsset(null);
       setDraft(null);
       setLoading(false);
       setCostLoading(false);
@@ -95,14 +95,14 @@ export function LaptopDetail() {
     setLoading(true);
     setCostLoading(true);
     Promise.all([
-      client.get<Laptop>(`/api/laptops/${id}`),
+      client.get<HardwareAsset>(`/api/hardware/${id}`),
       canFinancialView
-        ? client.get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`)
+        ? client.get<CostRecord | null>(`/api/hardware/${id}/hardware-cost`)
         : Promise.resolve({ data: null as CostRecord | null }),
     ])
       .then(([lapRes, costRes]) => {
         if (cancelled) return;
-        setLaptop(lapRes.data);
+        setHardwareAsset(lapRes.data);
         const c = costRes.data;
         if (c) {
           setPurchaseYear(
@@ -118,7 +118,7 @@ export function LaptopDetail() {
       })
       .catch(() => {
         if (cancelled) return;
-        setLaptop(null);
+        setHardwareAsset(null);
         setDraft(null);
       })
       .finally(() => {
@@ -135,12 +135,12 @@ export function LaptopDetail() {
   const reloadAll = useCallback(async () => {
     if (!id) return;
     const [lapRes, costRes] = await Promise.all([
-      client.get<Laptop>(`/api/laptops/${id}`),
+      client.get<HardwareAsset>(`/api/hardware/${id}`),
       canFinancialView
-        ? client.get<CostRecord | null>(`/api/laptops/${id}/hardware-cost`)
+        ? client.get<CostRecord | null>(`/api/hardware/${id}/hardware-cost`)
         : Promise.resolve({ data: null as CostRecord | null }),
     ]);
-    setLaptop(lapRes.data);
+    setHardwareAsset(lapRes.data);
     const c = costRes.data;
     if (c) {
       setPurchaseYear(c.purchase_year != null ? String(c.purchase_year) : "");
@@ -154,7 +154,7 @@ export function LaptopDetail() {
   }, [id, canFinancialView]);
 
   const setDraftField = useCallback(
-    <K extends keyof LaptopDraft>(key: K, value: LaptopDraft[K]) => {
+    <K extends keyof HardwareAssetDraft>(key: K, value: HardwareAssetDraft[K]) => {
       setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
       setErrors((prev) => {
         if (!prev[key]) return prev;
@@ -171,16 +171,16 @@ export function LaptopDetail() {
       setEditingState(next);
       setSaveError(null);
       setErrors({});
-      if (!next && laptop) {
-        setDraft(draftFromLaptopAndCostStrings(laptop, purchaseYear, costAmount));
+      if (!next && hardware) {
+        setDraft(draftFromHardwareAssetAndCostStrings(hardware, purchaseYear, costAmount));
       }
     },
-    [laptop, purchaseYear, costAmount],
+    [hardware, purchaseYear, costAmount],
   );
 
   async function handleSave() {
-    if (!laptop || !draft || !id) return;
-    const validationErrors = validateDraft(draft, laptop.is_active);
+    if (!hardware || !draft || !id) return;
+    const validationErrors = validateDraft(draft, hardware.is_active);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
@@ -188,29 +188,29 @@ export function LaptopDetail() {
     setSaving(true);
     setSaveError(null);
     try {
-      if (laptop.is_active) {
-        await client.put<Laptop>(`/api/laptops/${id}`, draftToLaptopPayload(draft));
+      if (hardware.is_active) {
+        await client.put<HardwareAsset>(`/api/hardware/${id}`, draftToHardwareAssetPayload(draft));
         if (canFinancialView) {
           const pyRaw = draft.purchase_year.trim();
           const py = pyRaw ? Number(pyRaw) : null;
           const costRaw = draft.purchase_cost.trim();
           const costAmt = costRaw ? Number(costRaw) : 0;
-          await client.put(`/api/laptops/${id}/hardware-cost`, {
+          await client.put(`/api/hardware/${id}/hardware-cost`, {
             amount: Number.isFinite(costAmt) && costAmt >= 0 ? costAmt : 0,
             purchase_year: py != null && Number.isFinite(py) ? py : null,
           });
         }
       } else {
-        await client.put<Laptop>(
-          `/api/laptops/${id}`,
-          draftToArchivedLaptopPayload(draft),
+        await client.put<HardwareAsset>(
+          `/api/hardware/${id}`,
+          draftToArchivedHardwareAssetPayload(draft),
         );
       }
       await reloadAll();
       setEditingState(false);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Failed to save laptop";
+        err instanceof Error ? err.message : "Failed to save hardware";
       setSaveError(msg);
     } finally {
       setSaving(false);
@@ -230,15 +230,15 @@ export function LaptopDetail() {
   }
 
   async function handleArchive() {
-    if (!id || !laptop) return;
+    if (!id || !hardware) return;
     const confirmed = window.confirm(
-      `Archive "${laptop.model_name}"? It will move to Archived hardware.`,
+      `Archive "${hardware.model_name}"? It will move to Archived hardware.`,
     );
     if (!confirmed) return;
     setActionBusy("archive");
     setActionError(null);
     try {
-      await client.post<Laptop>(`/api/laptops/${id}/archive`);
+      await client.post<HardwareAsset>(`/api/hardware/${id}/archive`);
       await reloadAll();
       setEditingState(false);
     } catch (err: unknown) {
@@ -249,15 +249,15 @@ export function LaptopDetail() {
   }
 
   async function handleUnarchive() {
-    if (!id || !laptop) return;
+    if (!id || !hardware) return;
     const confirmed = window.confirm(
-      `Unarchive "${laptop.model_name}"? It will return to Active hardware.`,
+      `Unarchive "${hardware.model_name}"? It will return to Active hardware.`,
     );
     if (!confirmed) return;
     setActionBusy("unarchive");
     setActionError(null);
     try {
-      await client.post<Laptop>(`/api/laptops/${id}/unarchive`);
+      await client.post<HardwareAsset>(`/api/hardware/${id}/unarchive`);
       await reloadAll();
       setEditingState(false);
     } catch (err: unknown) {
@@ -268,15 +268,15 @@ export function LaptopDetail() {
   }
 
   async function handleDelete() {
-    if (!id || !laptop) return;
+    if (!id || !hardware) return;
     const confirmed = window.confirm(
-      `Delete "${laptop.model_name}" permanently? This cannot be undone.`,
+      `Delete "${hardware.model_name}" permanently? This cannot be undone.`,
     );
     if (!confirmed) return;
     setActionBusy("delete");
     setActionError(null);
     try {
-      await client.delete(`/api/laptops/${id}`);
+      await client.delete(`/api/hardware/${id}`);
       navigate("/hardware");
     } catch (err: unknown) {
       setActionError(getActionErrorMessage(err));
@@ -295,12 +295,12 @@ export function LaptopDetail() {
   }, [isIndexRoute]);
 
   if (loading) return <DetailPageSkeleton />;
-  if (!laptop || !draft)
-    return <p className="text-sm text-red-600">Laptop not found.</p>;
+  if (!hardware || !draft)
+    return <p className="text-sm text-red-600">Hardware asset not found.</p>;
 
-  const outletContext: LaptopDetailContext = {
-    laptop,
-    reloadLaptop: reloadAll,
+  const outletContext: HardwareAssetDetailContext = {
+    hardware,
+    reloadHardwareAsset: reloadAll,
     purchaseYear,
     costAmount,
     costLoading,
@@ -327,7 +327,7 @@ export function LaptopDetail() {
   /** No `w-full` — that forces a line break after the `S/N:` label in a flex row. */
   const headerSerialEditCls =
     "min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm tabular-nums leading-tight text-gray-500 outline-none focus-visible:rounded-sm focus-visible:shadow-[inset_0_0_0_1px_theme(colors.blue.500)] dark:text-gray-400";
-  const displayName = editing ? draft.model_name : laptop.model_name;
+  const displayName = editing ? draft.model_name : hardware.model_name;
 
   return (
     <PageTransition>
@@ -342,11 +342,11 @@ export function LaptopDetail() {
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            {editing && laptop.is_active ? (
+            {editing && hardware.is_active ? (
               <>
                 <div className={headerTitleStackCls}>
                   <input
-                    id="laptop-header-model"
+                    id="hardware-header-model"
                     type="text"
                     name="model_name"
                     aria-label="Model name"
@@ -363,7 +363,7 @@ export function LaptopDetail() {
                   >
                     <span className="shrink-0">S/N: </span>
                     <input
-                      id="laptop-header-serial"
+                      id="hardware-header-serial"
                       type="text"
                       name="serial_number"
                       aria-label="Serial number"
@@ -392,9 +392,9 @@ export function LaptopDetail() {
               </>
             ) : (
               <div className={headerTitleStackCls}>
-                <h1 className={headerModelReadCls}>{laptop.model_name}</h1>
+                <h1 className={headerModelReadCls}>{hardware.model_name}</h1>
                 <p className={headerSerialReadCls}>
-                  S/N: {laptop.serial_number}
+                  S/N: {hardware.serial_number || "—"}
                 </p>
               </div>
             )}
@@ -414,7 +414,7 @@ export function LaptopDetail() {
               <KebabMenu
                 canEdit={canEdit}
                 canDelete={isAdmin}
-                isArchived={!laptop.is_active}
+                isArchived={!hardware.is_active}
                 busyAction={actionBusy}
                 onArchive={() => {
                   void handleArchive();
@@ -513,9 +513,9 @@ export function LaptopDetail() {
         {extraTab === "activity" ? (
           <Panel title="Activity">
             <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              Recent changes to this laptop.
+              Recent changes to this hardware.
             </p>
-            <AuditTimeline tableName="laptops" recordId={laptop.id} perPage={20} />
+            <AuditTimeline tableName="hardware_assets" recordId={hardware.id} perPage={20} />
           </Panel>
         ) : (
           <Outlet context={outletContext} />

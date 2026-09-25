@@ -22,7 +22,7 @@ def _make_user(role: str = "viewer", user_id: uuid.UUID | None = None) -> MagicM
 
 
 class DeleteUserValidationTest(unittest.TestCase):
-    def test_blocks_when_user_has_assignments_or_owners_or_laptops(self) -> None:
+    def test_blocks_when_user_has_assignments_or_owners_or_hardware_assets(self) -> None:
         async def run() -> None:
             target_id = uuid.uuid4()
             target = _make_user(user_id=target_id)
@@ -31,7 +31,7 @@ class DeleteUserValidationTest(unittest.TestCase):
             db = AsyncMock()
             db.get = AsyncMock(return_value=target)
             # First .execute is the last-admin check (target.role != "admin", so it's skipped).
-            # Subsequent calls are db.scalar for assignee_count, owner_count, laptop_count.
+            # Subsequent calls are db.scalar for assignee_count, owner_count, hardware_count.
             db.scalar = AsyncMock(side_effect=[2, 1, 3])
 
             with self.assertRaises(HTTPException) as ctx:
@@ -40,7 +40,7 @@ class DeleteUserValidationTest(unittest.TestCase):
             detail = ctx.exception.detail
             self.assertIn("assigned to 2 service(s)", detail)
             self.assertIn("owns 1 service(s)", detail)
-            self.assertIn("holds 3 laptop(s)", detail)
+            self.assertIn("holds 3 hardware record(s)", detail)
             db.delete.assert_not_called()
 
         asyncio.run(run())

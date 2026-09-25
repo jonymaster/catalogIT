@@ -39,8 +39,8 @@ def _user_label(u: User) -> str:
     return name or str(u.id)
 
 
-def _laptop_assignee_label(u: User) -> str:
-    """Prefer display name for laptop assignee history (matches detail / list copy)."""
+def _hardware_assignee_label(u: User) -> str:
+    """Prefer display name for hardware assignee history (matches detail / list copy)."""
     name = f"{u.first_name or ''} {u.last_name or ''}".strip()
     if name:
         return name
@@ -141,10 +141,10 @@ def _friendly_service_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | N
     return out
 
 
-_OS_LABELS = {"macos": "macOS", "linux": "Linux", "windows": "Windows"}
+_OS_LABELS = {"macos": "macOS", "linux": "Linux", "windows": "Windows", "android": "Android", "ios": "iOS", "ipados": "iPadOS"}
 
 
-def _friendly_laptop_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | None:
+def _friendly_hardware_value_dict(d: dict[str, Any] | None) -> dict[str, Any] | None:
     """Drop duplicate status FK when `status` is present; rename FK keys for timeline display."""
     if not d:
         return d
@@ -183,13 +183,13 @@ def _friendly_attachment_value_dict(d: dict[str, Any] | None) -> dict[str, Any] 
     return out
 
 
-async def _humanize_laptop_fks(
+async def _humanize_hardware_fks(
     db: AsyncSession,
     old_values: dict[str, Any] | None,
     new_values: dict[str, Any] | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     keys = {
-        "assigned_to_id": (User, _laptop_assignee_label),
+        "assigned_to_id": (User, _hardware_assignee_label),
         "hardware_status_id": (HardwareStatus, lambda r: r.name),
         "hardware_location_id": (HardwareLocation, lambda r: r.name),
     }
@@ -265,9 +265,9 @@ async def humanize_audit_values(
     if entity_table == "services":
         old_h, new_h = await _humanize_service_fks(db, old_values, new_values)
         return _friendly_service_value_dict(old_h), _friendly_service_value_dict(new_h)
-    if entity_table == "laptops":
-        old_h, new_h = await _humanize_laptop_fks(db, old_values, new_values)
-        return _friendly_laptop_value_dict(old_h), _friendly_laptop_value_dict(new_h)
+    if entity_table in ("hardware_assets", "laptops"):
+        old_h, new_h = await _humanize_hardware_fks(db, old_values, new_values)
+        return _friendly_hardware_value_dict(old_h), _friendly_hardware_value_dict(new_h)
     if entity_table == "attachments":
         old_h, new_h = await _humanize_attachment_fks(db, old_values, new_values)
         return _friendly_attachment_value_dict(old_h), _friendly_attachment_value_dict(new_h)

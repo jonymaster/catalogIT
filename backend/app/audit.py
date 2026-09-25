@@ -31,7 +31,7 @@ def _omit_audit_columns(table: str, row: dict) -> dict:
 AUDITED_TABLES: frozenset[str] = frozenset(
     {
         "services",
-        "laptops",
+        "hardware_assets",
         "vendors",
         "categories",
         "cost_centers",
@@ -97,7 +97,7 @@ def _summary_line(table: str, action: str) -> str:
 
 
 def _with_attachment_link(table: str, instance, details: dict) -> dict:
-    """So asset history can include attachment rows for the parent service/laptop."""
+    """So asset history can include attachment rows for the parent service/hardware."""
     if table != "attachments":
         return details
     return {

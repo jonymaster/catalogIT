@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,17 +13,22 @@ from app.dependencies.db import get_audited_db
 from app.models.user import User
 from app.models.category import Category
 from app.models.cost_record import CostRecord
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 class CostRecordOut(BaseModel):
+    @computed_field(deprecated="Use hardware_id")
+    @property
+    def laptop_id(self) -> str | None:
+        return self.hardware_id
+
     cost_record_id: str
     source: Literal["service", "hardware"] = "service"
     service_id: str | None = None
-    laptop_id: str | None = None
+    hardware_id: str | None = None
     service_name: str
     purchase_year: int | None = None
     vendor_id: str | None = None
@@ -60,7 +65,7 @@ async def get_dashboard(
 ):
     cr_stmt = select(CostRecord).order_by(CostRecord.fiscal_year)
     if not has_hardware_view:
-        cr_stmt = cr_stmt.where(CostRecord.laptop_id.is_(None))
+        cr_stmt = cr_stmt.where(CostRecord.hardware_id.is_(None))
     cr_result = await db.execute(cr_stmt)
     records = cr_result.scalars().all()
 
@@ -74,8 +79,8 @@ async def get_dashboard(
     )
     services = {str(s.id): s for s in svc_result.scalars().all()}
 
-    lap_result = await db.execute(select(Laptop))
-    laptops = {str(l.id): l for l in lap_result.scalars().all()}
+    lap_result = await db.execute(select(HardwareAsset))
+    hardware_assets = {str(l.id): l for l in lap_result.scalars().all()}
 
     cat_result = await db.execute(select(Category))
     categories = {str(c.id): c.name for c in cat_result.scalars().all()}
@@ -106,7 +111,7 @@ async def get_dashboard(
                     cost_record_id=str(r.id),
                     source="service",
                     service_id=str(r.service_id),
-                    laptop_id=None,
+                    hardware_id=None,
                     service_name=svc.name,
                     purchase_year=r.purchase_year,
                     vendor_id=str(svc.vendor.id) if svc.vendor else None,
@@ -140,17 +145,17 @@ async def get_dashboard(
                     notes=r.notes,
                 )
             )
-        elif r.laptop_id is not None:
-            lap = laptops.get(str(r.laptop_id))
+        elif r.hardware_id is not None:
+            lap = hardware_assets.get(str(r.hardware_id))
             if not lap:
                 continue
-            label = f"{lap.model_name} ({lap.serial_number})"
+            label = f"{lap.model_name} ({lap.serial_number})" if lap.serial_number else lap.model_name
             out.append(
                 CostRecordOut(
                     cost_record_id=str(r.id),
                     source="hardware",
                     service_id=None,
-                    laptop_id=str(r.laptop_id),
+                    hardware_id=str(r.hardware_id),
                     service_name=label,
                     purchase_year=r.purchase_year,
                     vendor_id=None,

@@ -3,20 +3,28 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, Integer, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 
-class Laptop(Base):
-    __tablename__ = "laptops"
+class HardwareAsset(Base):
+    __tablename__ = "hardware_assets"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    serial_number: Mapped[str] = mapped_column(String(255), unique=True)
+    serial_number: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    hardware_type: Mapped[str] = mapped_column(String(20), default="laptop", server_default="laptop")
+    quantity: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    os_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    imei: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    imei2: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     __table_args__ = (
+        CheckConstraint("hardware_type IN ('laptop', 'phone', 'tablet', 'accessory', 'peripheral')", name="ck_hardware_type"),
+        CheckConstraint("quantity >= 1 AND (hardware_type = 'accessory' OR quantity = 1)", name="ck_hardware_quantity"),
         Index(
-            "uq_laptops_serial_number_lower",
+            "uq_hardware_assets_serial_number_lower",
             func.lower(serial_number),
             unique=True,
         ),
@@ -51,7 +59,7 @@ class Laptop(Base):
     hardware_status: Mapped["HardwareStatus | None"] = relationship(lazy="selectin")  # noqa: F821
     hardware_location: Mapped["HardwareLocation | None"] = relationship(lazy="selectin")  # noqa: F821
     cost_records: Mapped[list["CostRecord"]] = relationship(  # noqa: F821
-        back_populates="laptop",
+        back_populates="hardware",
         lazy="noload",
         cascade="all, delete-orphan",
     )

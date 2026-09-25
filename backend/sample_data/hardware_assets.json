@@ -1,0 +1,124 @@
+[
+  {
+    "serial_number": "C02FABRIC01",
+    "model_name": "MacBook Pro 14-inch (2024)",
+    "cpu": "Apple M3 Pro",
+    "ram": "18 GB",
+    "storage_size": "512 GB SSD",
+    "operating_system": "macos",
+    "mdm_connected": true,
+    "status": "Assigned",
+    "assigned_to_user_seed_id": 3,
+    "notes": "Standard engineering image; hardware cost tracked on device",
+    "hardware_type": "laptop",
+    "quantity": 1
+  },
+  {
+    "serial_number": "C02FABRIC02",
+    "model_name": "MacBook Pro 14-inch (2024)",
+    "cpu": "Apple M3 Pro",
+    "ram": "36 GB",
+    "storage_size": "1 TB SSD",
+    "operating_system": "macos",
+    "mdm_connected": true,
+    "status": "Assigned",
+    "assigned_to_user_seed_id": 4,
+    "notes": "Build machine \u2014 extra RAM; CapEx in laptop cost record",
+    "hardware_type": "laptop",
+    "quantity": 1
+  },
+  {
+    "serial_number": "C02FABRIC03",
+    "model_name": "MacBook Air 15-inch",
+    "cpu": "Apple M2",
+    "ram": "16 GB",
+    "storage_size": "512 GB SSD",
+    "operating_system": "macos",
+    "mdm_connected": false,
+    "status": "In Stock",
+    "notes": "Unassigned spare; refresh stock",
+    "hardware_type": "laptop",
+    "quantity": 1
+  },
+  {
+    "serial_number": "PF4DEMO001",
+    "model_name": "ThinkPad X1 Carbon Gen 12",
+    "cpu": "Intel Core Ultra 7 155U",
+    "ram": "32 GB",
+    "storage_size": "512 GB SSD",
+    "operating_system": "windows",
+    "mdm_connected": true,
+    "status": "Assigned",
+    "assigned_to_user_seed_id": 1,
+    "notes": "IT admin laptop",
+    "hardware_type": "laptop",
+    "quantity": 1
+  },
+  {
+    "serial_number": "PF4DEMO002",
+    "model_name": "ThinkPad X1 Carbon Gen 12",
+    "cpu": "Intel Core Ultra 7 155U",
+    "ram": "16 GB",
+    "storage_size": "256 GB SSD",
+    "operating_system": "windows",
+    "mdm_connected": false,
+    "status": "In Stock",
+    "notes": "Pool device",
+    "hardware_type": "laptop",
+    "quantity": 1
+  },
+  {
+    "serial_number": "PF4DEMO003",
+    "model_name": "ThinkPad T14 Gen 5",
+    "cpu": "AMD Ryzen 7 PRO 8840U",
+    "ram": "32 GB",
+    "storage_size": "512 GB SSD",
+    "operating_system": "linux",
+    "mdm_connected": false,
+    "status": "Loaned",
+    "assigned_to_user_seed_id": 5,
+    "notes": "Short-term loan for contractor; return by end of quarter",
+    "hardware_type": "laptop",
+    "quantity": 1
+  },
+  {
+    "id": 1001,
+    "hardware_type": "phone",
+    "serial_number": "DEMO-PHONE-001",
+    "model_name": "iPhone",
+    "operating_system": "ios",
+    "storage_size": "128 GB",
+    "status": "In Stock"
+  },
+  {
+    "id": 1002,
+    "hardware_type": "tablet",
+    "serial_number": "DEMO-TABLET-001",
+    "model_name": "iPad",
+    "operating_system": "ipados",
+    "storage_size": "256 GB",
+    "status": "In Stock"
+  },
+  {
+    "id": 1003,
+    "hardware_type": "phone",
+    "serial_number": "DEMO-PHONE-002",
+    "model_name": "Android phone",
+    "operating_system": "android",
+    "status": "In Stock"
+  },
+  {
+    "id": 1004,
+    "hardware_type": "accessory",
+    "model_name": "USB-C cables",
+    "quantity": 20,
+    "status": "In Stock"
+  },
+  {
+    "id": 1005,
+    "hardware_type": "peripheral",
+    "model_name": "Meeting room monitor",
+    "quantity": 1,
+    "status": "In Stock"
+  }
+]

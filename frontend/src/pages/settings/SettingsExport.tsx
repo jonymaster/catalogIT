@@ -119,7 +119,7 @@ export function SettingsExport() {
           <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">data/seed-json/</code> (same
           filenames as <code className="rounded bg-gray-100 px-1 dark:bg-gray-800">data/seed</code>{" "}
           in the repo, with live UUIDs), and optionally PDF attachments stored for services and
-          laptops. Large datasets or many attachments can take several minutes.
+          hardware assets. Large datasets or many attachments can take several minutes.
         </p>
       </div>
 

@@ -41,7 +41,7 @@ def to_cost_record_read(record: CostRecord) -> CostRecordRead:
     return CostRecordRead(
         id=record.id,
         service_id=record.service_id,
-        laptop_id=record.laptop_id,
+        hardware_id=record.hardware_id,
         payment_method_id=record.payment_method_id,
         payment_method_name=None,
         fiscal_year=record.fiscal_year,
@@ -129,7 +129,7 @@ async def create_cost_record(
     payment_method_id = await _ensure_payment_method(db, body.payment_method_id)
     record = CostRecord(
         service_id=service_id,
-        laptop_id=None,
+        hardware_id=None,
         payment_method_id=payment_method_id,
         fiscal_year=body.fiscal_year,
         purchase_year=body.purchase_year,

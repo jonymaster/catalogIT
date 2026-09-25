@@ -19,7 +19,7 @@ class CostRecordRouterTest(unittest.TestCase):
         record = SimpleNamespace(
             id=record_id,
             service_id=service_id,
-            laptop_id=None,
+            hardware_id=None,
             payment_method_id=payment_method_id,
             fiscal_year=2025,
             purchase_year=2024,

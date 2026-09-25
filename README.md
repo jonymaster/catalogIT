@@ -9,7 +9,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 ## Features
 
 - **Service Catalog** — track services with cost, renewal dates, vendors, owners, and classifications
-- **Hardware Inventory** — manage laptops and devices with assignment tracking
+- **Hardware Inventory** — manage laptops, phones, tablets, accessories in bulk, and peripherals with assignments and locations ([hardware guide](docs/hardware.md))
 - **Renewal Calendar** — visual calendar view for upcoming renewals
 - **SSO & Provisioning** — OIDC single sign-on (Okta) with SCIM 2.0 automatic user provisioning
 - **Role-Based Access** — admin/editor/viewer roles plus per-feature permissions for financial data and hardware visibility

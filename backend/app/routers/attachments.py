@@ -5,23 +5,27 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from typing import Annotated
+from pydantic import BeforeValidator
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.dependencies.auth import get_current_user, require_role
+from app.dependencies.auth import get_current_user, require_role, ensure_hardware_view_access
 from app.dependencies.db import get_audited_db
 from app.dependencies.storage import get_s3_client
 from app.models.attachment import Attachment
-from app.models.laptop import Laptop
+from app.models.hardware import HardwareAsset
 from app.models.service import Service
 from app.models.user import User
 from app.schemas.attachment import AttachmentRead, PaginatedAttachmentResponse
 
 router = APIRouter(prefix="/api/attachments", tags=["attachments"])
 
-ALLOWED_ENTITY_TYPES = {"laptop": Laptop, "service": Service}
+EntityType = Annotated[str, BeforeValidator(lambda value: "hardware" if value == "laptop" else value)]
+
+ALLOWED_ENTITY_TYPES = {"hardware": HardwareAsset, "service": Service}
 ALLOWED_CONTENT_TYPES = {"application/pdf"}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
@@ -36,7 +40,7 @@ def _sanitize_filename(name: str) -> str:
 
 
 async def _validate_entity(
-    entity_type: str,
+    entity_type: EntityType,
     entity_id: uuid.UUID,
     db: AsyncSession,
     *,
@@ -73,6 +77,9 @@ async def download_attachment(
             status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found"
         )
 
+    if attachment.entity_type == "hardware":
+        await ensure_hardware_view_access(_user, db)
+
     cfg = get_settings()
 
     async with get_s3_client() as s3:
@@ -103,6 +110,9 @@ async def delete_attachment(
             status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found"
         )
 
+    if attachment.entity_type == "hardware":
+        await ensure_hardware_view_access(_user, db)
+    await _validate_entity(attachment.entity_type, attachment.entity_id, db, for_write=True)
     cfg = get_settings()
     async with get_s3_client() as s3:
         await s3.delete_object(
@@ -114,12 +124,15 @@ async def delete_attachment(
 
 @router.get("/{entity_type}/{entity_id}", response_model=PaginatedAttachmentResponse)
 async def list_attachments(
-    entity_type: str,
+    entity_type: EntityType,
     entity_id: uuid.UUID,
     db: AsyncSession = Depends(get_audited_db),
     page: int = Query(1, ge=1),
     per_page: int = Query(5, ge=1, le=50),
+    user: User = Depends(get_current_user),
 ):
+    if entity_type == "hardware":
+        await ensure_hardware_view_access(user, db)
     await _validate_entity(entity_type, entity_id, db)
     filters = [
         Attachment.entity_type == entity_type,
@@ -168,12 +181,14 @@ async def list_attachments(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_attachment(
-    entity_type: str,
+    entity_type: EntityType,
     entity_id: uuid.UUID,
     file: UploadFile,
     user: User = Depends(_writer),
     db: AsyncSession = Depends(get_audited_db),
 ):
+    if entity_type == "hardware":
+        await ensure_hardware_view_access(user, db)
     await _validate_entity(entity_type, entity_id, db, for_write=True)
 
     if file.content_type not in ALLOWED_CONTENT_TYPES:
@@ -221,7 +236,7 @@ async def upload_attachment(
 
 
 async def delete_entity_attachments(
-    entity_type: str, entity_id: uuid.UUID, db: AsyncSession
+    entity_type: EntityType, entity_id: uuid.UUID, db: AsyncSession
 ) -> None:
     """Remove all attachments (DB rows + S3 objects) for a given entity."""
     result = await db.execute(

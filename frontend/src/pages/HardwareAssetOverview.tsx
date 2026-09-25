@@ -1,3 +1,6 @@
+import { HardwareTypeFields } from "../components/HardwareTypeFields";
+import { isSimpleHardware, isMobileHardware, osOptionsForType, hardwareTypeLabel } from "../hardware/hardwareTypes";
+import type { HardwareAssetDraft } from "../service/hardwareDetailContext";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import client from "../api/client";
@@ -6,16 +9,16 @@ import { StatusBadge } from "../components/StatusBadge";
 import { UserDirectoryCheckboxPicker } from "../components/UserDirectoryCheckboxPicker";
 import { OsIcon } from "../components/ui/OsIcon";
 import { Avatar } from "../components/ui/Avatar";
-import type { LaptopDetailContext } from "../service/laptopDetailContext";
-import { OS_OPTIONS, operatingSystemLabel } from "../utils/operatingSystem";
+import type { HardwareAssetDetailContext } from "../service/hardwareDetailContext";
+import { operatingSystemLabel } from "../utils/operatingSystem";
 import type {
   HardwareLocation,
   HardwareStatus,
-  Laptop,
+  HardwareAsset,
   OperatingSystem,
 } from "../types/models";
 
-export type { LaptopDetailContext as LaptopDetailOutletContext } from "../service/laptopDetailContext";
+export type { HardwareAssetDetailContext as HardwareAssetDetailOutletContext } from "../service/hardwareDetailContext";
 
 function Row({
   label,
@@ -57,11 +60,7 @@ function useHardwareRefData(editing: boolean) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!editing) {
-      setReady(false);
-      return;
-    }
-    if (ready) return;
+    if (!editing) return;
     let cancelled = false;
     Promise.all([
       client.get<HardwareStatus[]>("/api/hardware-statuses/"),
@@ -82,36 +81,36 @@ function useHardwareRefData(editing: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [editing, ready]);
+  }, [editing]);
 
   return { hardwareStatuses, hardwareLocations, refReady: ready };
 }
 
-function viewOperatingSystem(laptop: Laptop) {
+function viewOperatingSystem(hardware: HardwareAsset) {
   return (
     <span className="inline-flex items-center gap-2">
-      <OsIcon operatingSystem={laptop.operating_system} className="h-5 w-5 shrink-0" />
-      <span>{operatingSystemLabel(laptop.operating_system)}</span>
+      <OsIcon operatingSystem={hardware.operating_system} className="h-5 w-5 shrink-0" />
+      <span>{operatingSystemLabel(hardware.operating_system)}</span>
     </span>
   );
 }
 
-function viewStatus(laptop: Laptop) {
-  return laptop.hardware_status ? (
+function viewStatus(hardware: HardwareAsset) {
+  return hardware.hardware_status ? (
     <ColoredReferenceBadge
-      label={laptop.hardware_status.name}
-      color={laptop.hardware_status.color}
+      label={hardware.hardware_status.name}
+      color={hardware.hardware_status.color}
     />
   ) : (
-    <StatusBadge status={laptop.status} />
+    <StatusBadge status={hardware.status} />
   );
 }
 
-function AssignedRead({ laptop }: { laptop: Laptop }) {
-  if (!laptop.assigned_to) {
+function AssignedRead({ hardware }: { hardware: HardwareAsset }) {
+  if (!hardware.assigned_to) {
     return <p className="text-sm text-fg-4">Unassigned.</p>;
   }
-  const u = laptop.assigned_to;
+  const u = hardware.assigned_to;
   return (
     <div className="flex items-start gap-3">
       <span className="shrink-0">
@@ -130,22 +129,22 @@ function AssignedRead({ laptop }: { laptop: Laptop }) {
   );
 }
 
-function viewLocation(laptop: Laptop) {
-  return laptop.hardware_location?.name?.trim()
-    ? laptop.hardware_location.name
+function viewLocation(hardware: HardwareAsset) {
+  return hardware.hardware_location?.name?.trim()
+    ? hardware.hardware_location.name
     : "—";
 }
 
 interface RightColumnProps {
-  laptop: Laptop;
+  hardware: HardwareAsset;
   activeEdit: boolean;
   archivedEdit: boolean;
-  draft: LaptopDetailContext["draft"];
-  setDraftField: LaptopDetailContext["setDraftField"];
+  draft: HardwareAssetDetailContext["draft"];
+  setDraftField: HardwareAssetDetailContext["setDraftField"];
 }
 
 function RightColumn({
-  laptop,
+  hardware,
   activeEdit,
   archivedEdit,
   draft,
@@ -164,15 +163,15 @@ function RightColumn({
               onChange={(ids) =>
                 setDraftField("assigned_to_id", ids[0] ?? "")
               }
-              seedUsers={laptop.assigned_to ? [laptop.assigned_to] : []}
+              seedUsers={hardware.assigned_to ? [hardware.assigned_to] : []}
             />
           </div>
         ) : (
-          <AssignedRead laptop={laptop} />
+          <AssignedRead hardware={hardware} />
         )}
       </section>
 
-      <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+      {!isSimpleHardware(draft.hardware_type) && <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
         <h2 className="mb-3 text-base font-semibold text-fg">MDM</h2>
         <dl className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
@@ -193,19 +192,19 @@ function RightColumn({
                   <span className="sr-only">MDM connected</span>
                 </label>
               ) : (
-                <BooleanYesNoBadge value={laptop.mdm_connected} />
+                <BooleanYesNoBadge value={hardware.mdm_connected} />
               )}
             </dd>
           </div>
         </dl>
-      </section>
+      </section>}
     </div>
   );
 }
 
-export function LaptopOverview() {
+export function HardwareAssetOverview() {
   const {
-    laptop,
+    hardware,
     purchaseYear,
     costAmount,
     costLoading,
@@ -214,13 +213,13 @@ export function LaptopOverview() {
     draft,
     setDraftField,
     errors,
-  } = useOutletContext<LaptopDetailContext>();
+  } = useOutletContext<HardwareAssetDetailContext>();
 
   const { hardwareStatuses, hardwareLocations, refReady } =
     useHardwareRefData(editing);
 
-  const activeEdit = editing && laptop.is_active;
-  const archivedEdit = editing && !laptop.is_active;
+  const activeEdit = editing && hardware.is_active;
+  const archivedEdit = editing && !hardware.is_active;
 
   useEffect(() => {
     if (!editing || !refReady || hardwareStatuses.length === 0) return;
@@ -249,8 +248,23 @@ export function LaptopOverview() {
           <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
             <h2 className="mb-4 text-base font-semibold text-fg">General</h2>
             <dl className="space-y-6">
+              {activeEdit ? <HardwareTypeFields value={draft} onChange={(patch) => {
+                for (const key of Object.keys(patch) as (keyof HardwareAssetDraft)[]) {
+                  setDraftField(key, patch[key]!);
+                }
+              }} /> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Row label="Hardware type">{hardwareTypeLabel(hardware.hardware_type)}</Row>
+                {hardware.hardware_type === "accessory" && <Row label="Quantity">{hardware.quantity}</Row>}
+                {!isSimpleHardware(hardware.hardware_type) && <Row label="OS version">{hardware.os_version || "—"}</Row>}
+                {isMobileHardware(hardware.hardware_type) && <>
+                  <Row label="IMEI">{hardware.imei || "—"}</Row>
+                  <Row label="Second IMEI">{hardware.imei2 || "—"}</Row>
+                  <Row label="Phone number">{hardware.phone_number || "—"}</Row>
+                </>}
+              </div>}
+              {(["quantity", "imei", "imei2"] as const).map((key) => errors[key] && <p key={key} className="text-sm text-danger">{errors[key]}</p>)}
               <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
-                <Row label="Operating system">
+                {!isSimpleHardware(draft.hardware_type) && <Row label="Operating system">
                   {activeEdit ? (
                     <div className="flex items-center gap-2">
                       <OsIcon
@@ -269,7 +283,7 @@ export function LaptopOverview() {
                         }
                       >
                         <option value="">— Unknown —</option>
-                        {OS_OPTIONS.map((o) => (
+                        {osOptionsForType(draft.hardware_type).map((o) => (
                           <option key={o.value} value={o.value}>
                             {o.label}
                           </option>
@@ -277,9 +291,9 @@ export function LaptopOverview() {
                       </select>
                     </div>
                   ) : (
-                    viewOperatingSystem(laptop)
+                    viewOperatingSystem(hardware)
                   )}
-                </Row>
+                </Row>}
                 <Row label="Status">
                   {activeEdit || archivedEdit ? (
                     <select
@@ -304,7 +318,7 @@ export function LaptopOverview() {
                       )}
                     </select>
                   ) : (
-                    viewStatus(laptop)
+                    viewStatus(hardware)
                   )}
                 </Row>
                 <Row label="Location">
@@ -331,12 +345,12 @@ export function LaptopOverview() {
                       )}
                     </select>
                   ) : (
-                    viewLocation(laptop)
+                    viewLocation(hardware)
                   )}
                 </Row>
               </div>
 
-              <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
+              {!isSimpleHardware(draft.hardware_type) && <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-3">
                 <Row label="CPU">
                   {activeEdit ? (
                     <input
@@ -345,7 +359,7 @@ export function LaptopOverview() {
                       onChange={(e) => setDraftField("cpu", e.target.value)}
                     />
                   ) : (
-                    laptop.cpu || "—"
+                    hardware.cpu || "—"
                   )}
                 </Row>
                 <Row label="RAM">
@@ -356,7 +370,7 @@ export function LaptopOverview() {
                       onChange={(e) => setDraftField("ram", e.target.value)}
                     />
                   ) : (
-                    laptop.ram || "—"
+                    hardware.ram || "—"
                   )}
                 </Row>
                 <Row label="Storage">
@@ -369,10 +383,10 @@ export function LaptopOverview() {
                       }
                     />
                   ) : (
-                    laptop.storage_size || "—"
+                    hardware.storage_size || "—"
                   )}
                 </Row>
-              </div>
+              </div>}
 
               {canFinancialView &&
                 (costLoading && !activeEdit ? (
@@ -400,7 +414,7 @@ export function LaptopOverview() {
                         "—"
                       )}
                     </Row>
-                    <Row label="Cost" error={errors.purchase_cost}>
+                    <Row label={draft.hardware_type === "accessory" ? "Total batch cost" : "Cost"} error={errors.purchase_cost}>
                       {activeEdit ? (
                         <input
                           type="number"
@@ -443,7 +457,7 @@ export function LaptopOverview() {
 
         <div className="lg:col-span-1">
           <RightColumn
-            laptop={laptop}
+            hardware={hardware}
             activeEdit={activeEdit}
             archivedEdit={archivedEdit}
             draft={draft}
@@ -455,8 +469,8 @@ export function LaptopOverview() {
       {!editing && (
         <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
           <h2 className="mb-3 text-base font-semibold text-fg">Notes</h2>
-          {laptop.notes?.trim() ? (
-            <p className="whitespace-pre-wrap text-sm text-fg">{laptop.notes}</p>
+          {hardware.notes?.trim() ? (
+            <p className="whitespace-pre-wrap text-sm text-fg">{hardware.notes}</p>
           ) : (
             <p className="text-sm text-fg-4">No notes yet.</p>
           )}
