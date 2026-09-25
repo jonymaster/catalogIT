@@ -171,6 +171,11 @@ catalogIT/
 
 Highlights from the most recent releases. Full notes on the [GitHub releases page](https://github.com/jonymaster/catalogIT/releases).
 
+### v1.5.0 — September 2026
+
+- **Generic Hardware Support:** Now supporting not only laptops, but also phones, tablets, accessories and peripherals.
+- Bug fixes around user search results.
+
 ### v1.4.0 — April 2026
 
 - **Granular permissions:** new Financial view and Hardware visibility permissions, applied end-to-end across the UI and API. Admins still see everything.
