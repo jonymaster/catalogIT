@@ -254,6 +254,11 @@ export function ServiceDetail() {
     }
   }
 
+  function handleDuplicate() {
+    if (!service) return;
+    navigate("/services/new", { state: { duplicateFrom: service } });
+  }
+
   const pathname = location.pathname;
   const lastPathRef = useRef(pathname);
   if (lastPathRef.current !== pathname) {
@@ -430,6 +435,7 @@ export function ServiceDetail() {
                 canDelete={isAdmin}
                 isArchived={!service.is_active}
                 busyAction={actionBusy}
+                onDuplicate={handleDuplicate}
                 onArchive={() => {
                   void handleArchive();
                 }}
@@ -573,6 +579,7 @@ interface KebabMenuProps {
   canDelete: boolean;
   isArchived: boolean;
   busyAction: "archive" | "unarchive" | "delete" | null;
+  onDuplicate: () => void;
   onArchive: () => void;
   onUnarchive: () => void;
   onDelete: () => void;
@@ -583,6 +590,7 @@ function KebabMenu({
   canDelete,
   isArchived,
   busyAction,
+  onDuplicate,
   onArchive,
   onUnarchive,
   onDelete,
@@ -632,7 +640,13 @@ function KebabMenu({
             role="menu"
             className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-md"
           >
-            <MenuItem label="Duplicate" onClick={() => setOpen(false)} />
+            {canEdit && (
+              <MenuItem
+                label="Duplicate"
+                disabled={isBusy}
+                onClick={() => runAndClose(onDuplicate)}
+              />
+            )}
             {canEdit && (
               <MenuItem
                 label={archiveBusy ? `${archiveLabel}...` : archiveLabel}

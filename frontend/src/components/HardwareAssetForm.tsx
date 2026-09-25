@@ -23,6 +23,7 @@ import type {
 
 interface Props {
   initial?: HardwareAsset;
+  duplicate?: boolean;
 }
 
 type FormData = HardwareAssetDraft;
@@ -51,12 +52,25 @@ function toFormData(l?: HardwareAsset): FormData {
   };
 }
 
-export function HardwareAssetForm({ initial }: Props = {}) {
+export function HardwareAssetForm({ initial, duplicate = false }: Props = {}) {
   const navigate = useNavigate();
   const { canFinancialView } = useAuth();
-  const isEdit = Boolean(initial?.id);
+  const isEdit = Boolean(initial?.id) && !duplicate;
 
-  const [form, setForm] = useState<FormData>(() => toFormData(initial));
+  const [form, setForm] = useState<FormData>(() => {
+    const source = toFormData(initial);
+    return duplicate ? {
+      ...source,
+      serial_number: "",
+      imei: "",
+      imei2: "",
+      phone_number: "",
+      status: "In Stock",
+      hardware_status_id: "",
+      assigned_to_id: "",
+      mdm_connected: false,
+    } : source;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
@@ -114,7 +128,7 @@ export function HardwareAssetForm({ initial }: Props = {}) {
   }, [hardwareStatuses, isEdit]);
 
   useEffect(() => {
-    if (!initial?.id || !initial.is_active || !canFinancialView) return;
+    if (duplicate || !initial?.id || !initial.is_active || !canFinancialView) return;
     client
       .get<CostRecord | null>(`/api/hardware/${initial.id}/hardware-cost`)
       .then((r) => {
@@ -129,7 +143,7 @@ export function HardwareAssetForm({ initial }: Props = {}) {
         }
       })
       .catch(() => {});
-  }, [initial?.id, initial?.is_active, canFinancialView]);
+  }, [initial?.id, initial?.is_active, canFinancialView, duplicate]);
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

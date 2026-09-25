@@ -20,6 +20,7 @@ import type {
 
 interface Props {
   initial?: Service;
+  duplicate?: boolean;
 }
 
 interface ApiErrorDetail {
@@ -127,12 +128,15 @@ function Toggle({
   );
 }
 
-export function ServiceForm({ initial }: Props) {
+export function ServiceForm({ initial, duplicate = false }: Props) {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const isEdit = !!initial;
+  const isEdit = !!initial && !duplicate;
 
-  const [draft, setDraft] = useState<ServiceDraft>(() => toDraft(initial));
+  const [draft, setDraft] = useState<ServiceDraft>(() => ({
+    ...toDraft(initial),
+    name: duplicate && initial ? `${initial.name} (copy)` : (initial?.name ?? ""),
+  }));
   const [extras, setExtras] = useState<ExtraFields>(() => toExtraFields(initial));
   const [offsetsError, setOffsetsError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

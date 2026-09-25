@@ -285,6 +285,11 @@ export function HardwareAssetDetail() {
     }
   }
 
+  function handleDuplicate() {
+    if (!hardware) return;
+    navigate("/hardware/new", { state: { duplicateFrom: hardware } });
+  }
+
   const isIndexRoute =
     id != null &&
     (location.pathname === `/hardware/${id}` ||
@@ -416,6 +421,7 @@ export function HardwareAssetDetail() {
                 canDelete={isAdmin}
                 isArchived={!hardware.is_active}
                 busyAction={actionBusy}
+                onDuplicate={handleDuplicate}
                 onArchive={() => {
                   void handleArchive();
                 }}
@@ -530,6 +536,7 @@ interface KebabMenuProps {
   canDelete: boolean;
   isArchived: boolean;
   busyAction: "archive" | "unarchive" | "delete" | null;
+  onDuplicate: () => void;
   onArchive: () => void;
   onUnarchive: () => void;
   onDelete: () => void;
@@ -540,6 +547,7 @@ function KebabMenu({
   canDelete,
   isArchived,
   busyAction,
+  onDuplicate,
   onArchive,
   onUnarchive,
   onDelete,
@@ -590,7 +598,13 @@ function KebabMenu({
             role="menu"
             className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface py-1 shadow-md"
           >
-            <MenuItem label="Duplicate" onClick={() => setOpen(false)} />
+            {canEdit && (
+              <MenuItem
+                label="Duplicate"
+                disabled={isBusy}
+                onClick={() => runAndClose(onDuplicate)}
+              />
+            )}
             {canEdit && (
               <MenuItem
                 label={archiveBusy ? `${archiveLabel}...` : archiveLabel}
