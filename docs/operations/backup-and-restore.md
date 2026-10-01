@@ -12,6 +12,8 @@ A **full backup** includes:
 
 **Consistency:** For a strict point-in-time copy, pause writes briefly and snapshot both layers, or accept a small skew between DB and object backup times (rarely an issue if backups run minutes apart).
 
+Compose retains the legacy `minio` service, `minio_data` volume, and `MINIO_*` settings. For upgrades from MinIO, follow the [next-release migration instructions](../releases/next.md); a bucket mirror alone is not a complete storage-state rollback backup.
+
 Configure variables using [`.env.example`](../../.env.example) as a checklist; copy to `.env` for local Compose.
 
 ---
@@ -23,11 +25,11 @@ Configure variables using [`.env.example`](../../.env.example) as a checklist; c
 | Volume       | Service | Purpose                                      |
 |-------------|---------|----------------------------------------------|
 | `pgdata`    | `db`    | PostgreSQL 16 data directory                 |
-| `minio_data`| `minio` | MinIO object store (`/data`)                 |
+| `minio_data`| `minio` | Silo object store (`/data`)                 |
 
 These persist across `docker compose stop` and `docker compose down`. They are removed if you run `docker compose down -v` or delete the volumes explicitly.
 
-The API service mounts `./data:/data`; the application code does not use `/data` today. If you store files there later, include `./data` in the same backup procedure as the database and MinIO.
+The API service mounts `./data:/data`; the application code does not use `/data` today. If you store files there later, include `./data` in the same backup procedure as the database and Silo.
 
 ### One-command backup (script)
 
@@ -49,12 +51,12 @@ Adjust user and database names to match `.env` (`POSTGRES_USER`, `POSTGRES_DB`).
 docker compose exec -T db pg_dump -U catalogit -Fc catalogit > pg-backup.dump
 ```
 
-### Manual: MinIO bucket mirror
+### Manual: Silo bucket mirror
 
-Using the MinIO client (`mc`) against the running Compose network (bucket name defaults to `catalogit-attachments`; override with `MINIO_BUCKET_NAME` in `.env`):
+Using the Silo client (`mc`) against the running Compose network (bucket name defaults to `catalogit-attachments`; override with `MINIO_BUCKET_NAME` in `.env`):
 
 ```bash
-# Example: alias pointing at the MinIO service from another container on the same Compose network
+# Example: alias pointing at the Silo service from another container on the same Compose network
 mc alias set local http://localhost:9000 catalogit catalogit_local   # use MINIO_ROOT_* from .env
 mc mirror local/catalogit-attachments ./backup-objects/
 ```
@@ -81,11 +83,11 @@ Always test restores on a **copy** of data first.
 - Store attachments in **Amazon S3** (same S3 API the app already uses). Point `MINIO_ENDPOINT` at the regional S3 endpoint, set `MINIO_BUCKET_NAME`, and use IAM credentials or an **IAM task role** on the ECS task (preferred over long-lived keys in environment variables).
 - **Backup:** Rely on RDS backup/snapshot policies for the database. For S3, use versioning, cross-region replication, and optionally [AWS Backup](https://aws.amazon.com/backup/) for a single policy across RDS and S3. ECS **tasks do not need data volumes** for application state if RDS and S3 hold all data.
 
-### Option B: Self-managed Postgres and MinIO on ECS or a server
+### Option B: Self-managed Postgres and Silo on ECS or a server
 
-- Mount **EBS volumes** (or **EFS** where shared storage is required) for Postgres data and for MinIO’s data directory. Do not rely on ephemeral container storage for either.
+- Mount **EBS volumes** (or **EFS** where shared storage is required) for Postgres data and for Silo’s data directory. Do not rely on ephemeral container storage for either.
 - **Postgres:** Schedule `pg_dump` (`-Fc`) to durable storage (e.g. S3), and optionally use EBS snapshots of the data volume for faster full-disk recovery.
-- **MinIO:** Prefer **bucket-level backup** with `mc mirror` or `aws s3 sync` to a second bucket or off-site target. Volume-only snapshots of MinIO are possible but harder to align with a live database without a maintenance window.
+- **Silo:** Prefer **bucket-level backup** with `mc mirror` or `aws s3 sync` to a second bucket or off-site target. Volume-only snapshots of Silo are possible but harder to align with a live database without a maintenance window.
 
 ### Automation and monitoring
 
@@ -117,6 +119,6 @@ These are **not** fully captured in a database dump. Store them in a secrets man
 | Integrations | `SCIM_TOKEN`, OAuth-related settings stored in DB but provider secrets in env |
 | Object storage | `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET_NAME`, `MINIO_USE_SSL` |
 | Cron / internal | `CRON_SECRET` |
-| Compose-only (MinIO server) | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` when running MinIO yourself |
+| Compose-only (Silo server) | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` when running Silo yourself |
 
 After a disaster, redeploy the application with the same logical configuration so OIDC, SCIM, and attachment URLs remain valid (`PUBLIC_BASE_URL`, `FRONTEND_URL`).

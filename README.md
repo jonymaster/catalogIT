@@ -56,7 +56,7 @@ Treat it as a throwaway environment: do not store real or sensitive information.
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS            |
 | Database | PostgreSQL 16                                       |
 | Auth     | OIDC + SCIM 2.0, local password fallback            |
-| Storage  | S3-compatible (MinIO locally, AWS S3 in production) |
+| Storage  | S3-compatible (Silo in Compose, AWS S3 supported) |
 
 
 ## Quick Start
@@ -90,8 +90,10 @@ Once running:
 | Frontend           | [http://localhost:5173](http://localhost:5173)           |
 | API                | [http://localhost:8000](http://localhost:8000)           |
 | API Docs (Swagger) | [http://localhost:8000/docs](http://localhost:8000/docs) |
-| MinIO Console      | [http://localhost:9001](http://localhost:9001)           |
+| Silo Console      | [http://localhost:9001](http://localhost:9001)           |
 
+
+Existing installations: see the [Silo upgrade notes](docs/releases/next.md) before updating. Compose retains the `minio` service, storage names, and `MINIO_*` settings for compatibility.
 
 ### Database migrations
 
