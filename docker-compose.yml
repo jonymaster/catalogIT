@@ -15,8 +15,9 @@ services:
       timeout: 3s
       retries: 5
 
+  # Keep the service and storage names for existing installations.
   minio:
-    image: minio/minio
+    image: docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -27,7 +28,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/ready"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -14,7 +14,7 @@ CatalogIT sends **renewal reminder emails** (and **Gmail test emails** from Inte
 | Use the built-in default (no upload) | Do nothing; the API ships a default layout |
 | Connect Google to send mail | **Settings → Integrations → Gmail** |
 
-Object storage (MinIO or S3) must be configured for uploads. Local Docker Compose includes MinIO.
+Object storage (Silo or another S3-compatible service) must be configured for uploads. Local Docker Compose includes Silo.
 
 ---
 

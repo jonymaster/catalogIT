@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local backup: PostgreSQL (pg_dump -Fc) + MinIO bucket mirror via Compose.
+# Local backup: PostgreSQL (pg_dump -Fc) + Silo bucket mirror via Compose.
 # Requires: docker compose, running db + minio services. Loads .env from repo root.
 set -euo pipefail
 
