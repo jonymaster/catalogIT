@@ -3,7 +3,7 @@ variable "TAG" {
 }
 
 group "default" {
-  targets = ["ui", "api"]
+  targets = ["ui", "api", "mcp"]
 }
 
 target "ui" {
@@ -22,6 +22,16 @@ target "api" {
   tags = [
     "jonymaster/catalogit-api:${TAG}",
     "jonymaster/catalogit-api:latest",
+  ]
+  platforms = ["linux/amd64", "linux/arm64"]
+}
+
+target "mcp" {
+  context    = "./mcp"
+  dockerfile = "Dockerfile"
+  tags = [
+    "jonymaster/catalogit-mcp:${TAG}",
+    "jonymaster/catalogit-mcp:latest",
   ]
   platforms = ["linux/amd64", "linux/arm64"]
 }

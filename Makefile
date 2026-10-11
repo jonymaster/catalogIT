@@ -7,7 +7,7 @@ BUILDER ?= catalogit-multiarch
 backup-local:
 	@./scripts/backup-local.sh
 
-# Build and push both UI and API images (version tag + :latest). Override: make release TAG=1.2.0
+# Build and push UI, API, and MCP images (version tag + :latest). Override: make release TAG=1.2.0
 release:
 	@docker buildx inspect $(BUILDER) >/dev/null 2>&1 || docker buildx create --name $(BUILDER) --driver docker-container --use
 	@docker buildx use $(BUILDER)

@@ -17,6 +17,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **Notifications** — renewal reminders and alerts via Gmail, Slack, Telegram, or webhooks ([email templates](docs/email-templates.md))
 - **File Attachments** — attach contracts and documents to services (S3-compatible storage)
 - **API Tokens** — programmatic access for automation and integrations
+- **MCP server** — read-only service, vendor, hardware, and cost lookups over local stdio or hosted Streamable HTTP ([setup guide](docs/integrations/mcp.md))
 - **Backup & Restore** — complete tooling for database and object storage backups
 
 ## Live demo
@@ -128,6 +129,7 @@ CatalogIT can load **bundled demo data** on the **first** API startup when the d
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | **Email templates** (subject, HTML upload, logos, preview) | [docs/email-templates.md](docs/email-templates.md)                             |
 | Integrations overview                                      | [docs/integrations/README.md](docs/integrations/README.md)                     |
+| MCP and AI assistants                                       | [docs/integrations/mcp.md](docs/integrations/mcp.md)                          |
 | Gmail setup                                                | [docs/integrations/gmail.md](docs/integrations/gmail.md)                       |
 | Slack setup                                                | [docs/integrations/slack.md](docs/integrations/slack.md)                       |
 | Telegram setup                                             | [docs/integrations/telegram.md](docs/integrations/telegram.md)                 |
@@ -151,6 +153,7 @@ catalogIT/
 │   ├── alembic/       # Database migrations
 │   ├── sample_data/   # Optional seed JSON (bundled in API image for SEED_SAMPLE_DATA)
 │   └── Dockerfile
+├── mcp/               # Read-only MCP adapter for the REST API (stdio + Streamable HTTP)
 ├── frontend/          # React (Vite) application
 │   ├── src/           # Components, pages, hooks, types
 │   └── Dockerfile
@@ -164,7 +167,7 @@ catalogIT/
 ├── scripts/           # Utility scripts (backup, etc.)
 ├── docker-compose.yml
 ├── docker-compose.server.yml  # Production-oriented stack (pinned images via CATALOGIT_TAG)
-├── docker-bake.hcl    # Multi-arch image build (API + UI; version + latest tags)
+├── docker-bake.hcl    # Multi-arch image build (API + UI + MCP; version + latest tags)
 ├── Makefile           # e.g. make release — push images; make backup-local
 └── .env.example       # Environment variable template
 ```
