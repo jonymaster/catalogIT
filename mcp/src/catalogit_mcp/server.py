@@ -59,7 +59,10 @@ def _configuration() -> str:
 
 def _api_token(ctx: Context) -> str:
     """Use the caller's bearer token for HTTP; retain env tokens for local stdio only."""
-    headers = ctx.headers or {}
+    # In MCP Python SDK 1.26, HTTP request headers live on the underlying
+    # Starlette Request attached to the request context (there is no ctx.headers).
+    request = ctx.request_context.request
+    headers = request.headers if request is not None else {}
     authorization = headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.casefold() == "bearer" and token.strip():
