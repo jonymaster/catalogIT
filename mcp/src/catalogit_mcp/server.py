@@ -7,11 +7,18 @@ from typing import Any
 from urllib.parse import quote, urlsplit
 
 import httpx
-import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 _MAX_RESULTS = 100
+_MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
+_MCP_PORT = int(os.environ.get("MCP_PORT", "8000"))
+_MCP_ALLOWED_HOSTS = [
+    item.strip() for item in os.environ.get("MCP_ALLOWED_HOSTS", "").split(",") if item.strip()
+]
+_MCP_ALLOWED_ORIGINS = [
+    item.strip() for item in os.environ.get("MCP_ALLOWED_ORIGINS", "").split(",") if item.strip()
+]
 
 mcp = FastMCP(
     "CatalogIT",
@@ -19,6 +26,16 @@ mcp = FastMCP(
         "Read-only access to a CatalogIT instance. Use these tools to look up services, "
         "vendors, hardware, and service cost records. The server cannot modify CatalogIT. "
         "Hardware and financial tools require the connected CatalogIT user's existing permissions."
+    ),
+    host=_MCP_HOST,
+    port=_MCP_PORT,
+    transport_security=(
+        TransportSecuritySettings(
+            allowed_hosts=_MCP_ALLOWED_HOSTS,
+            allowed_origins=_MCP_ALLOWED_ORIGINS,
+        )
+        if _MCP_ALLOWED_HOSTS
+        else None
     ),
 )
 
@@ -271,24 +288,13 @@ def main() -> None:
     if transport == "stdio":
         mcp.run(transport="stdio")
     elif transport == "streamable-http":
-        host = os.environ.get("MCP_HOST", "0.0.0.0")
-        port = int(os.environ.get("MCP_PORT", "8000"))
-        allowed_hosts = _csv_setting("MCP_ALLOWED_HOSTS")
-        allowed_origins = _csv_setting("MCP_ALLOWED_ORIGINS")
-        if not allowed_hosts:
+        if not _MCP_ALLOWED_HOSTS:
             raise RuntimeError("Set MCP_ALLOWED_HOSTS to the public hostname(s) that proxy to this server")
-        security = TransportSecuritySettings(
-            allowed_hosts=allowed_hosts,
-            allowed_origins=allowed_origins,
-        )
-        app = mcp.streamable_http_app(transport_security=security)
-        uvicorn.run(app, host=host, port=port)
+        # This SDK API reads host, port, and transport security from the
+        # FastMCP constructor; run() selects only the transport.
+        mcp.run(transport="streamable-http")
     else:
         raise RuntimeError("CATALOGIT_TRANSPORT must be 'stdio' or 'streamable-http'")
-
-
-def _csv_setting(name: str) -> list[str]:
-    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
 
 
 if __name__ == "__main__":
