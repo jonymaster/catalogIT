@@ -1,4 +1,4 @@
-# Production-oriented stack for a host behind Nginx Proxy Manager (or similar).
+# Production-oriented application stack for deployment behind an HTTPS reverse proxy.
 #
 # Images (pre-built multi-arch on Docker Hub). Build and push from the repo root:
 #   make release
@@ -20,8 +20,10 @@
 # Migrations: the API container runs `alembic upgrade head` on startup (see app lifespan).
 # Manual `docker compose ... exec api alembic upgrade head` is only needed for one-off fixes.
 #
-# NPM: one hostname with path routing — "/" -> ui:80, "/api", "/auth", "/scim", "/docs",
-# "/openapi.json" -> api:8000 — so the browser keeps a single origin (matches frontend axios baseURL "/").
+# Reverse proxy: path routing — "/" -> ui:80, "/api", "/auth", "/scim", "/docs",
+# "/openapi.json" -> api:8000, and "/mcp" -> MCP service port 8000 — so the browser keeps a single origin.
+# Prefer a shared Docker network for the proxy. Host port 8002 binds to loopback by default;
+# if the proxy must reach a host interface, set MCP_BIND to that interface and firewall it to the proxy only.
 #
 # UI keeps restarting? On the Portainer host run: docker logs <ui-container-name>
 #   - "exec format error" — image CPU arch does not match the host (e.g. arm64 image on
@@ -102,6 +104,22 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+
+  mcp:
+    image: jonymaster/catalogit-mcp:${CATALOGIT_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${MCP_BIND:-127.0.0.1}:${MCP_PUBLISH:-8002}:8000"
+    environment:
+      CATALOGIT_URL: http://api:8000
+      CATALOGIT_ALLOW_HTTP: "true"
+      CATALOGIT_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:?Set the public hostname(s) that proxy to the MCP server}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+    depends_on:
+      - api
 
   ui:
     # Image must serve static files on container port 80 (Dockerfile.prod), not Vite dev.

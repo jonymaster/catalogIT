@@ -56,6 +56,22 @@ services:
       minio:
         condition: service_healthy
 
+  mcp:
+    build:
+      context: ./mcp
+    ports:
+      - "${MCP_BIND:-127.0.0.1}:${MCP_PUBLISH:-8001}:8000"
+    environment:
+      CATALOGIT_URL: http://api:8000
+      CATALOGIT_ALLOW_HTTP: "true"
+      CATALOGIT_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000
+      MCP_ALLOWED_HOSTS: localhost:*,127.0.0.1:*,[::1]:*
+      MCP_ALLOWED_ORIGINS: http://localhost:8001,http://127.0.0.1:8001
+    depends_on:
+      - api
+
   ui:
     build:
       context: ./frontend

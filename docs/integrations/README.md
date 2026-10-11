@@ -8,6 +8,7 @@ CatalogIT sends notifications through **deployment-scoped** integrations configu
 
 ## Guides
 
+- [MCP and AI assistants](mcp.md) — local stdio or hosted Streamable HTTP read-only access for MCP-compatible AI clients.
 - [Gmail (Google)](gmail.md)
 - [Slack](slack.md)
 - [Telegram](telegram.md)
