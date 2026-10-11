@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import quote, urlsplit
 
 import httpx
+import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
@@ -280,7 +281,8 @@ def main() -> None:
             allowed_hosts=allowed_hosts,
             allowed_origins=allowed_origins,
         )
-        mcp.run(transport="streamable-http", host=host, port=port, transport_security=security)
+        app = mcp.streamable_http_app(transport_security=security)
+        uvicorn.run(app, host=host, port=port)
     else:
         raise RuntimeError("CATALOGIT_TRANSPORT must be 'stdio' or 'streamable-http'")
 
