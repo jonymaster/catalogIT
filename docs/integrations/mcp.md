@@ -77,17 +77,72 @@ The MCP server excludes service notes, personal contact details, hardware notes 
 - **Hardware or costs are unavailable:** hardware lookup requires hardware visibility; cost records require financial visibility.
 - **Tools do not appear:** reload the AI client after editing its MCP configuration and check the client's MCP server logs for process startup errors.
 
-## Hosted Streamable HTTP and ChatGPT
+## Hosted Streamable HTTP
 
-The MCP service also supports Streamable HTTP at `/mcp`. It calls CatalogIT's REST API and forwards the bearer token supplied by the MCP client. CatalogIT validates that token on each API request, applies the token owner's role and hardware/financial permissions, and records API audit events as that user. MCP itself still exposes read-only tools.
+The MCP service also supports Streamable HTTP at `/mcp`. It calls CatalogIT's REST API and forwards the caller's credential. CatalogIT validates that credential on each API request, applies the user's role and hardware/financial permissions, and records API audit events as that user. MCP itself still exposes read-only tools.
 
-For ChatGPT's bearer-token configuration, create an API token in **Settings → API Tokens** and enter it as the MCP server bearer token. This is a static CatalogIT API token, not an OAuth login. Give the token to an account with the minimum role and feature permissions needed, and revoke it in CatalogIT if it is exposed. If ChatGPT stores one shared token for a workspace connection, all users of that connection act with that token owner's permissions. OAuth can be added later to provide a separate sign-in/consent flow for each user.
+A hosted connection can authenticate in two ways:
+
+| Method | Clients | How |
+| --- | --- | --- |
+| Static API token | Claude Code, Claude Desktop (stdio), other clients that send custom headers | Send `Authorization: Bearer <CatalogIT API token>` |
+| OAuth sign-in | Claude.ai custom connectors, ChatGPT developer mode | Bring your own OAuth provider and configure it in **Settings → MCP Sign-in** |
+
+ChatGPT and Claude.ai custom connectors do not accept a pasted static bearer token; use OAuth sign-in for them.
 
 ### Deploy the endpoint
 
 1. Build and push the multi-architecture images from the repository root: `make release TAG=<version>`. This publishes `jonymaster/catalogit-mcp` along with the UI and API images.
-2. Update the production Compose stack to include the `mcp` service from `docker-compose.server.yml`. It listens on container port `8000` and reaches the API internally at `http://api:8000`. The optional host mapping defaults to loopback port `8002`; set `MCP_PUBLISH` for a different port.
-3. In your reverse proxy, route `/mcp` to the MCP service on port `8000` over a private/shared container network. Preserve the `/mcp` path when proxying and serve it over HTTPS. Set `MCP_ALLOWED_HOSTS` to the external hostname (include a `hostname:*` entry if the proxy sends a port in the Host header); set `MCP_ALLOWED_ORIGINS` if your client sends an Origin header.
-4. Connect ChatGPT to `https://<your-catalogit-hostname>/mcp`, select its bearer-token authentication option, and enter the CatalogIT API token. Scan the tools and try a read-only lookup.
+2. Add the `mcp` service from `docker-compose.server.yml` to the production stack. It listens on container port `8000` and reaches the API internally at `http://api:8000`. Set `MCP_ALLOWED_HOSTS` to the external hostname (include a `hostname:*` entry if the proxy sends a port in the Host header); set `MCP_ALLOWED_ORIGINS` if your client sends an Origin header.
+3. The UI image proxies `/mcp` to the `mcp` service, like `/api`. If your reverse proxy routes everything to the UI container, no extra rule is needed. Otherwise route `/mcp` to the MCP service on port `8000`, preserve the path and the Host header, disable response buffering, and serve it over HTTPS.
+4. Check the endpoint. An `initialize` POST to `https://<host>/mcp` must return `200` with `content-type: text/event-stream`. An HTML response means `/mcp` reaches the UI instead of the MCP service; `421` means `MCP_ALLOWED_HOSTS` does not include the hostname.
 
-The HTTP server requires a bearer token when a tool calls CatalogIT; missing, revoked, or expired tokens are rejected by the CatalogIT API. PostgreSQL remains private and is never accessed by the MCP service. ChatGPT plan and workspace settings determine whether custom MCP apps are available; see [OpenAI's ChatGPT MCP app instructions](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).
+### Static API token (Claude Code)
+
+```sh
+claude mcp add --transport http catalogit https://<host>/mcp \
+  --header "Authorization: Bearer $CATALOGIT_TOKEN"
+```
+
+If an authenticating proxy protects the hostname (for example Cloudflare Access), the client must also pass that proxy's credentials, such as `CF-Access-Client-Id` and `CF-Access-Client-Secret` for an Access service token with a **Service Auth** policy.
+
+### OAuth sign-in (bring your own provider)
+
+CatalogIT does not run an OAuth server. An external issuer runs the sign-in, and CatalogIT trusts the JWT access tokens it signs:
+
+1. The AI client calls `/mcp`, receives `401` with OAuth discovery metadata, and opens the provider's sign-in page.
+2. The user signs in; the client receives an access token and calls `/mcp` again.
+3. The MCP service forwards the token (or the proxy's identity JWT, see `MCP_IDENTITY_HEADER`) to the API.
+4. The API validates signature, issuer, audience, and expiry against **Settings → MCP Sign-in**, then maps the configured claim (default `email`) to an existing active CatalogIT user. Tokens never create users.
+
+Configure **Settings → MCP Sign-in** as an admin:
+
+- **Issuer URL:** must equal the token's `iss` claim.
+- **JWKS URL:** the issuer's signing keys. Leave blank to discover it from `<issuer>/.well-known/openid-configuration`.
+- **Audience:** must be one of the token's `aud` values.
+- **Email claim:** the claim holding the user's email.
+
+Use **Test signing keys** to confirm CatalogIT can fetch the keys, then enable the issuer.
+
+#### Cloudflare Access Managed OAuth
+
+If Cloudflare Access already protects your CatalogIT hostname, Access can act as the OAuth server for `/mcp`, using your existing identity provider (for example Okta) for sign-in.
+
+1. In Cloudflare Zero Trust, create a self-hosted Access application for `<host>/mcp` with the same allow policy as the main application. A more specific path takes precedence over the hostname application.
+2. In the application's advanced settings, enable **Managed OAuth** and dynamic client registration. Cloudflare recommends a short access-token lifetime (5–15 minutes) with a longer session.
+3. Copy the application's **AUD tag**.
+4. Set `MCP_IDENTITY_HEADER=Cf-Access-Jwt-Assertion` for the `mcp` service. Access sends the signed user identity in that header; the MCP service forwards it to the API.
+5. In **Settings → MCP Sign-in**, set:
+   - Issuer URL: `https://<team>.cloudflareaccess.com`
+   - JWKS URL: `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs`
+   - Audience: the AUD tag
+   - Email claim: `email`
+6. Add the connector in Claude or ChatGPT with URL `https://<host>/mcp` and OAuth authentication. Sign in when prompted.
+
+The CatalogIT API validates the Access JWT itself, so a request that bypasses Cloudflare with a forged header is rejected.
+
+#### Other providers
+
+Any issuer that signs JWT access tokens with a published JWKS works, for example an Okta custom authorization server. The AI client must be able to register with the provider (dynamic client registration) or accept a pre-registered client ID and secret. Serving OAuth discovery metadata directly from the MCP service, without a proxy such as Cloudflare Access, is not implemented yet.
+
+PostgreSQL remains private and is never accessed by the MCP service. ChatGPT plan and workspace settings determine whether custom MCP apps are available; see [OpenAI's ChatGPT MCP app instructions](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).

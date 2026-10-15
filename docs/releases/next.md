@@ -26,3 +26,9 @@ Fresh installations can use the normal Quick Start without migration steps. Exis
 ### Recovery
 
 If validation fails, keep traffic and writers paused. Stop Silo and restore the original image/configuration and the matching pre-upgrade storage recovery point; restore PostgreSQL as needed to keep it consistent with object storage. Do not simply run the old image against Silo-modified state: this release changes durable IAM state and does not support rolling downgrade. Never run old and new servers against the same writable storage. If writes have resumed, preserve and reconcile subsequent database/object changes before restoring an older snapshot to avoid losing them.
+
+## MCP sign-in with your own OAuth provider
+
+AI assistants that require OAuth (Claude.ai custom connectors, ChatGPT developer mode) can now connect to the hosted MCP endpoint. Configure an external token issuer in **Settings → MCP Sign-in**. CatalogIT accepts JWT access tokens signed by that issuer and maps them to existing, active users by email; tokens never create users. Cloudflare Access Managed OAuth is supported via the new `MCP_IDENTITY_HEADER` setting for the `mcp` service. See [MCP and AI assistants](../integrations/mcp.md).
+
+The UI image now proxies `/mcp` to the `mcp` service, so a reverse proxy that routes everything to the UI container needs no extra rule. Migration `049` adds the `trusted_token_issuer` table; the API applies it on startup.

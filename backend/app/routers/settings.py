@@ -34,6 +34,19 @@ from app.schemas.notifications import (
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from app.schemas.oidc import OidcConfigRead, OidcConfigWrite, OidcTestResult
+from app.models.trusted_token_issuer import TrustedTokenIssuer
+from app.schemas.trusted_token_issuer import (
+    TrustedTokenIssuerRead,
+    TrustedTokenIssuerTestResult,
+    TrustedTokenIssuerWrite,
+)
+from app.services.trusted_token_issuer import (
+    IssuerConfigError,
+    fetch_jwks,
+    normalize_issuer,
+    require_https_url,
+    resolve_jwks_url,
+)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -94,6 +107,68 @@ async def test_oidc_config(
         )
     except httpx.HTTPError as exc:
         return OidcTestResult(success=False, error=str(exc))
+
+
+@router.get("/token-issuer", response_model=TrustedTokenIssuerRead | None)
+async def get_token_issuer_config(
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    return await db.get(TrustedTokenIssuer, 1)
+
+
+def _validate_token_issuer(body: TrustedTokenIssuerWrite) -> None:
+    try:
+        if body.enabled or body.issuer_url.strip():
+            require_https_url(body.issuer_url.strip(), "Issuer URL")
+        if body.jwks_url.strip():
+            require_https_url(body.jwks_url.strip(), "JWKS URL")
+    except IssuerConfigError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if body.enabled and not body.audience.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Audience is required")
+    if not body.email_claim.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email claim is required")
+
+
+@router.put("/token-issuer", response_model=TrustedTokenIssuerRead)
+async def save_token_issuer_config(
+    body: TrustedTokenIssuerWrite,
+    _user: User = Depends(_admin),
+    db: AsyncSession = Depends(get_audited_db),
+):
+    _validate_token_issuer(body)
+    config = await db.get(TrustedTokenIssuer, 1)
+    if config is None:
+        config = TrustedTokenIssuer(id=1)
+        db.add(config)
+
+    config.provider_name = body.provider_name.strip()
+    config.issuer_url = normalize_issuer(body.issuer_url)
+    config.jwks_url = body.jwks_url.strip()
+    config.audience = body.audience.strip()
+    config.email_claim = body.email_claim.strip()
+    config.enabled = body.enabled
+
+    await db.flush()
+    await db.refresh(config)
+    return config
+
+
+@router.post("/token-issuer/test", response_model=TrustedTokenIssuerTestResult)
+async def test_token_issuer_config(
+    body: TrustedTokenIssuerWrite,
+    _user: User = Depends(_admin),
+):
+    """Resolve and fetch the issuer's JWKS to verify that tokens can be validated."""
+    _validate_token_issuer(body)
+    candidate = TrustedTokenIssuer(issuer_url=body.issuer_url, jwks_url=body.jwks_url)
+    try:
+        jwks_url = await resolve_jwks_url(candidate)
+        jwks = await fetch_jwks(jwks_url, force=True)
+    except IssuerConfigError as exc:
+        return TrustedTokenIssuerTestResult(success=False, error=str(exc))
+    return TrustedTokenIssuerTestResult(success=True, jwks_url=jwks_url, key_count=len(jwks["keys"]))
 
 
 class ScimStatus(BaseModel):

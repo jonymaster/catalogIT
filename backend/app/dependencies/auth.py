@@ -19,6 +19,7 @@ from app.models.api_token import ApiToken
 from app.models.user import User
 from app.models.user_permission import UserPermission
 from app.permissions import PERMISSION_FINANCIAL_VIEW, PERMISSION_HARDWARE_VIEW
+from app.services.trusted_token_issuer import authenticate_trusted_issuer_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -69,6 +70,9 @@ async def get_current_user(
         user_id = uuid.UUID(payload["sub"])
     except (JWTError, KeyError, ValueError):
         user = await _authenticate_via_api_token(raw_token, db)
+        if user:
+            return user
+        user = await authenticate_trusted_issuer_token(raw_token, db)
         if user:
             return user
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

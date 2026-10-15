@@ -19,6 +19,10 @@ _MCP_ALLOWED_HOSTS = [
 _MCP_ALLOWED_ORIGINS = [
     item.strip() for item in os.environ.get("MCP_ALLOWED_ORIGINS", "").split(",") if item.strip()
 ]
+# Header set by an authenticating proxy (e.g. "Cf-Access-Jwt-Assertion" with Cloudflare
+# Access Managed OAuth). When present it is forwarded instead of the Authorization header;
+# CatalogIT validates it against Settings -> Token issuer.
+_MCP_IDENTITY_HEADER = os.environ.get("MCP_IDENTITY_HEADER", "").strip().casefold()
 
 mcp = FastMCP(
     "CatalogIT",
@@ -63,12 +67,18 @@ def _api_token(ctx: Context) -> str:
     # Starlette Request attached to the request context (there is no ctx.headers).
     request = ctx.request_context.request
     headers = request.headers if request is not None else {}
+    if _MCP_IDENTITY_HEADER:
+        identity_token = headers.get(_MCP_IDENTITY_HEADER, "").strip()
+        if identity_token:
+            return identity_token
     authorization = headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.casefold() == "bearer" and token.strip():
         return token.strip()
     if os.environ.get("CATALOGIT_TRANSPORT", "stdio").casefold() != "stdio":
-        raise RuntimeError("Provide a CatalogIT API token as a Bearer token in the MCP connection")
+        raise RuntimeError(
+            "Sign in through the MCP connection's OAuth flow or provide a CatalogIT API token as a Bearer token"
+        )
 
     token = os.environ.get("CATALOGIT_API_TOKEN", "").strip()
     if not token:
