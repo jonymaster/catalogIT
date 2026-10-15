@@ -72,7 +72,7 @@ Treat it as a throwaway environment: do not store real or sensitive information.
 
 ```bash
 # Clone the repository
-git clone https://github.com/jcoponet/catalogIT.git
+git clone https://github.com/jonymaster/catalogIT.git
 cd catalogIT
 
 # Configure environment

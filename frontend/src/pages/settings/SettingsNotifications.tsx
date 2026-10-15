@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/Button";
 
 /** Source files in the public repo (docs + canned HTML). */
 const REPO_MAIN =
-  "https://github.com/jcoponet/catalogIT/blob/main";
+  "https://github.com/jonymaster/catalogIT/blob/main";
 import { useToast } from "../../context/useToast";
 import type { User } from "../../types/models";
 
