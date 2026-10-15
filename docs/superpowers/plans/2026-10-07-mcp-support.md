@@ -23,7 +23,7 @@ Prefer the MCP project's maintained Python SDK and Streamable HTTP for remote de
 
 ## Phases
 
-**Current state (2026-10-11):** The `mcp/` adapter provides read-only service, vendor, hardware, and service-cost tools over CatalogIT REST. It supports local stdio and hosted Streamable HTTP at `/mcp`, forwarding the request bearer token to CatalogIT. The production image/Compose service and ChatGPT setup guidance are included. OAuth-based per-user login, selected writes, and broader AI plugin work remain future work.
+**Current state (2026-10-15):** The `mcp/` adapter provides read-only service, vendor, hardware, and service-cost tools over CatalogIT REST. It supports local stdio and hosted Streamable HTTP at `/mcp`. Hosted calls forward either a static CatalogIT API token or an externally issued JWT; the API validates external JWTs against the admin-configured trusted token issuer (**Settings → MCP Sign-in**) and maps them to existing users by email. The UI nginx proxies `/mcp`. Cloudflare Access Managed OAuth is the first supported OAuth provider. MCP-served OAuth discovery metadata (for issuers without an authenticating proxy), selected writes, and broader AI plugin work remain future work.
 
 ### Phase 0 — contract and access model
 

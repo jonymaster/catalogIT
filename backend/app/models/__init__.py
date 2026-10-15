@@ -16,6 +16,7 @@ from app.models.service_history import ServiceHistoryEntry
 from app.models.hardware import HardwareAsset
 from app.models.global_audit_event import GlobalAuditEvent
 from app.models.oidc_config import OidcConfig
+from app.models.trusted_token_issuer import TrustedTokenIssuer
 from app.models.api_token import ApiToken
 from app.models.attachment import Attachment
 from app.models.integration_config import IntegrationConfig
@@ -44,6 +45,7 @@ __all__ = [
     "HardwareAsset",
     "GlobalAuditEvent",
     "OidcConfig",
+    "TrustedTokenIssuer",
     "ApiToken",
     "Attachment",
     "IntegrationConfig",

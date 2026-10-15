@@ -33,6 +33,7 @@ import { Settings } from "./pages/Settings";
 import { SettingsOidc } from "./pages/settings/SettingsOidc";
 import { SettingsIntegrations } from "./pages/settings/SettingsIntegrations";
 import { SettingsScim } from "./pages/settings/SettingsScim";
+import { SettingsTokenIssuer } from "./pages/settings/SettingsTokenIssuer";
 import { SettingsTokens } from "./pages/settings/SettingsTokens";
 import { SettingsApi } from "./pages/settings/SettingsApi";
 import { SettingsReferenceData } from "./pages/settings/SettingsReferenceData";
@@ -147,6 +148,7 @@ export default function App() {
                   <Route path="notifications" element={<SettingsNotifications />} />
                   <Route path="integrations" element={<SettingsIntegrations />} />
                   <Route path="scim" element={<SettingsScim />} />
+                  <Route path="mcp" element={<SettingsTokenIssuer />} />
                   <Route path="reference-data" element={<SettingsReferenceData />}>
                     <Route index element={<SettingsReferenceDataHome />} />
                     <Route

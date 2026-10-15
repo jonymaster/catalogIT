@@ -4,6 +4,7 @@ import { PageTransition } from "../components/PageTransition";
 const tabs = [
   { to: "oidc", label: "OIDC" },
   { to: "scim", label: "SCIM" },
+  { to: "mcp", label: "MCP Sign-in" },
   { to: "integrations", label: "Integrations" },
   { to: "notifications", label: "Notifications" },
   { to: "reference-data", label: "Reference Data" },

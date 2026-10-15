@@ -118,6 +118,7 @@ services:
       MCP_PORT: 8000
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:?Set the public hostname(s) that proxy to the MCP server}
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_IDENTITY_HEADER: ${MCP_IDENTITY_HEADER:-}
     depends_on:
       - api
 
