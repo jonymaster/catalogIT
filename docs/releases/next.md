@@ -36,3 +36,7 @@ The UI image now proxies `/mcp` to the `mcp` service, so a reverse proxy that ro
 ## MCP record history and audit log
 
 Two new read-only MCP tools: `get_record_history` returns the change history of a service, hardware asset, vendor, or tag, and `list_audit_events` returns the global audit log (admin accounts only). Notes, contact details, assignees, cellular identifiers, and financial references are removed from history values, and audit log results list changed field names without their values. See [MCP and AI assistants](../integrations/mcp.md).
+
+## Record history access checks
+
+`GET /api/history/{table}/{id}` now applies the same permissions as the records themselves. Catalog tables stay open to any signed-in user; hardware tables need hardware visibility; cost records need financial visibility (and hardware visibility for hardware cost records); users, API tokens, sign-in and integration settings, notification settings, and standalone attachment history are admin-only. Unknown table names return `404`. Service and hardware timelines in the UI are unchanged.
