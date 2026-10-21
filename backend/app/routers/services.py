@@ -353,6 +353,8 @@ async def create_service(
     return _scrub_financial(service, has_financial_view)
 
 
+# PUT is kept for the UI; both methods only change fields present in the body.
+@router.patch("/{service_id}", response_model=ServiceRead)
 @router.put("/{service_id}", response_model=ServiceRead)
 async def update_service(
     service_id: uuid.UUID,

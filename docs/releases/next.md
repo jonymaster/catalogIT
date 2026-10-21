@@ -40,3 +40,9 @@ Two new read-only MCP tools: `get_record_history` returns the change history of 
 ## Record history access checks
 
 `GET /api/history/{table}/{id}` now applies the same permissions as the records themselves. Catalog tables stay open to any signed-in user; hardware tables need hardware visibility; cost records need financial visibility (and hardware visibility for hardware cost records); users, API tokens, sign-in and integration settings, notification settings, and standalone attachment history are admin-only. Unknown table names return `404`. Service and hardware timelines in the UI are unchanged.
+
+## MCP write tools
+
+The MCP server can now create and update vendors, tags, and services (`create_vendor`, `update_vendor`, `create_tag`, `update_tag`, `create_service`, `update_service`). Each tool calls the existing API, so the token owner's role decides what is allowed and every change is recorded in history under that user. Writes cannot delete or archive records, and do not touch notes, contacts, people, or financial fields. A viewer-role token keeps the connection read-only. See [MCP and AI assistants](../integrations/mcp.md).
+
+`PATCH /api/services/{id}` is now available alongside `PUT`; both change only the fields in the request body.

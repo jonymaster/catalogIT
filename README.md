@@ -17,7 +17,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **Notifications** — renewal reminders and alerts via Gmail, Slack, Telegram, or webhooks ([email templates](docs/email-templates.md))
 - **File Attachments** — attach contracts and documents to services (S3-compatible storage)
 - **API Tokens** — programmatic access for automation and integrations
-- **MCP server** — read-only service, vendor, hardware, and cost lookups over local stdio or hosted Streamable HTTP ([setup guide](docs/integrations/mcp.md))
+- **MCP server** — service, vendor, hardware, cost, and history lookups plus selected vendor, tag, and service writes over local stdio or hosted Streamable HTTP ([setup guide](docs/integrations/mcp.md))
 - **Backup & Restore** — complete tooling for database and object storage backups
 
 ## Live demo
@@ -153,7 +153,7 @@ catalogIT/
 │   ├── alembic/       # Database migrations
 │   ├── sample_data/   # Optional seed JSON (bundled in API image for SEED_SAMPLE_DATA)
 │   └── Dockerfile
-├── mcp/               # Read-only MCP adapter for the REST API (stdio + Streamable HTTP)
+├── mcp/               # MCP adapter for the REST API (stdio + Streamable HTTP)
 ├── frontend/          # React (Vite) application
 │   ├── src/           # Components, pages, hooks, types
 │   └── Dockerfile
