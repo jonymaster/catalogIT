@@ -32,3 +32,7 @@ If validation fails, keep traffic and writers paused. Stop Silo and restore the 
 AI assistants that require OAuth (Claude.ai custom connectors, ChatGPT developer mode) can now connect to the hosted MCP endpoint. Configure an external token issuer in **Settings → MCP Sign-in**. CatalogIT accepts JWT access tokens signed by that issuer and maps them to existing, active users by email; tokens never create users. Cloudflare Access Managed OAuth is supported via the new `MCP_IDENTITY_HEADER` setting for the `mcp` service. See [MCP and AI assistants](../integrations/mcp.md).
 
 The UI image now proxies `/mcp` to the `mcp` service, so a reverse proxy that routes everything to the UI container needs no extra rule. Migration `049` adds the `trusted_token_issuer` table; the API applies it on startup.
+
+## MCP record history and audit log
+
+Two new read-only MCP tools: `get_record_history` returns the change history of a service, hardware asset, vendor, or tag, and `list_audit_events` returns the global audit log (admin accounts only). Notes, contact details, assignees, cellular identifiers, and financial references are removed from history values, and audit log results list changed field names without their values. See [MCP and AI assistants](../integrations/mcp.md).

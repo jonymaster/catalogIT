@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any
 from urllib.parse import quote, urlsplit
 
@@ -28,7 +29,8 @@ mcp = FastMCP(
     "CatalogIT",
     instructions=(
         "Read-only access to a CatalogIT instance. Use these tools to look up services, "
-        "vendors, hardware, and service cost records. The server cannot modify CatalogIT. "
+        "vendors, hardware, service cost records, record change history, and the audit log. "
+        "The server cannot modify CatalogIT. "
         "Hardware and financial tools require the connected CatalogIT user's existing permissions."
     ),
     host=_MCP_HOST,
@@ -292,6 +294,145 @@ async def get_service_cost_records(
         for row in rows[:limit]
     ]
     return {"count": min(len(rows), limit), "truncated": len(rows) > limit, "cost_records": summaries}
+
+
+_HISTORY_TABLES = {
+    "service": "services",
+    "hardware": "hardware_assets",
+    "vendor": "vendors",
+    "tag": "tags",
+}
+# History values mirror whole database rows, so drop the same private fields the
+# summaries above leave out, plus financial references and storage locations.
+_HISTORY_HIDDEN_FIELDS = frozenset({
+    "notes",
+    "point_of_contact",
+    "imei",
+    "imei2",
+    "phone_number",
+    "assigned_to",
+    "assigned_to_id",
+    "cost_center",
+    "cost_center_id",
+    "payment_method",
+    "payment_method_id",
+    "storage_key",
+})
+_AUDIT_CATEGORIES = {"data_change", "security", "notification", "error"}
+
+
+def _actor_summary(actor: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Attribute events by name only; emails and profile fields stay out of results."""
+    if not actor:
+        return None
+    full_name = " ".join(
+        part for part in (actor.get("first_name"), actor.get("last_name")) if part
+    )
+    return {"id": actor.get("id"), "name": actor.get("display_name") or full_name or None}
+
+
+def _visible_values(values: dict[str, Any] | None) -> dict[str, Any] | None:
+    if values is None:
+        return None
+    return {key: value for key, value in values.items() if key not in _HISTORY_HIDDEN_FIELDS}
+
+
+def _page_bounds(page: int, per_page: int) -> tuple[int, int]:
+    if page < 1:
+        raise ValueError("page must be 1 or greater")
+    return page, _bounded_limit(per_page)
+
+
+@mcp.tool()
+async def get_record_history(
+    ctx: Context,
+    record_type: str,
+    record_id: str,
+    page: int = 1,
+    per_page: int = 50,
+) -> dict[str, Any]:
+    """Get the change history of one service, hardware asset, vendor, or tag, newest first.
+
+    record_type is one of: service, hardware, vendor, tag. Service and hardware history include
+    their attachment changes. Hardware history requires hardware visibility. Notes, contact
+    details, assignees, cellular identifiers, and financial references are removed from values.
+    """
+    table = _HISTORY_TABLES.get(record_type)
+    if table is None:
+        raise ValueError(f"record_type must be one of: {', '.join(sorted(_HISTORY_TABLES))}")
+    try:
+        record_uuid = uuid.UUID(record_id)
+    except ValueError as exc:
+        raise ValueError("record_id must be a CatalogIT UUID") from exc
+    page, per_page = _page_bounds(page, per_page)
+    payload = await _api_get(
+        f"/api/history/{table}/{record_uuid}",
+        params={"page": page, "per_page": per_page},
+        ctx=ctx,
+    )
+    entries = [
+        {
+            "id": row.get("id"),
+            "table": row.get("table_name"),
+            "action": row.get("action"),
+            "changed_by": _actor_summary(row.get("changed_by")),
+            "timestamp": row.get("timestamp"),
+            "old_values": _visible_values(row.get("old_values")),
+            "new_values": _visible_values(row.get("new_values")),
+        }
+        for row in payload.get("items", [])
+    ]
+    return {
+        "page": payload.get("page"),
+        "total_pages": payload.get("total_pages"),
+        "total_count": payload.get("total_count"),
+        "entries": entries,
+    }
+
+
+@mcp.tool()
+async def list_audit_events(
+    ctx: Context,
+    category: str | None = None,
+    page: int = 1,
+    per_page: int = 50,
+) -> dict[str, Any]:
+    """List CatalogIT's global audit log, newest first. Requires an admin account.
+
+    category is one of: data_change, security, notification, error. Results include each event's
+    summary and, for data changes, the names of changed fields. Changed values, request
+    details, and error payloads are not returned; use get_record_history for record values.
+    """
+    if category is not None and category not in _AUDIT_CATEGORIES:
+        raise ValueError(f"category must be one of: {', '.join(sorted(_AUDIT_CATEGORIES))}")
+    page, per_page = _page_bounds(page, per_page)
+    params: dict[str, Any] = {"page": page, "per_page": per_page}
+    if category:
+        params["category"] = category
+    payload = await _api_get("/api/settings/audit-events", params=params, ctx=ctx)
+    events = []
+    for row in payload.get("items", []):
+        details = row.get("details") if isinstance(row.get("details"), dict) else {}
+        event = {
+            "id": row.get("id"),
+            "category": row.get("category"),
+            "event_type": row.get("event_type"),
+            "entity_table": row.get("entity_table"),
+            "entity_id": row.get("entity_key"),
+            "actor": _actor_summary(row.get("actor")),
+            "occurred_at": row.get("occurred_at"),
+            "summary": row.get("summary"),
+        }
+        if row.get("category") == "data_change":
+            changed = set(details.get("new_values") or {}) | set(details.get("old_values") or {})
+            event["changed_fields"] = sorted(changed - _HISTORY_HIDDEN_FIELDS)
+        events.append(event)
+    return {
+        "page": payload.get("page"),
+        "total_pages": payload.get("total_pages"),
+        "total_count": payload.get("total_count"),
+        "events": events,
+    }
 
 
 def main() -> None:

@@ -2,7 +2,7 @@
 
 CatalogIT includes a **read-only MCP server** for AI clients that support local stdio or hosted Streamable HTTP. The MCP process calls CatalogIT's REST API using an API token; it does not connect directly to PostgreSQL. Every API request is authorized as the CatalogIT user who owns the token.
 
-The first release provides tools to search/list services, fetch a service by ID, search vendors and hardware, and read service cost records. Hardware and financial tools require the corresponding CatalogIT visibility permissions. The MCP server does not expose write operations.
+The first release provides tools to search/list services, fetch a service by ID, search vendors and hardware, read service cost records, read the change history of a record, and (for admins) read the global audit log. Hardware and financial tools require the corresponding CatalogIT visibility permissions. The MCP server does not expose write operations.
 
 ## Requirements
 
@@ -55,8 +55,10 @@ Restart or reload the AI client, then confirm that the CatalogIT tools appear in
 | `list_vendors` | List or search vendors by name | Catalog access |
 | `list_hardware_assets` | Search assets by model, serial, status, or location; optionally filter by hardware type or archive state | Hardware visibility |
 | `get_service_cost_records` | Read costs for a service | Financial visibility |
+| `get_record_history` | Read the change history of a service, hardware asset, vendor, or tag by UUID, newest first; service and hardware history include attachment changes | Catalog access; hardware history requires hardware visibility |
+| `list_audit_events` | Read the global audit log, newest first; optionally filter by category (`data_change`, `security`, `notification`, `error`) | Admin |
 
-List tools default to 50 results and accept `limit` from 1 to 100. Searching filters the API's current list response, so large catalogs may still require the API to return the complete list before the MCP server narrows the result.
+List tools default to 50 results and accept `limit` from 1 to 100. `get_record_history` and `list_audit_events` are paginated instead: they accept `page` (from 1) and `per_page` (from 1 to 100) and return `total_pages`. Searching filters the API's current list response, so large catalogs may still require the API to return the complete list before the MCP server narrows the result.
 
 Examples of questions to ask your assistant:
 
@@ -64,8 +66,10 @@ Examples of questions to ask your assistant:
 - “Look up the vendor and status for [service name].”
 - “Search laptops for serial number [serial].” (Requires hardware visibility.)
 - “Summarize the service cost records for [service name].” (Requires financial visibility.)
+- “Who changed the status of [service name], and when?”
+- “List this week's failed sign-ins.” (Requires an admin account.)
 
-The MCP server excludes service notes, personal contact details, hardware notes and cellular identifiers, vendor notes, and cost-record notes from its results. It does not offer arbitrary SQL, writes, or record deletion.
+The MCP server excludes service notes, personal contact details, hardware notes and cellular identifiers, vendor notes, and cost-record notes from its results. History values also omit hardware assignees, cost centers, payment methods, and attachment storage keys. History and audit results name the person who made a change but not their email address. `list_audit_events` returns each event's summary and, for data changes, only the names of changed fields; use `get_record_history` to see values. It does not offer arbitrary SQL, writes, or record deletion.
 
 ## Troubleshooting
 
