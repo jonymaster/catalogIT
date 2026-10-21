@@ -8,13 +8,65 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies.db import get_audited_db
-from app.dependencies.auth import get_current_user, ensure_hardware_view_access
+from app.dependencies.auth import (
+    ensure_financial_view_access,
+    ensure_hardware_view_access,
+    get_current_user,
+)
+from app.models.cost_record import CostRecord
 from app.models.user import User
 from app.history_display import humanize_audit_values
 from app.models.global_audit_event import GlobalAuditEvent
 from app.schemas.audit import AuditLogRead, PaginatedHistoryResponse
 
 router = APIRouter(prefix="/api/history", tags=["history"])
+
+# Access needed to read each audited table's history. Tables not listed return 404.
+_CATALOG_TABLES = frozenset({
+    "services",
+    "vendors",
+    "tags",
+    "categories",
+    "cost_centers",
+    "payment_methods",
+    "service_statuses",
+    "service_classifications",
+    "contracts",
+    "service_history",
+})
+_HARDWARE_TABLES = frozenset({"hardware_assets", "laptops", "hardware_statuses", "hardware_locations"})
+_FINANCIAL_TABLES = frozenset({"cost_records"})
+# Attachments are read through their service/hardware timelines; standalone history is admin-only.
+_ADMIN_TABLES = frozenset({
+    "users",
+    "api_tokens",
+    "oidc_config",
+    "integration_config",
+    "notification_global_settings",
+    "attachments",
+})
+
+
+async def _ensure_history_access(
+    table_name: str, record_id: uuid.UUID, user: User, db: AsyncSession
+) -> None:
+    if table_name in _CATALOG_TABLES:
+        return
+    if table_name in _HARDWARE_TABLES:
+        await ensure_hardware_view_access(user, db)
+        return
+    if table_name in _FINANCIAL_TABLES:
+        await ensure_financial_view_access(user, db)
+        # Hardware cost records also need hardware visibility, as on their own router.
+        record = await db.get(CostRecord, record_id)
+        if record is not None and record.hardware_id is not None:
+            await ensure_hardware_view_access(user, db)
+        return
+    if table_name in _ADMIN_TABLES:
+        if user.role != "admin":
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return
+    raise HTTPException(status_code=404, detail="History is not available for this table")
 
 
 def _history_filters(table_name: str, record_id: uuid.UUID):
@@ -71,8 +123,7 @@ async def get_history(
     db: AsyncSession = Depends(get_audited_db),
     user: User = Depends(get_current_user),
 ):
-    if table_name in ("hardware_assets", "laptops"):
-        await ensure_hardware_view_access(user, db)
+    await _ensure_history_access(table_name, record_id, user, db)
     scope = _history_filters(table_name, record_id)
 
     count_stmt = select(func.count()).select_from(GlobalAuditEvent).where(scope)

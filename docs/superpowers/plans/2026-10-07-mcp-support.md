@@ -23,7 +23,7 @@ Prefer the MCP project's maintained Python SDK and Streamable HTTP for remote de
 
 ## Phases
 
-**Current state (2026-10-15):** The `mcp/` adapter provides read-only service, vendor, hardware, and service-cost tools over CatalogIT REST. It supports local stdio and hosted Streamable HTTP at `/mcp`. Hosted calls forward either a static CatalogIT API token or an externally issued JWT; the API validates external JWTs against the admin-configured trusted token issuer (**Settings → MCP Sign-in**) and maps them to existing users by email. The UI nginx proxies `/mcp`. Cloudflare Access Managed OAuth is the first supported OAuth provider. MCP-served OAuth discovery metadata (for issuers without an authenticating proxy), selected writes, and broader AI plugin work remain future work.
+**Current state (2026-10-21):** The `mcp/` adapter provides read tools for services, vendors, hardware, service costs, record history, and the admin audit log, plus the first Phase 3 writes (create/update vendor, tag, and service) over CatalogIT REST. It supports local stdio and hosted Streamable HTTP at `/mcp`. Hosted calls forward either a static CatalogIT API token or an externally issued JWT; the API validates external JWTs against the admin-configured trusted token issuer (**Settings → MCP Sign-in**) and maps them to existing users by email. The UI nginx proxies `/mcp`. Cloudflare Access Managed OAuth is the first supported OAuth provider. MCP-served OAuth discovery metadata (for issuers without an authenticating proxy), further writes, and broader AI plugin work remain future work.
 
 ### Phase 0 — contract and access model
 
@@ -59,7 +59,9 @@ Deliverables: adapter package, container/development entry point, environment co
 - Add request timeouts, safe retry behavior for reads, clear API-unavailable errors, and operational health checks.
 - Document network requirements and reverse-proxy routing for hosted Streamable HTTP. Keep the route behind HTTPS; CatalogIT API bearer tokens are required for tool calls.
 
-### Phase 3 — selected writes
+### Phase 3 — selected writes (first set implemented)
+
+Implemented 2026-10-21: `create_vendor`, `update_vendor`, `create_tag`, `update_tag`, `create_service`, and `update_service`. Service updates use a new `PATCH /api/services/{id}` route that shares the existing partial-update handler. Write tools carry MCP write annotations and never send notes, contacts, people, or financial references.
 
 Add write tools one action at a time, based on pilot feedback. Candidate first writes are creating/updating a service, tag, or vendor. Use existing API endpoints so schema validation, role checks, audit attribution, and database rules still apply.
 
