@@ -32,19 +32,24 @@ logger = logging.getLogger(__name__)
 async def _seed_admin() -> None:
     """Ensure a working admin account exists on every startup.
 
-    - If no admin exists, create one using ADMIN_* profile fields and ADMIN_DEFAULT_PASSWORD.
-    - If the admin exists but never changed their password
+    The bootstrap admin is the user whose email is ADMIN_EMAIL.
+
+    - If no admin exists at all, create the bootstrap admin using ADMIN_* profile
+      fields and ADMIN_DEFAULT_PASSWORD.
+    - If the bootstrap admin exists but never changed their password
       (must_reset_password is still True), re-sync the hash from the env var
       so a changed ADMIN_DEFAULT_PASSWORD always takes effect.
-    - If the admin already chose their own password, leave it alone.
+    - If the bootstrap admin already chose their own password, or other admins
+      exist but none matches ADMIN_EMAIL, leave everything alone. A user with
+      ADMIN_EMAIL who is no longer an admin is not promoted or changed.
 
-    Silently skips if the users table has not been created (migrations not yet run).
+    Skips with a warning if the users table has not been created (migrations not yet run).
     """
     cfg = get_settings()
     try:
         async with async_session() as session:
             result = await session.execute(
-                select(User).where(User.role == "admin").limit(1)
+                select(User).where(User.email == cfg.ADMIN_EMAIL)
             )
             admin = result.scalar_one_or_none()
 
@@ -53,6 +58,11 @@ async def _seed_admin() -> None:
             ).decode()
 
             if admin is None:
+                other_admin = await session.execute(
+                    select(User.id).where(User.role == "admin").limit(1)
+                )
+                if other_admin.scalar_one_or_none() is not None:
+                    return
                 admin = User(
                     external_id=cfg.ADMIN_EXTERNAL_ID,
                     email=cfg.ADMIN_EMAIL,
@@ -65,13 +75,16 @@ async def _seed_admin() -> None:
                 )
                 session.add(admin)
                 logger.info("Default admin account created")
-            elif admin.must_reset_password:
+            elif admin.role == "admin" and admin.must_reset_password:
                 admin.password_hash = hashed
                 logger.info("Admin password re-synced from ADMIN_DEFAULT_PASSWORD")
 
             await session.commit()
     except Exception:
-        logger.warning("Admin seed skipped (run migrations first: alembic upgrade head)")
+        logger.warning(
+            "Admin seed skipped (run migrations first: alembic upgrade head)",
+            exc_info=True,
+        )
 
 
 async def _seed_sample_data() -> None:

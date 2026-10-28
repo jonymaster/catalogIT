@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     SCIM_TOKEN: str = ""
 
     ADMIN_DEFAULT_PASSWORD: str = "changeme"
-    # Bootstrap admin (only used when no admin user exists yet; see main._seed_admin)
+    # Bootstrap admin: created when no admin exists; its password re-syncs until first reset (see main._seed_admin)
     ADMIN_EMAIL: str = "admin@catalogit.local"
     ADMIN_EXTERNAL_ID: str = "local:admin"
     ADMIN_FIRST_NAME: str = "Admin"
