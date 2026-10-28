@@ -1,5 +1,5 @@
 import { useState, useCallback, type ReactNode } from "react";
-import { SidebarContext, useSidebar } from "./sidebar-context";
+import { SidebarContext } from "./sidebar-context";
 
 const STORAGE_KEY = "sidebar-collapsed";
 
@@ -26,5 +26,3 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     </SidebarContext.Provider>
   );
 }
-
-export { useSidebar };

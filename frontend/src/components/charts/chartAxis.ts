@@ -95,7 +95,7 @@ export function buildChartAxis(
   const safe = (v: number) => Math.max(v, LOG_EPS);
   const logLo = Math.log10(safe(minV));
   const logHi = Math.log10(safe(maxV));
-  let lo = logLo;
+  const lo = logLo;
   let hi = logHi;
   if (hi <= lo) {
     hi = lo + 0.02;

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useOutletContext } from "react-router-dom";
 import client from "../api/client";
@@ -30,7 +30,6 @@ export function ServiceAssignments() {
   const [directoryPage, setDirectoryPage] = useState<UserDirectoryPage | null>(
     null,
   );
-  const [directoryLoading, setDirectoryLoading] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   /** Working selection while modal is open (all assignees across pages). */
@@ -43,26 +42,35 @@ export function ServiceAssignments() {
 
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const loadDirectoryPage = useCallback(async (p: number, query: string) => {
-    setDirectoryLoading(true);
-    try {
-      const r = await client.get<UserDirectoryPage>("/api/users/page", {
-        params: {
-          page: p,
-          per_page: DIRECTORY_PAGE_SIZE,
-          q: query || undefined,
-        },
-      });
-      setDirectoryPage(r.data);
-    } finally {
-      setDirectoryLoading(false);
-    }
-  }, []);
+  // Loading while the modal is open and the last finished request differs from the current one.
+  const directoryKey = `${page}|${searchQuery}`;
+  const [settledDirectoryKey, setSettledDirectoryKey] = useState<string | null>(
+    null,
+  );
+  const directoryLoading = manageOpen && settledDirectoryKey !== directoryKey;
 
   useEffect(() => {
     if (!manageOpen) return;
-    void loadDirectoryPage(page, searchQuery);
-  }, [manageOpen, page, searchQuery, loadDirectoryPage]);
+    let cancelled = false;
+    client
+      .get<UserDirectoryPage>("/api/users/page", {
+        params: {
+          page,
+          per_page: DIRECTORY_PAGE_SIZE,
+          q: searchQuery || undefined,
+        },
+      })
+      .then((r) => {
+        if (!cancelled) setDirectoryPage(r.data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSettledDirectoryKey(directoryKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [manageOpen, page, searchQuery, directoryKey]);
 
   useEffect(() => {
     if (!manageOpen) return;
@@ -263,6 +271,7 @@ export function ServiceAssignments() {
                 setSearchQuery("");
                 setAllUsersSelected(false);
                 setDirectoryPage(null);
+                setSettledDirectoryKey(null);
                 setManageOpen(true);
               }}
               disabled={saving}

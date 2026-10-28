@@ -52,6 +52,27 @@ function toFormData(l?: HardwareAsset): FormData {
   };
 }
 
+function withDefaultStatus(
+  form: FormData,
+  statuses: HardwareStatus[],
+  isEdit: boolean,
+): FormData {
+  if (form.hardware_status_id) return form;
+  const byName = statuses.find(
+    (status) => status.name.toLowerCase() === form.status.trim().toLowerCase(),
+  );
+  if (byName) {
+    return { ...form, hardware_status_id: byName.id, status: byName.name };
+  }
+  if (!isEdit) {
+    const inStock = statuses.find((status) => status.name === "In Stock");
+    if (inStock) {
+      return { ...form, hardware_status_id: inStock.id, status: inStock.name };
+    }
+  }
+  return form;
+}
+
 export function HardwareAssetForm({ initial, duplicate = false }: Props = {}) {
   const navigate = useNavigate();
   const { canFinancialView } = useAuth();
@@ -91,41 +112,16 @@ export function HardwareAssetForm({ initial, duplicate = false }: Props = {}) {
   useEffect(() => {
     client
       .get<HardwareStatus[]>("/api/hardware-statuses/")
-      .then((r) => setHardwareStatuses(r.data))
+      .then((r) => {
+        setHardwareStatuses(r.data);
+        setForm((prev) => withDefaultStatus(prev, r.data, isEdit));
+      })
       .catch(() => setHardwareStatuses([]));
     client
       .get<HardwareLocation[]>("/api/hardware-locations/")
       .then((r) => setHardwareLocations(r.data))
       .catch(() => setHardwareLocations([]));
-  }, []);
-
-  useEffect(() => {
-    if (hardwareStatuses.length === 0) return;
-    setForm((prev) => {
-      if (prev.hardware_status_id) return prev;
-      const byName = hardwareStatuses.find(
-        (status) => status.name.toLowerCase() === prev.status.trim().toLowerCase(),
-      );
-      if (byName) {
-        return {
-          ...prev,
-          hardware_status_id: byName.id,
-          status: byName.name,
-        };
-      }
-      if (!isEdit) {
-        const inStock = hardwareStatuses.find((status) => status.name === "In Stock");
-        if (inStock) {
-          return {
-            ...prev,
-            hardware_status_id: inStock.id,
-            status: inStock.name,
-          };
-        }
-      }
-      return prev;
-    });
-  }, [hardwareStatuses, isEdit]);
+  }, [isEdit]);
 
   useEffect(() => {
     if (duplicate || !initial?.id || !initial.is_active || !canFinancialView) return;

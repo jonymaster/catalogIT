@@ -139,12 +139,17 @@ export function SettingsReferenceDataResource() {
   const [editingRecord, setEditingRecord] = useState<ReferenceDataRecord | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
+  const [loadedResource, setLoadedResource] = useState(resource);
+  if (loadedResource !== resource) {
+    setLoadedResource(resource);
+    setLoading(true);
+  }
+
   useEffect(() => {
     if (!resource) {
       return;
     }
 
-    setLoading(true);
     client
       .get<ReferenceDataRecord[]>(resource.api_path)
       .then((response) => {

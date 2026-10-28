@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   type ReactNode,
-  useRef,
   useState,
 } from "react";
 import {
@@ -53,47 +52,47 @@ export function HardwareAssetDetail() {
     "archive" | "unarchive" | "delete" | null
   >(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [costLoading, setCostLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(id));
+  const [costLoading, setCostLoading] = useState(Boolean(id));
   const [purchaseYear, setPurchaseYear] = useState("");
   const [costAmount, setCostAmount] = useState("");
   const [extraTab, setExtraTab] = useState<"activity" | null>(null);
 
-  const openEditConsumed = useRef(false);
-
   const pathname = location.pathname;
-  const lastPathRef = useRef(pathname);
-  if (lastPathRef.current !== pathname) {
-    lastPathRef.current = pathname;
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
     if (editing) setEditingState(false);
   }
 
-  useEffect(() => {
-    openEditConsumed.current = false;
-  }, [id]);
+  const loadKey = `${id ?? ""}|${canFinancialView}`;
+  const [loadedKey, setLoadedKey] = useState(loadKey);
+  if (loadedKey !== loadKey) {
+    setLoadedKey(loadKey);
+    setLoading(Boolean(id));
+    setCostLoading(Boolean(id));
+  }
+
+  // Edit redirects arrive with { openEdit: true }; open the editor once per navigation.
+  const openEditRequested =
+    (location.state as { openEdit?: boolean } | null)?.openEdit === true;
+  const [openEditHandledKey, setOpenEditHandledKey] = useState<string | null>(
+    null,
+  );
+  if (openEditRequested && openEditHandledKey !== location.key) {
+    setOpenEditHandledKey(location.key);
+    if (canEdit) setEditingState(true);
+  }
 
   useEffect(() => {
-    if (openEditConsumed.current) return;
-    const st = location.state as { openEdit?: boolean } | null;
-    if (st?.openEdit) {
-      openEditConsumed.current = true;
+    if (openEditRequested) {
       navigate(location.pathname, { replace: true, state: null });
-      if (canEdit) setEditingState(true);
     }
-  }, [location.state, location.pathname, canEdit, navigate]);
+  }, [openEditRequested, location.pathname, navigate]);
 
   useEffect(() => {
-    if (!id) {
-      setHardwareAsset(null);
-      setDraft(null);
-      setLoading(false);
-      setCostLoading(false);
-      return;
-    }
-
+    if (!id) return;
     let cancelled = false;
-    setLoading(true);
-    setCostLoading(true);
     Promise.all([
       client.get<HardwareAsset>(`/api/hardware/${id}`),
       canFinancialView
@@ -295,9 +294,11 @@ export function HardwareAssetDetail() {
     (location.pathname === `/hardware/${id}` ||
       location.pathname === `/hardware/${id}/`);
 
-  useEffect(() => {
+  const [wasIndexRoute, setWasIndexRoute] = useState(isIndexRoute);
+  if (wasIndexRoute !== isIndexRoute) {
+    setWasIndexRoute(isIndexRoute);
     if (!isIndexRoute) setExtraTab(null);
-  }, [isIndexRoute]);
+  }
 
   if (loading) return <DetailPageSkeleton />;
   if (!hardware || !draft)

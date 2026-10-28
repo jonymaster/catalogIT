@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useCommandPalette } from "../context/CommandPaletteContext";
+import { useCommandPalette } from "../context/command-palette-context";
 import { MagnifyingGlassIcon } from "./Icons";
 
 interface Props {

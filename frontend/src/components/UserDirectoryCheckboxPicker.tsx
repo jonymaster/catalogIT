@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -43,44 +42,39 @@ export function UserDirectoryCheckboxPicker({
   const [directoryPage, setDirectoryPage] = useState<UserDirectoryPage | null>(
     null,
   );
-  const [loading, setLoading] = useState(false);
   const [userCache, setUserCache] = useState<Map<string, User>>(() => new Map());
+  // Loading while the last finished request differs from the current one.
+  const requestKey = `${page}|${searchQuery}|${pageSize}`;
+  const [settledKey, setSettledKey] = useState<string | null>(null);
+  const loading = settledKey !== requestKey;
 
   useEffect(() => {
-    setUserCache((prev) => {
-      const next = new Map(prev);
-      for (const u of seedUsers) next.set(u.id, u);
-      return next;
-    });
-  }, [seedUsers]);
-
-  const loadPage = useCallback(
-    async (p: number, q: string) => {
-      setLoading(true);
-      try {
-        const r = await client.get<UserDirectoryPage>("/api/users/page", {
-          params: {
-            page: p,
-            per_page: pageSize,
-            q: q.trim() || undefined,
-          },
-        });
+    let cancelled = false;
+    client
+      .get<UserDirectoryPage>("/api/users/page", {
+        params: {
+          page,
+          per_page: pageSize,
+          q: searchQuery.trim() || undefined,
+        },
+      })
+      .then((r) => {
+        if (cancelled) return;
         setDirectoryPage(r.data);
         setUserCache((prev) => {
           const next = new Map(prev);
           for (const u of r.data.items) next.set(u.id, u);
           return next;
         });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pageSize],
-  );
-
-  useEffect(() => {
-    void loadPage(page, searchQuery);
-  }, [page, searchQuery, loadPage]);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSettledKey(requestKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [page, searchQuery, pageSize, requestKey]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -95,9 +89,9 @@ export function UserDirectoryCheckboxPicker({
 
   const selectedUsersOrdered = useMemo(() => {
     return value
-      .map((id) => userCache.get(id))
+      .map((id) => userCache.get(id) ?? seedUsers.find((u) => u.id === id))
       .filter((u): u is User => u != null);
-  }, [value, userCache]);
+  }, [value, userCache, seedUsers]);
 
   function toggle(id: string) {
     if (single) {

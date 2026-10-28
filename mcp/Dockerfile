@@ -6,10 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MCP_HOST=0.0.0.0 \
     MCP_PORT=8000
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /app
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
+
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN uv sync --locked --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000
 CMD ["catalogit-mcp"]

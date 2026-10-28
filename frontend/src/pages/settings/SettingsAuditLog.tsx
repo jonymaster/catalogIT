@@ -89,7 +89,15 @@ export function SettingsAuditLog() {
     });
   };
 
-  const load = useCallback(async (pageNum: number) => {
+  const [loadedCategory, setLoadedCategory] = useState(category);
+  if (loadedCategory !== category) {
+    setLoadedCategory(category);
+    setLoading(true);
+    setExpandedIds(new Set());
+    setPage(1);
+  }
+
+  const requestPage = useCallback(async (pageNum: number) => {
     const params = new URLSearchParams();
     params.set("page", String(pageNum));
     params.set("per_page", String(PER_PAGE));
@@ -97,16 +105,23 @@ export function SettingsAuditLog() {
     const r = await client.get<PaginatedGlobalAudit>(
       `/api/settings/audit-events?${params.toString()}`,
     );
-    setItems(r.data.items);
-    setTotalPages(r.data.total_pages);
-    setTotalCount(r.data.total_count);
-    setPage(r.data.page);
+    return r.data;
   }, [category]);
 
+  function showPage(data: PaginatedGlobalAudit) {
+    setItems(data.items);
+    setTotalPages(data.total_pages);
+    setTotalCount(data.total_count);
+    setPage(data.page);
+  }
+
+  async function load(pageNum: number) {
+    showPage(await requestPage(pageNum));
+  }
+
   useEffect(() => {
-    setLoading(true);
-    setExpandedIds(new Set());
-    load(1)
+    requestPage(1)
+      .then(showPage)
       .catch((e: unknown) => {
         showToast({
           type: "error",
@@ -114,11 +129,7 @@ export function SettingsAuditLog() {
         });
       })
       .finally(() => setLoading(false));
-  }, [load, showToast]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [category]);
+  }, [requestPage, showToast]);
 
   async function goToPage(next: number) {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;
