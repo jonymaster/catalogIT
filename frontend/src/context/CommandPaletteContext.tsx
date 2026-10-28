@@ -1,23 +1,11 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-
-interface CommandPaletteContextValue {
-  open: boolean;
-  openPalette: () => void;
-  closePalette: () => void;
-  togglePalette: () => void;
-}
-
-const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(
-  null,
-);
+import { CommandPaletteContext } from "./command-palette-context";
 
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -53,14 +41,4 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       {children}
     </CommandPaletteContext.Provider>
   );
-}
-
-export function useCommandPalette() {
-  const ctx = useContext(CommandPaletteContext);
-  if (!ctx) {
-    throw new Error(
-      "useCommandPalette must be used within CommandPaletteProvider",
-    );
-  }
-  return ctx;
 }

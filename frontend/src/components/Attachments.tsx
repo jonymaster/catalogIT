@@ -27,8 +27,15 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const entityKey = `${entityType}/${entityId}`;
+  const [loadedKey, setLoadedKey] = useState(entityKey);
+  if (loadedKey !== entityKey) {
+    setLoadedKey(entityKey);
+    setLoading(true);
+    setError(null);
+  }
 
-  const fetchPage = useCallback(
+  const requestPage = useCallback(
     async (pageNum: number) => {
       const params = new URLSearchParams();
       params.set("page", String(pageNum));
@@ -36,21 +43,28 @@ export function Attachments({ entityType, entityId }: AttachmentsProps) {
       const r = await client.get<PaginatedAttachments>(
         `/api/attachments/${entityType}/${entityId}?${params.toString()}`,
       );
-      setAttachments(r.data.items);
-      setPage(r.data.page);
-      setTotalPages(r.data.total_pages);
-      setTotalCount(r.data.total_count);
+      return r.data;
     },
     [entityType, entityId],
   );
 
+  function showPage(data: PaginatedAttachments) {
+    setAttachments(data.items);
+    setPage(data.page);
+    setTotalPages(data.total_pages);
+    setTotalCount(data.total_count);
+  }
+
+  async function fetchPage(pageNum: number) {
+    showPage(await requestPage(pageNum));
+  }
+
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetchPage(1)
+    requestPage(1)
+      .then(showPage)
       .catch(() => setError("Failed to load attachments"))
       .finally(() => setLoading(false));
-  }, [fetchPage]);
+  }, [requestPage]);
 
   async function goToPage(next: number) {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;

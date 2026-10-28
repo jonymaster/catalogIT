@@ -63,9 +63,11 @@ export function CostRecordForm({ serviceId, initial }: Props) {
       .then((r) => setPaymentMethods(r.data));
   }, []);
 
-  useEffect(() => {
+  const [formSource, setFormSource] = useState(initial);
+  if (formSource !== initial) {
+    setFormSource(initial);
     setForm(toFormData(initial));
-  }, [initial]);
+  }
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

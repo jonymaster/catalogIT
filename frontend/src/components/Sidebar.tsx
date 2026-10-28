@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { useSidebar } from "../context/SidebarContext";
+import { useSidebar } from "../context/sidebar-context";
 import { BrandMark } from "./BrandMark";
 import {
   HomeIcon,

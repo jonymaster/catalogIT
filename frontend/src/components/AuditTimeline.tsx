@@ -49,8 +49,14 @@ export function AuditTimeline({
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const recordKey = `${tableName}/${recordId}/${perPage}`;
+  const [loadedKey, setLoadedKey] = useState(recordKey);
+  if (loadedKey !== recordKey) {
+    setLoadedKey(recordKey);
+    setLoading(true);
+  }
 
-  const load = useCallback(
+  const requestPage = useCallback(
     async (pageNum: number) => {
       const params = new URLSearchParams();
       params.set("page", String(pageNum));
@@ -58,30 +64,34 @@ export function AuditTimeline({
       const r = await client.get<PaginatedHistoryResponse>(
         `/api/history/${tableName}/${recordId}?${params.toString()}`,
       );
-      setEntries(r.data.items);
-      setPage(r.data.page);
-      setTotalPages(r.data.total_pages);
-      setTotalCount(r.data.total_count);
+      return r.data;
     },
     [tableName, recordId, perPage],
   );
 
+  function showPage(data: PaginatedHistoryResponse) {
+    setEntries(data.items);
+    setPage(data.page);
+    setTotalPages(data.total_pages);
+    setTotalCount(data.total_count);
+  }
+
   useEffect(() => {
-    setLoading(true);
-    load(1)
+    requestPage(1)
+      .then(showPage)
       .catch(() => {
         setEntries([]);
         setTotalPages(0);
         setTotalCount(0);
       })
       .finally(() => setLoading(false));
-  }, [load]);
+  }, [requestPage]);
 
   async function goToPage(next: number) {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;
     setLoading(true);
     try {
-      await load(next);
+      showPage(await requestPage(next));
     } finally {
       setLoading(false);
     }

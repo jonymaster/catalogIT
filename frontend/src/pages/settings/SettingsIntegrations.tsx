@@ -51,6 +51,13 @@ function axiosDetail(e: unknown): string | undefined {
   return undefined;
 }
 
+function requestIntegrations() {
+  return Promise.all([
+    client.get<Meta>("/api/settings/integrations/meta"),
+    client.get<{ channels: IntegrationChannel[] }>("/api/settings/integrations"),
+  ]);
+}
+
 export function SettingsIntegrations() {
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -68,12 +75,8 @@ export function SettingsIntegrations() {
   const [gClientId, setGClientId] = useState("");
   const [gSecret, setGSecret] = useState("");
 
-  const refresh = useCallback(async () => {
-    try {
-      const [m, list] = await Promise.all([
-        client.get<Meta>("/api/settings/integrations/meta"),
-        client.get<{ channels: IntegrationChannel[] }>("/api/settings/integrations"),
-      ]);
+  const showIntegrations = useCallback(
+    ([m, list]: Awaited<ReturnType<typeof requestIntegrations>>) => {
       setMeta(m.data);
       setChannels(list.data.channels);
       for (const ch of list.data.channels) {
@@ -93,14 +96,25 @@ export function SettingsIntegrations() {
           setGClientId(ch.metadata.client_id ?? "");
         }
       }
+    },
+    [],
+  );
+
+  const refresh = useCallback(async () => {
+    try {
+      showIntegrations(await requestIntegrations());
     } catch {
       showToast({ type: "error", text: "Failed to load integrations." });
     }
-  }, [showToast]);
+  }, [showIntegrations, showToast]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    requestIntegrations()
+      .then(showIntegrations)
+      .catch(() => {
+        showToast({ type: "error", text: "Failed to load integrations." });
+      });
+  }, [showIntegrations, showToast]);
 
   useEffect(() => {
     const g = searchParams.get("google");

@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
-import { useCommandPalette } from "../context/CommandPaletteContext";
+import { useCommandPalette } from "../context/command-palette-context";
 import client from "../api/client";
 import { SunIcon, MoonIcon, BellIcon } from "./Icons";
 import { CommandPalette } from "./CommandPalette";
