@@ -213,6 +213,7 @@ Highlights from the most recent releases. Full notes on the [GitHub releases pag
 - **MCP server:** new `mcp` service and `jonymaster/catalogit-mcp` image. AI assistants can use it to search services, vendors, hardware, and cost records over local stdio or hosted Streamable HTTP (v1.6.0).
 - **MCP OAuth sign-in:** Claude.ai and ChatGPT connectors can sign in through your own OAuth provider, configured in **Settings → MCP Sign-in**. The UI image now proxies `/mcp` (v1.6.2).
 - **MCP history, audit log, and write tools:** read record history and the audit log, and create or update vendors, tags, and services. Record history API now enforces per-table permissions. New `PATCH /api/services/{id}` endpoint (v1.6.3).
+- **Security and maintenance:** frontend dependency updates for all open Dependabot alerts (v1.6.4). Bootstrap admin password fix for installs with several admins, CI on every pull request, and Python images built from committed lockfiles (v1.6.5).
 
 ### v1.5.2 — October 2026
 
