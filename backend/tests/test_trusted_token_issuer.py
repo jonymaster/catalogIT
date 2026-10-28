@@ -9,7 +9,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from jose import jwk, jwt
+import jwt
+from jwt.algorithms import RSAAlgorithm
 
 from app.models.trusted_token_issuer import TrustedTokenIssuer
 from app.services import trusted_token_issuer as issuer_module
@@ -25,11 +26,11 @@ _PRIVATE_PEM = _private_key.private_bytes(
     serialization.PrivateFormat.PKCS8,
     serialization.NoEncryption(),
 ).decode()
-_PUBLIC_PEM = _private_key.public_key().public_bytes(
-    serialization.Encoding.PEM,
-    serialization.PublicFormat.SubjectPublicKeyInfo,
-).decode()
-JWKS = {"keys": [{**jwk.construct(_PUBLIC_PEM, "RS256").to_dict(), "kid": KID}]}
+JWKS = {
+    "keys": [
+        {**RSAAlgorithm.to_jwk(_private_key.public_key(), as_dict=True), "alg": "RS256", "kid": KID}
+    ]
+}
 
 
 def _token(**overrides) -> str:

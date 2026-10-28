@@ -11,14 +11,14 @@ import httpx
 logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
-from jose import jwt
-from jose.exceptions import JWTError
+import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
 from app.dependencies.db import get_audited_db
+from app.jwks import decode_with_jwks, unverified_claims
 from app.global_audit import record_global_audit_event, record_global_audit_event_committed
 from app.dependencies.auth import get_current_user, load_user_permission_slugs
 from app.models.oidc_config import OidcConfig
@@ -278,24 +278,22 @@ async def oidc_callback(
             raise HTTPException(status_code=502, detail="Failed to fetch OIDC JWKS")
         jwks = jwks_resp.json()
         try:
-            # OIDC id_tokens may include at_hash; python-jose needs the access_token to verify it.
-            oidc_decode_options = None if access_token else {"verify_at_hash": False}
-            claims = jwt.decode(
+            # at_hash, when present, is checked against the access_token.
+            claims = decode_with_jwks(
                 id_token,
                 jwks,
                 algorithms=["RS256", "ES256"],
                 audience=oidc.client_id,
                 issuer=oidc.issuer_url.rstrip("/"),
-                access_token=access_token,
-                options=oidc_decode_options,
+                access_token=access_token or None,
             )
-        except JWTError as exc:
+        except jwt.PyJWTError as exc:
             logger.error("OIDC id_token verification failed: %s", exc)
             raise HTTPException(status_code=401, detail="Invalid OIDC id_token")
     else:
         # Fallback: no JWKS URI in discovery (non-standard provider)
         logger.warning("OIDC provider has no jwks_uri; using unverified claims")
-        claims = jwt.get_unverified_claims(id_token)
+        claims = unverified_claims(id_token)
 
     userinfo_endpoint = discovery.get("userinfo_endpoint")
     if userinfo_endpoint and access_token:

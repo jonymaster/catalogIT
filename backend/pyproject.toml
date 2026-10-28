@@ -7,11 +7,11 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
-    "sqlalchemy[asyncio]",
+    "sqlalchemy[asyncio]>=2.0,<2.1",
     "asyncpg",
     "alembic",
     "pydantic-settings",
-    "python-jose[cryptography]",
+    "pyjwt[crypto]",
     "httpx",
     "python-multipart",
     "bcrypt",
