@@ -8,9 +8,6 @@ build/
 .venv/
 *.egg
 
-# uv
-uv.lock
-
 # Node
 node_modules/
 dist/

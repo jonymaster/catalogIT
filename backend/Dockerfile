@@ -9,11 +9,11 @@ FROM python:3.12-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
-COPY pyproject.toml .
-RUN uv sync --no-dev --no-install-project
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project
 
 COPY . .
-RUN uv sync --no-dev
+RUN uv sync --locked --no-dev
 
 FROM python:3.12-slim
 
