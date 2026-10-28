@@ -81,15 +81,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // setToken and logout reset preferences state, so only fetch here.
   useEffect(() => {
-    if (!token) {
-      setPreferencesState(null);
-      setPreferencesLoading(false);
-      return;
-    }
-
-    void refreshPreferences();
-  }, [token, refreshPreferences]);
+    if (!token) return;
+    let cancelled = false;
+    client
+      .get<UserPreferences>("/api/me/preferences")
+      .then((response) => {
+        if (!cancelled) setPreferencesState(response.data);
+      })
+      .catch(() => {
+        if (!cancelled) setPreferencesState(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPreferencesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const canEdit =
     !!user?.role && (ROLE_HIERARCHY[user.role] ?? 0) >= ROLE_HIERARCHY.editor;

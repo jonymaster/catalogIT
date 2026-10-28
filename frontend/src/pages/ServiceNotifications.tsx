@@ -32,11 +32,13 @@ export function ServiceNotifications() {
   const [recipientSearch, setRecipientSearch] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const [formSource, setFormSource] = useState(service);
+  if (formSource !== service) {
+    setFormSource(service);
     setEnabled(service.renewal_reminders_enabled);
     setOffsetsText(service.renewal_offsets_days?.join(", ") ?? "");
     setRecipientIds(service.notification_recipients.map((u) => u.id));
-  }, [service]);
+  }
 
   useEffect(() => {
     client

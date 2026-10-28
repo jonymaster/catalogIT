@@ -3,28 +3,30 @@ import client from "../../api/client";
 import { PageTransition } from "../../components/PageTransition";
 import type { HardwareAsset, Service } from "../../types/models";
 
+function requestArchived() {
+  return Promise.all([
+    client.get<Service[]>("/api/services/", { params: { archived: true } }),
+    client.get<HardwareAsset[]>("/api/hardware/", { params: { archived: true } }),
+  ]);
+}
+
 export function SettingsRecordDeletion() {
   const [services, setServices] = useState<Service[]>([]);
   const [hardware_assets, setHardwareAssets] = useState<HardwareAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  async function loadArchived() {
-    setLoading(true);
-    try {
-      const [servicesResp, hardware_assetsResp] = await Promise.all([
-        client.get<Service[]>("/api/services/", { params: { archived: true } }),
-        client.get<HardwareAsset[]>("/api/hardware/", { params: { archived: true } }),
-      ]);
-      setServices(servicesResp.data);
-      setHardwareAssets(hardware_assetsResp.data);
-    } finally {
-      setLoading(false);
-    }
+  function showArchived([servicesResp, hardware_assetsResp]: Awaited<
+    ReturnType<typeof requestArchived>
+  >) {
+    setServices(servicesResp.data);
+    setHardwareAssets(hardware_assetsResp.data);
   }
 
   useEffect(() => {
-    void loadArchived();
+    requestArchived()
+      .then(showArchived)
+      .finally(() => setLoading(false));
   }, []);
 
   async function deleteService(service: Service) {

@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -52,7 +51,7 @@ export function ServiceDetail() {
   const isAdmin = user?.role === "admin";
 
   const [service, setService] = useState<Service | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(id));
 
   const [editing, setEditingState] = useState(false);
   const [draft, setDraft] = useState<ServiceDraft | null>(null);
@@ -77,16 +76,15 @@ export function ServiceDetail() {
     }
   }, [showToast]);
 
-  useEffect(() => {
-    if (!id) {
-      setService(null);
-      setDraft(null);
-      setLoading(false);
-      return;
-    }
+  const [loadedId, setLoadedId] = useState(id);
+  if (loadedId !== id) {
+    setLoadedId(id);
+    setLoading(Boolean(id));
+  }
 
+  useEffect(() => {
+    if (!id) return;
     let cancelled = false;
-    setLoading(true);
     client
       .get<Service>(`/api/services/${id}`)
       .then((r) => {
@@ -260,9 +258,9 @@ export function ServiceDetail() {
   }
 
   const pathname = location.pathname;
-  const lastPathRef = useRef(pathname);
-  if (lastPathRef.current !== pathname) {
-    lastPathRef.current = pathname;
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
     if (editing) setEditingState(false);
   }
 

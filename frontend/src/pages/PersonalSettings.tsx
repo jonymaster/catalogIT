@@ -35,18 +35,32 @@ function formatApiError(err: unknown): string {
   return "Something went wrong.";
 }
 
+function toPreferencesForm(
+  preferences: UserPreferences | null,
+): PreferencesFormState {
+  return {
+    locale: preferences?.locale ?? null,
+    timezone: preferences?.timezone ?? null,
+    theme: preferences?.theme ?? "light",
+    receive_renewal_notifications:
+      preferences?.receive_renewal_notifications ?? true,
+  };
+}
+
 export function PersonalSettings() {
   const { preferences, preferencesLoading, setPreferences } = useAuth();
   const { showToast } = useToast();
   const [profile, setProfile] = useState<User | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
-  const [form, setForm] = useState<PreferencesFormState>({
-    locale: null,
-    timezone: null,
-    theme: "light",
-    receive_renewal_notifications: true,
-  });
+  const [form, setForm] = useState<PreferencesFormState>(() =>
+    toPreferencesForm(preferences),
+  );
+  const [formSource, setFormSource] = useState(preferences);
+  if (formSource !== preferences) {
+    setFormSource(preferences);
+    setForm(toPreferencesForm(preferences));
+  }
   const [savingNotifications, setSavingNotifications] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
@@ -72,18 +86,7 @@ export function PersonalSettings() {
     Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
   useEffect(() => {
-    setForm({
-      locale: preferences?.locale ?? null,
-      timezone: preferences?.timezone ?? null,
-      theme: preferences?.theme ?? "light",
-      receive_renewal_notifications:
-        preferences?.receive_renewal_notifications ?? true,
-    });
-  }, [preferences]);
-
-  useEffect(() => {
     let cancelled = false;
-    setProfileLoading(true);
     client
       .get<User>("/api/me/profile")
       .then((r) => {
