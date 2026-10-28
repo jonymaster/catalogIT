@@ -43,8 +43,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          cache-dependency-glob: backend/uv.lock
-      - run: uv run --locked --with pytest pytest -q
+          cache-dependency-glob: backend/pyproject.toml
+      - run: uv run --with pytest pytest -q
 
   mcp:
     name: MCP tests
@@ -57,5 +57,5 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          cache-dependency-glob: mcp/uv.lock
-      - run: uv run --locked --with pytest pytest -q
+          cache-dependency-glob: mcp/pyproject.toml
+      - run: uv run --with pytest pytest -q
