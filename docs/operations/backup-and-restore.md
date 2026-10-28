@@ -12,7 +12,7 @@ A **full backup** includes:
 
 **Consistency:** For a strict point-in-time copy, pause writes briefly and snapshot both layers, or accept a small skew between DB and object backup times (rarely an issue if backups run minutes apart).
 
-Compose retains the legacy `minio` service, `minio_data` volume, and `MINIO_*` settings. For upgrades from MinIO, follow the [next-release migration instructions](../releases/next.md); a bucket mirror alone is not a complete storage-state rollback backup.
+Compose retains the legacy `minio` service, `minio_data` volume, and `MINIO_*` settings. For upgrades from MinIO, follow the [v1.5.2 migration instructions](../releases/v1.5.2.md); a bucket mirror alone is not a complete storage-state rollback backup.
 
 Configure variables using [`.env.example`](../../.env.example) as a checklist; copy to `.env` for local Compose.
 

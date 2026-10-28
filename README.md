@@ -17,7 +17,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **Notifications** — renewal reminders and alerts via Gmail, Slack, Telegram, or webhooks ([email templates](docs/email-templates.md))
 - **File Attachments** — attach contracts and documents to services (S3-compatible storage)
 - **API Tokens** — programmatic access for automation and integrations
-- **MCP server** — service, vendor, hardware, cost, and history lookups plus selected vendor, tag, and service writes over local stdio or hosted Streamable HTTP ([setup guide](docs/integrations/mcp.md))
+- **AI assistants (MCP)** — connect Claude, ChatGPT, and other MCP clients to search services, vendors, hardware, costs, history, and the audit log, and to create or update vendors, tags, and services; local stdio or hosted Streamable HTTP with API-token or OAuth sign-in ([details](#ai-assistants-mcp))
 - **Backup & Restore** — complete tooling for database and object storage backups
 
 ## Live demo
@@ -58,6 +58,7 @@ Treat it as a throwaway environment: do not store real or sensitive information.
 | Database | PostgreSQL 16                                       |
 | Auth     | OIDC + SCIM 2.0, local password fallback            |
 | Storage  | S3-compatible (Silo in Compose, AWS S3 supported) |
+| MCP      | Python MCP SDK, Streamable HTTP + stdio, httpx      |
 
 
 ## Quick Start
@@ -91,10 +92,11 @@ Once running:
 | Frontend           | [http://localhost:5173](http://localhost:5173)           |
 | API                | [http://localhost:8000](http://localhost:8000)           |
 | API Docs (Swagger) | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| MCP (Streamable HTTP) | [http://localhost:8001/mcp](http://localhost:8001/mcp) |
 | Silo Console      | [http://localhost:9001](http://localhost:9001)           |
 
 
-Existing installations: see the [Silo upgrade notes](docs/releases/next.md) before updating. Compose retains the `minio` service, storage names, and `MINIO_*` settings for compatibility.
+Existing installations: see the [Silo upgrade notes](docs/releases/v1.5.2.md) before updating. Compose retains the `minio` service, storage names, and `MINIO_*` settings for compatibility.
 
 ### Database migrations
 
@@ -121,6 +123,36 @@ CatalogIT can load **bundled demo data** on the **first** API startup when the d
 **Production:** prefer `SEED_SAMPLE_DATA=false` after the first deploy if you do not want the demo catalog on new empty databases. The production compose file (`[docker-compose.server.yml](docker-compose.server.yml)`) defaults this to false.
 
 **Releases:** multi-arch images are built with `**make release`** or `**docker buildx bake`** (see `[docker-bake.hcl](docker-bake.hcl)`); images are tagged with the release version and `**latest**`. For server deploys you can pin `**CATALOGIT_TAG**` (for example `1.1.1`) so `docker-compose.server.yml` pulls a specific tag instead of `latest`.
+
+## AI assistants (MCP)
+
+CatalogIT ships an [MCP](https://modelcontextprotocol.io/) server (`mcp/`, image `jonymaster/catalogit-mcp`) so AI assistants can query and update the catalog. The MCP server calls the CatalogIT REST API and never connects to PostgreSQL. Every request runs as the CatalogIT user who owns the credential, so roles, financial and hardware visibility, and audit attribution apply unchanged.
+
+**Tools**
+
+- **Read:** `list_services`, `get_service`, `list_vendors`, `list_hardware_assets`, `get_service_cost_records`, `get_record_history`, `list_audit_events` (admin only)
+- **Write:** `create_vendor`, `update_vendor`, `create_tag`, `update_tag`, `create_service`, `update_service`
+
+The MCP server cannot delete or archive records. Notes, personal contact details, and financial references are removed from results. A viewer-role token makes the connection read-only.
+
+**Connect**
+
+| Mode | Clients | Authentication |
+| --- | --- | --- |
+| Local stdio (`uv run --project mcp catalogit-mcp`) | Claude Desktop, Cursor, other local MCP clients | API token from **Settings → API Tokens** in `CATALOGIT_API_TOKEN` |
+| Hosted Streamable HTTP (`https://<host>/mcp`) | Claude Code and clients that send custom headers | `Authorization: Bearer <API token>` |
+| Hosted Streamable HTTP with OAuth | Claude.ai custom connectors, ChatGPT developer mode | Your own OAuth provider (for example Cloudflare Access Managed OAuth), configured in **Settings → MCP Sign-in** |
+
+Example for Claude Code against a hosted instance:
+
+```bash
+claude mcp add --transport http catalogit https://<host>/mcp \
+  --header "Authorization: Bearer $CATALOGIT_TOKEN"
+```
+
+The `mcp` service is part of both Compose stacks. The UI image proxies `/mcp` to that service, so a single public hostname serves the UI, API, and MCP endpoint. For production, set `MCP_ALLOWED_HOSTS` (required) and optionally `MCP_ALLOWED_ORIGINS` and `MCP_IDENTITY_HEADER`. See `.env.example` for these settings.
+
+Read the full [MCP setup guide](docs/integrations/mcp.md) for client configuration, permissions per tool, OAuth setup, and troubleshooting.
 
 ## Documentation
 
@@ -159,7 +191,7 @@ catalogIT/
 │   └── Dockerfile
 ├── docs/
 │   ├── email-templates.md  # How to customize and upload email HTML
-│   ├── integrations/       # Gmail, Slack, Telegram, webhook guides
+│   ├── integrations/       # MCP, Gmail, Slack, Telegram, webhook guides
 │   └── operations/         # Backup and restore procedures
 ├── email-templates/        # Canned HTML you can copy, edit, and upload in the app
 ├── branding/          # Logo assets (light/dark, horizontal/square)
@@ -175,6 +207,16 @@ catalogIT/
 ## Release history
 
 Highlights from the most recent releases. Full notes on the [GitHub releases page](https://github.com/jonymaster/catalogIT/releases).
+
+### v1.6.x — October 2026
+
+- **MCP server:** new `mcp` service and `jonymaster/catalogit-mcp` image. AI assistants can use it to search services, vendors, hardware, and cost records over local stdio or hosted Streamable HTTP (v1.6.0).
+- **MCP OAuth sign-in:** Claude.ai and ChatGPT connectors can sign in through your own OAuth provider, configured in **Settings → MCP Sign-in**. The UI image now proxies `/mcp` (v1.6.2).
+- **MCP history, audit log, and write tools:** read record history and the audit log, and create or update vendors, tags, and services. Record history API now enforces per-table permissions. New `PATCH /api/services/{id}` endpoint (v1.6.3).
+
+### v1.5.2 — October 2026
+
+- **Silo object storage:** the bundled MinIO image is replaced by Silo, a community-maintained MinIO fork. Existing installations: follow the [upgrade notes](docs/releases/v1.5.2.md) before updating.
 
 ### v1.5.0 — September 2026
 
