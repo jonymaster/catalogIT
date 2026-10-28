@@ -14,10 +14,11 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
-from jose import JWTError, jwt
+import jwt
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.jwks import decode_with_jwks, unverified_claims
 from app.models.trusted_token_issuer import TrustedTokenIssuer
 from app.models.user import User
 
@@ -91,8 +92,8 @@ async def authenticate_trusted_issuer_token(raw_token: str, db: AsyncSession) ->
     """Return the active user for a valid external token, or None if it does not apply or fails."""
     try:
         header = jwt.get_unverified_header(raw_token)
-        unverified = jwt.get_unverified_claims(raw_token)
-    except JWTError:
+        unverified = unverified_claims(raw_token)
+    except jwt.PyJWTError:
         return None
     if header.get("alg") not in _ALGORITHMS:
         return None
@@ -110,18 +111,18 @@ async def authenticate_trusted_issuer_token(raw_token: str, db: AsyncSession) ->
         jwks = await fetch_jwks(jwks_url)
         if not _has_kid(jwks, header.get("kid")):
             jwks = await fetch_jwks(jwks_url, force=True)
-        claims = jwt.decode(
+        claims = decode_with_jwks(
             raw_token,
             jwks,
             algorithms=_ALGORITHMS,
             audience=config.audience.strip(),
             issuer=token_issuer,
-            options={"require_exp": True, "require_iat": False, "verify_at_hash": False},
+            options={"require": ["exp"]},
         )
     except IssuerConfigError as exc:
         logger.warning("Trusted token issuer unavailable: %s", exc)
         return None
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         logger.info("Trusted issuer token rejected: %s", exc)
         return None
 
