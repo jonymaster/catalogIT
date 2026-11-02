@@ -34,7 +34,8 @@ mcp = FastMCP(
         "hardware, service cost records, record change history, and the audit log. The create_* "
         "and update_* tools change CatalogIT data: confirm the intended change with the user "
         "first, and look up record ids with the read tools instead of guessing them. The server "
-        "cannot delete or archive records. "
+        "cannot delete or archive catalog records; the delete_*_cost tools permanently remove "
+        "cost records, so run them only after the user confirms. "
         "Hardware and financial tools require the connected CatalogIT user's existing permissions."
     ),
     host=_MCP_HOST,
@@ -145,6 +146,8 @@ async def _api_request(
             message += f". The token owner's role or feature permissions do not allow this {action}."
         raise RuntimeError(message)
 
+    if response.status_code == 204:
+        return None
     try:
         return response.json()
     except ValueError as exc:
@@ -165,6 +168,9 @@ _CREATES = ToolAnnotations(
 )
 _UPDATES = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+)
+_DELETES = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
 )
 _CRITICALITY_VALUES = {"Critical", "High", "Medium", "Low"}
 
@@ -368,6 +374,57 @@ async def list_hardware_assets(
     return {"count": min(len(rows), limit), "truncated": len(rows) > limit, "hardware_assets": [_hardware_summary(row) for row in rows[:limit]]}
 
 
+_COST_RECORD_TYPES = {"actual", "estimated", "budget"}
+
+
+def _cost_record_summary(row: dict[str, Any]) -> dict[str, Any]:
+    """Cost record fields shared by every cost tool; notes and recorder stay out."""
+    return {
+        "id": row.get("id"),
+        "service_id": row.get("service_id"),
+        "hardware_id": row.get("hardware_id"),
+        "fiscal_year": row.get("fiscal_year"),
+        "purchase_year": row.get("purchase_year"),
+        "amount": row.get("amount"),
+        "record_type": row.get("record_type"),
+        "payment_method_id": row.get("payment_method_id"),
+        "payment_method_name": row.get("payment_method_name"),
+        "recorded_at": row.get("recorded_at"),
+    }
+
+
+def _year_arg(name: str, value: int | None) -> int | None:
+    if value is not None and not 1900 <= value <= 2100:
+        raise ValueError(f"{name} must be between 1900 and 2100")
+    return value
+
+
+def _amount_arg(value: float | None) -> float | None:
+    if value is not None and value < 0:
+        raise ValueError("amount cannot be negative")
+    return value
+
+
+def _record_type_arg(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip().lower()
+    if cleaned not in _COST_RECORD_TYPES:
+        raise ValueError(f"record_type must be one of: {', '.join(sorted(_COST_RECORD_TYPES))}")
+    return cleaned
+
+
+def _service_cost_path(service_id: str, record_id: str | None = None) -> str:
+    path = f"/api/services/{_uuid_arg('service_id', service_id)}/cost-records/"
+    if record_id is not None:
+        path += _uuid_arg("record_id", record_id)
+    return path
+
+
+def _hardware_cost_path(hardware_id: str) -> str:
+    return f"/api/hardware/{_uuid_arg('hardware_id', hardware_id)}/hardware-cost"
+
+
 @mcp.tool(annotations=_READ_ONLY)
 async def get_service_cost_records(
     ctx: Context,
@@ -377,20 +434,160 @@ async def get_service_cost_records(
     """List a service's financial cost records. Requires financial visibility."""
     limit = _bounded_limit(limit)
     rows = await _api_get(f"/api/services/{quote(service_id, safe='')}/cost-records/", ctx=ctx)
-    summaries = [
-        {
-            "id": row.get("id"),
-            "service_id": row.get("service_id"),
-            "fiscal_year": row.get("fiscal_year"),
-            "purchase_year": row.get("purchase_year"),
-            "amount": row.get("amount"),
-            "record_type": row.get("record_type"),
-            "payment_method_name": row.get("payment_method_name"),
-            "recorded_at": row.get("recorded_at"),
-        }
-        for row in rows[:limit]
-    ]
+    summaries = [_cost_record_summary(row) for row in rows[:limit]]
     return {"count": min(len(rows), limit), "truncated": len(rows) > limit, "cost_records": summaries}
+
+
+@mcp.tool(annotations=_READ_ONLY)
+async def get_hardware_cost(ctx: Context, hardware_id: str) -> dict[str, Any]:
+    """Get a hardware asset's purchase cost. Requires financial and hardware visibility.
+
+    Each hardware asset has at most one cost record. Returns cost_record as null when none is set.
+    """
+    row = await _api_get(_hardware_cost_path(hardware_id), ctx=ctx)
+    return {"cost_record": _cost_record_summary(row) if row else None}
+
+
+@mcp.tool(annotations=_READ_ONLY)
+async def list_payment_methods(ctx: Context, query: str | None = None, limit: int = 50) -> dict[str, Any]:
+    """List or search payment methods by name, for use with the cost record tools."""
+    limit = _bounded_limit(limit)
+    rows = await _api_get("/api/payment-methods/", ctx=ctx)
+    needle = query.casefold().strip() if query else ""
+    if needle:
+        rows = [row for row in rows if needle in str(row.get("name") or "").casefold()]
+    return {
+        "count": min(len(rows), limit),
+        "truncated": len(rows) > limit,
+        "payment_methods": [{"id": row.get("id"), "name": row.get("name")} for row in rows[:limit]],
+    }
+
+
+@mcp.tool(annotations=_CREATES)
+async def create_service_cost_record(
+    ctx: Context,
+    service_id: str,
+    fiscal_year: int,
+    amount: float,
+    record_type: str,
+    purchase_year: int | None = None,
+    payment_method_id: str | None = None,
+) -> dict[str, Any]:
+    """Add a cost record to a service. This changes CatalogIT data.
+
+    Requires an editor or admin account with financial visibility. record_type is actual,
+    estimated, or budget. Years are between 1900 and 2100; amount cannot be negative. Pass a
+    payment_method_id from list_payment_methods. Archived services are read-only for costs.
+    Cost-record notes can only be set in the CatalogIT UI. Returns the new cost record.
+    """
+    body = {
+        "fiscal_year": _year_arg("fiscal_year", fiscal_year),
+        "amount": _amount_arg(amount),
+        "record_type": _record_type_arg(record_type),
+    } | _changes(
+        purchase_year=_year_arg("purchase_year", purchase_year),
+        payment_method_id=(
+            _uuid_arg("payment_method_id", payment_method_id) if payment_method_id else None
+        ),
+    )
+    row = await _api_write("POST", _service_cost_path(service_id), body, ctx=ctx)
+    return _cost_record_summary(row)
+
+
+@mcp.tool(annotations=_UPDATES)
+async def update_service_cost_record(
+    ctx: Context,
+    service_id: str,
+    record_id: str,
+    fiscal_year: int | None = None,
+    amount: float | None = None,
+    record_type: str | None = None,
+    purchase_year: int | None = None,
+    payment_method_id: str | None = None,
+) -> dict[str, Any]:
+    """Change fields on one service cost record. This changes CatalogIT data.
+
+    Requires an editor or admin account with financial visibility. Only the fields you pass
+    are changed; fields cannot be cleared through this tool, and notes are kept. Archived
+    services are read-only for costs. Returns the updated cost record.
+    """
+    path = _service_cost_path(service_id, record_id)
+    body = _changes(
+        fiscal_year=_year_arg("fiscal_year", fiscal_year),
+        amount=_amount_arg(amount),
+        record_type=_record_type_arg(record_type),
+        purchase_year=_year_arg("purchase_year", purchase_year),
+        payment_method_id=(
+            _uuid_arg("payment_method_id", payment_method_id) if payment_method_id else None
+        ),
+    )
+    if not body:
+        raise ValueError("Pass at least one field to change")
+    row = await _api_write("PUT", path, body, ctx=ctx)
+    return _cost_record_summary(row)
+
+
+@mcp.tool(annotations=_DELETES)
+async def delete_service_cost_record(ctx: Context, service_id: str, record_id: str) -> dict[str, Any]:
+    """Permanently delete one service cost record. This cannot be undone.
+
+    Confirm with the user before running it. Requires an editor or admin account with
+    financial visibility. Archived services are read-only for costs.
+    """
+    path = _service_cost_path(service_id, record_id)
+    await _api_request("DELETE", path, ctx=ctx)
+    return {
+        "deleted": True,
+        "id": _uuid_arg("record_id", record_id),
+        "service_id": _uuid_arg("service_id", service_id),
+    }
+
+
+@mcp.tool(annotations=_UPDATES)
+async def set_hardware_cost(
+    ctx: Context,
+    hardware_id: str,
+    amount: float,
+    purchase_year: int | None = None,
+    fiscal_year: int | None = None,
+) -> dict[str, Any]:
+    """Set the purchase cost of a hardware asset. This changes CatalogIT data.
+
+    Requires an editor or admin account with financial and hardware visibility. Each asset has
+    one cost record of type actual; this creates it or replaces its amount. purchase_year and
+    fiscal_year keep their current values when omitted; a new record's fiscal year defaults to
+    the purchase year, then to the current year. amount must be greater than 0; use
+    delete_hardware_cost to remove a cost. Archived hardware is read-only for costs.
+    """
+    if amount <= 0:
+        raise ValueError("amount must be greater than 0; use delete_hardware_cost to remove a cost")
+    path = _hardware_cost_path(hardware_id)
+    _year_arg("purchase_year", purchase_year)
+    _year_arg("fiscal_year", fiscal_year)
+    if purchase_year is None or fiscal_year is None:
+        current = await _api_get(path, ctx=ctx) or {}
+        if purchase_year is None:
+            purchase_year = current.get("purchase_year")
+        if fiscal_year is None:
+            fiscal_year = current.get("fiscal_year")
+    body = {"amount": amount} | _changes(purchase_year=purchase_year, fiscal_year=fiscal_year)
+    row = await _api_write("PUT", path, body, ctx=ctx)
+    return _cost_record_summary(row)
+
+
+@mcp.tool(annotations=_DELETES)
+async def delete_hardware_cost(ctx: Context, hardware_id: str) -> dict[str, Any]:
+    """Permanently remove a hardware asset's purchase cost. This cannot be undone.
+
+    Confirm with the user before running it. Requires an editor or admin account with
+    financial and hardware visibility. Archived hardware is read-only for costs.
+    """
+    path = _hardware_cost_path(hardware_id)
+    hardware_id = _uuid_arg("hardware_id", hardware_id)
+    if not await _api_get(path, ctx=ctx):
+        return {"deleted": False, "hardware_id": hardware_id}
+    await _api_write("PUT", path, {"amount": 0}, ctx=ctx)
+    return {"deleted": True, "hardware_id": hardware_id}
 
 
 _HISTORY_TABLES = {
@@ -398,6 +595,7 @@ _HISTORY_TABLES = {
     "hardware": "hardware_assets",
     "vendor": "vendors",
     "tag": "tags",
+    "cost_record": "cost_records",
 }
 # History values mirror whole database rows, so drop the same private fields the
 # summaries above leave out, plus financial references and storage locations.
@@ -448,10 +646,12 @@ async def get_record_history(
     page: int = 1,
     per_page: int = 50,
 ) -> dict[str, Any]:
-    """Get the change history of one service, hardware asset, vendor, or tag, newest first.
+    """Get the change history of one service, hardware asset, vendor, tag, or cost record, newest first.
 
-    record_type is one of: service, hardware, vendor, tag. Service and hardware history include
-    their attachment changes. Hardware history requires hardware visibility. Notes, contact
+    record_type is one of: service, hardware, vendor, tag, cost_record. Service and hardware
+    history include their attachment changes. Hardware history requires hardware visibility;
+    cost record history requires financial visibility (and hardware visibility for hardware
+    costs). Notes, contact
     details, assignees, cellular identifiers, and financial references are removed from values.
     """
     table = _HISTORY_TABLES.get(record_type)
