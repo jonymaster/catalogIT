@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import "./CostsReport.print.css";
 import client from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
@@ -14,10 +14,13 @@ import { DataTable } from "../components/DataTable";
 import { Monogram } from "../components/ui/Monogram";
 import { OsIcon } from "../components/ui/OsIcon";
 import { formatMoneyCompact } from "../components/ui/money-format";
+import { useAuth } from "../context/useAuth";
 import { useDashboardCostData } from "../hooks/useDashboardCostData";
 import {
   COMPARISON_MODE_LABEL,
+  COMPARISON_MODES,
   comparisonRecordTypesForMode,
+  parseComparisonMode,
   type ComparisonMode,
   type CostSourceFilter,
   type DashboardCostRecord,
@@ -32,6 +35,7 @@ function lineItemDetailPath(r: DashboardCostRecord): string | null {
   return null;
 }
 import { buildCsv, downloadCsvFile } from "../utils/csv";
+import { parseYearParam } from "../utils/fiscalYearClose";
 import {
   buildStackedYearData,
   combinedActualEstimatedByYear,
@@ -313,17 +317,25 @@ function StatCell({
 
 export function CostsReport() {
   const navigate = useNavigate();
+  const { user, canFinancialView } = useAuth();
+  const canCloseFiscalYear = user?.role === "admin" && canFinancialView;
+  // `?year=` and `?mode=` (e.g. from the close-year wizard) preselect the
+  // focus year and the view; without them the defaults apply.
+  const [searchParams] = useSearchParams();
   const { records: allRecords, fiscalYears: apiYears, loading, error } =
     useDashboardCostData();
 
   const [categories, setCategories] = useState<string[]>([]);
   const [source, setSource] = useState<CostSourceFilter>("all");
   const [classifications, setClassifications] = useState<string[]>([]);
-  const [comparisonMode, setComparisonMode] =
-    useState<ComparisonMode>("only_actual");
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>(
+    () => parseComparisonMode(searchParams.get("mode")) ?? "only_actual",
+  );
   const [costCenters, setCostCenters] = useState<string[]>([]);
   const [fiscalYearsFilter, setFiscalYearsFilter] = useState<number[]>([]);
-  const [focusYear, setFocusYear] = useState<number | null>(null);
+  const [focusYear, setFocusYear] = useState<number | null>(() =>
+    parseYearParam(searchParams.get("year")),
+  );
   const [yearBarChartScale, setYearBarChartScale] =
     useState<ChartYScaleMode>("linearFocused");
   const [printGeneratedAt, setPrintGeneratedAt] = useState("");
@@ -537,13 +549,18 @@ export function CostsReport() {
     return Array.from(ys).sort((a, b) => a - b);
   }, [recordsForSelectedVisuals]);
 
+  // A focus year the report has no data for (e.g. an old `?year=` link) is
+  // ignored everywhere: KPIs, line items, and the year filter chip.
+  const activeFocusYear =
+    focusYear !== null && chartYears.includes(focusYear) ? focusYear : null;
+
   const displayYear = useMemo(() => {
     if (chartYears.length === 0) return null;
-    if (focusYear !== null && chartYears.includes(focusYear)) return focusYear;
+    if (activeFocusYear !== null) return activeFocusYear;
     const cy = new Date().getFullYear();
     if (chartYears.includes(cy)) return cy;
     return chartYears[chartYears.length - 1];
-  }, [chartYears, focusYear]);
+  }, [chartYears, activeFocusYear]);
 
 
   const costByYearA = useMemo(
@@ -727,8 +744,8 @@ export function CostsReport() {
 
   const displayedDetail = useMemo(() => {
     let rows = sortedDetail;
-    if (focusYear !== null) {
-      rows = rows.filter((r) => r.fiscal_year === focusYear);
+    if (activeFocusYear !== null) {
+      rows = rows.filter((r) => r.fiscal_year === activeFocusYear);
     }
     if (selectedBucket) {
       rows = rows.filter((r) => {
@@ -741,7 +758,7 @@ export function CostsReport() {
       });
     }
     return rows;
-  }, [sortedDetail, focusYear, selectedBucket, vendorByServiceId]);
+  }, [sortedDetail, activeFocusYear, selectedBucket, vendorByServiceId]);
 
   const displayRecordTypeLabel = useCallback(
     (recordType: string, fiscalYear: number): string => {
@@ -1118,17 +1135,27 @@ export function CostsReport() {
         }
       `}</style>
 
-      <div className="print:hidden">
-        <h1
-          className="text-fg"
-          style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
-        >
-          IT Financial Report
-        </h1>
-        <p className="mt-1 text-[13px] text-fg-3">
-          Default is actual-only; switch the view to compare pairs of record types, filter, export, or
-          print.
-        </p>
+      <div className="print:hidden flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1
+            className="text-fg"
+            style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}
+          >
+            IT Financial Report
+          </h1>
+          <p className="mt-1 text-[13px] text-fg-3">
+            Default is actual-only; switch the view to compare pairs of record types, filter, export, or
+            print.
+          </p>
+        </div>
+        {canCloseFiscalYear && (
+          <Link
+            to="/costs/close-year"
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Close financial year
+          </Link>
+        )}
       </div>
 
       <div className="hidden print:block costs-report-print-summary">
@@ -1184,14 +1211,7 @@ export function CostsReport() {
           <span className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
             View
           </span>
-          {(
-            [
-              "only_actual",
-              "actual_vs_estimated",
-              "actual_vs_budget",
-              "estimated_vs_budget",
-            ] as const
-          ).map((m) => (
+          {COMPARISON_MODES.map((m) => (
             <button
               key={m}
               type="button"
@@ -1814,11 +1834,11 @@ export function CostsReport() {
           <div className="print-table-section mt-8 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 print:break-inside-avoid">
             <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-200 bg-gray-50 px-5 py-3 text-sm font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-400">
               <span>Line items ({displayedDetail.length})</span>
-              {(focusYear !== null || selectedBucket) && (
+              {(activeFocusYear !== null || selectedBucket) && (
                 <span className="flex flex-wrap items-center gap-2 text-[11px] normal-case tracking-normal text-fg-3">
-                  {focusYear !== null && (
+                  {activeFocusYear !== null && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5">
-                      FY {focusYear}
+                      FY {activeFocusYear}
                       <button
                         type="button"
                         onClick={() => setFocusYear(null)}

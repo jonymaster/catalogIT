@@ -74,3 +74,20 @@ export function RequireHardwareView({ children }: { children: ReactNode }) {
 
   return <>{children}</>;
 }
+
+/** Renders children only for admins; everyone else is sent to `redirectTo`. */
+export function RequireAdmin({
+  children,
+  redirectTo = "/",
+}: {
+  children: ReactNode;
+  redirectTo?: string;
+}) {
+  const { user } = useAuth();
+
+  if (user?.role !== "admin") {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  return <>{children}</>;
+}
