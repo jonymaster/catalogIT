@@ -2,7 +2,7 @@
 
 CatalogIT includes an **MCP server** for AI clients that support local stdio or hosted Streamable HTTP. The MCP process calls CatalogIT's REST API using an API token; it does not connect directly to PostgreSQL. Every API request is authorized as the CatalogIT user who owns the token.
 
-The MCP server provides tools to search/list services, fetch a service by ID, search vendors, hardware, and payment methods, read service and hardware cost records, read the change history of a record, and (for admins) read the global audit log. Hardware and financial tools require the corresponding CatalogIT visibility permissions. A small set of write tools can create and update vendors, tags, and services, and create, update, and delete cost records. The MCP server cannot delete or archive services, hardware, vendors, or tags.
+The MCP server provides tools to search/list services, fetch a service by ID, search vendors, hardware, and payment methods, read service and hardware cost records, read the change history of a record, and (for admins) read the global audit log and preview closing a financial year. Hardware and financial tools require the corresponding CatalogIT visibility permissions. A small set of write tools can create and update vendors, tags, and services, and create, update, and delete cost records. The MCP server cannot delete or archive services, hardware, vendors, or tags.
 
 ## Requirements
 
@@ -59,8 +59,11 @@ Restart or reload the AI client, then confirm that the CatalogIT tools appear in
 | `list_payment_methods` | List or search payment methods by name | Catalog access |
 | `get_record_history` | Read the change history of a service, hardware asset, vendor, tag, or cost record by UUID, newest first; service and hardware history include attachment changes | Catalog access; hardware history requires hardware visibility; cost record history requires financial visibility (and hardware visibility for hardware costs) |
 | `list_audit_events` | Read the global audit log, newest first; optionally filter by category (`data_change`, `security`, `notification`, `error`) | Admin |
+| `preview_close_fiscal_year` | Preview closing a financial year: the estimated service cost records that would become actual, and the next-year estimate per service, with an optional uplift percentage (`uplift_pct`, -100 to 1000) | Admin with financial visibility |
 
 List tools default to 50 results and accept `limit` from 1 to 100. `get_record_history` and `list_audit_events` are paginated instead: they accept `page` (from 1) and `per_page` (from 1 to 100) and return `total_pages`. Searching filters the API's current list response, so large catalogs may still require the API to return the complete list before the MCP server narrows the result.
+
+`preview_close_fiscal_year` is read-only. It calls `POST /api/cost-records/close-year/preview`, which changes nothing, so it is annotated as a read tool. It needs an admin token with financial visibility; other tokens get `403`. The result lists, per service, each conversion row, the payment methods of the service's existing actuals (`existing_actual_payment_method_ids`), the next-year action (`create` or `skip`) with its skip reason, the warning flags, archived services that were skipped, and totals. Cost-record notes are left out. Closing a year and reverting a close are available only in the web UI.
 
 Examples of questions to ask your assistant:
 
@@ -70,6 +73,7 @@ Examples of questions to ask your assistant:
 - “Summarize the service cost records for [service name].” (Requires financial visibility.)
 - “Who changed the status of [service name], and when?”
 - “List this week's failed sign-ins.” (Requires an admin account.)
+- “Preview closing 2026 with a 3% uplift. Which services are flagged?” (Requires an admin account with financial visibility.)
 
 ## Available write tools
 
@@ -99,7 +103,7 @@ Examples:
 - “Add a 2027 budget of 12,000 for [service name].” (Requires financial visibility.)
 - “Set the purchase cost of laptop [serial] to 1,850.” (Requires financial and hardware visibility.)
 
-The MCP server excludes service notes, personal contact details, hardware notes and cellular identifiers, vendor notes, and cost-record notes from its results. History values also omit hardware assignees, cost centers, payment methods, and attachment storage keys. History and audit results name the person who made a change but not their email address. `list_audit_events` returns each event's summary and, for data changes, only the names of changed fields; use `get_record_history` to see values. It does not offer arbitrary SQL, bulk changes, archiving, or deletion of records other than cost records.
+The MCP server excludes service notes, personal contact details, hardware notes and cellular identifiers, vendor notes, and cost-record notes from its results. History values also omit hardware assignees, cost centers, payment methods, and attachment storage keys. History and audit results name the person who made a change but not their email address. `list_audit_events` returns each event's summary and, for data changes, only the names of changed fields; use `get_record_history` to see values. It does not offer arbitrary SQL, bulk changes, archiving, closing a financial year, or deletion of records other than cost records.
 
 ## Troubleshooting
 
