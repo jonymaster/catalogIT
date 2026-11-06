@@ -43,6 +43,7 @@ AUDITED_TABLES: frozenset[str] = frozenset(
         "tags",
         "contracts",
         "cost_records",
+        "fiscal_year_close_batches",
         "attachments",
         "service_history",
         "oidc_config",

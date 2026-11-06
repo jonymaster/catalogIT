@@ -44,6 +44,7 @@ _ADMIN_TABLES = frozenset({
     "integration_config",
     "notification_global_settings",
     "attachments",
+    "fiscal_year_close_batches",
 })
 
 
