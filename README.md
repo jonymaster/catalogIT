@@ -9,7 +9,7 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 ## Features
 
 - **Service Catalog** — track services with cost, renewal dates, vendors, owners, and classifications
-- **Close financial year** — admins turn a year's estimated service costs into actuals and roll them into next year's estimates, with review and revert ([details](#closing-a-financial-year))
+- **Close financial year** — admin wizard that turns a year's estimated service costs into actuals and rolls them into next year's estimates, with revert
 - **Hardware Inventory** — manage laptops, phones, tablets, accessories in bulk, and peripherals with assignments and locations ([hardware guide](docs/hardware.md))
 - **Renewal Calendar** — visual calendar view for upcoming renewals
 - **SSO & Provisioning** — OIDC single sign-on (Okta) with SCIM 2.0 automatic user provisioning
@@ -20,19 +20,6 @@ CatalogIT helps organizations track their SaaS subscriptions, cloud services, an
 - **API Tokens** — programmatic access for automation and integrations
 - **AI assistants (MCP)** — connect Claude, ChatGPT, and other MCP clients to search services, vendors, hardware, costs, history, and the audit log, to create or update vendors, tags, and services, and to manage cost records; local stdio or hosted Streamable HTTP with API-token or OAuth sign-in ([details](#ai-assistants-mcp))
 - **Backup & Restore** — complete tooling for database and object storage backups
-
-### Closing a financial year
-
-Admins with financial visibility close a year from **Cost Report → Close financial year**. A wizard lets you pick the year, review and edit every change, and confirm. The fiscal year is the calendar year. When you close year X:
-
-- **Conversion:** each active service's `estimated` cost records in X become `actual`. The records change in place; no copies are made.
-- **Next-year estimate:** each service gets one `estimated` record in X+1. Its amount is the sum of the service's actuals in X after the conversion, with an optional uplift percentage. You can edit any amount before you confirm.
-- **Rules:** archived services are skipped. Budget records are ignored. Hardware costs are out of scope. No next-year record is created when the service already has a cost record in X+1, or when the amount is zero. Future years cannot be closed.
-- **Flags:** `estimate_with_actual` means the service already has actuals in X; its estimates are excluded by default to avoid double counting. `added_during_year` means the service was created in X, so the amount may cover part of a year. `mixed_payment_methods` means the actuals in X use different payment methods; the new record gets none. `year_not_ended` means X is the current year, so costs may still change.
-- **Revert:** the wizard lists previous closes. Reverting one sets its converted records back to `estimated` with their current amount and deletes the records it created. Records edited by hand after the close are reverted too. Revert is blocked while a service it touched is archived.
-- **Chained closes:** closing X+1 later converts the estimates that the close of X created. To revert the close of X, revert the close of X+1 first; until then the revert is refused and names the later closes. Reverting the close of X+1 sets those records back to `estimated` and links them to the close of X again, so reverting X then deletes them.
-- **Yearly cost:** a service's yearly cost comes from its latest year with service cost records, so after a close it shows next year's estimate, unless the service already has cost records in a later year. Everything built on it switches too: the service list and detail, user seat costs, the renewal calendar, and renewal reminders; on the Dashboard, the **Renewal risk (90 days)** amount, **Top vendors by spend**, and the amounts in **Upcoming renewals**; the Cost Report's **Next 30 days** stat; the `yearly_cost` field of the MCP `list_services` and `get_service` tools; and the `yearly_cost` column of `services.csv` in the admin data export (**Settings → Export**).
-- **Year-based views:** charts and totals on the Dashboard and the Cost Report read cost records by year. They default to the current calendar year when it has cost records, else to the latest year with records. So if you close last year before the current year has any records, their default moves to the current year, which now holds the new estimates. For year X they count the converted records as actuals.
 
 ## Live demo
 
