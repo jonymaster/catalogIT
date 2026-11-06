@@ -176,17 +176,25 @@ class PaymentMethodsAndHistoryTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(api_get.await_args.args[0], f"/api/history/cost_records/{_RECORD_ID}")
 
 
+def _patched_client(response: httpx.Response | Exception):
+    client = MagicMock()
+    if isinstance(response, Exception):
+        client.request = AsyncMock(side_effect=response)
+    else:
+        client.request = AsyncMock(return_value=response)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=None)
+    return (
+        patch.object(server, "_configuration", return_value="https://catalogit.test"),
+        patch.object(server, "_api_token", return_value="token"),
+        patch.object(server.httpx, "AsyncClient", return_value=client),
+    )
+
+
 class ApiResponseTest(unittest.IsolatedAsyncioTestCase):
     async def _request(self, response: httpx.Response):
-        client = MagicMock()
-        client.request = AsyncMock(return_value=response)
-        client.__aenter__ = AsyncMock(return_value=client)
-        client.__aexit__ = AsyncMock(return_value=None)
-        with (
-            patch.object(server, "_configuration", return_value="https://catalogit.test"),
-            patch.object(server, "_api_token", return_value="token"),
-            patch.object(server.httpx, "AsyncClient", return_value=client),
-        ):
+        configuration, token, client = _patched_client(response)
+        with configuration, token, client:
             return await server._api_request("DELETE", "/api/x", ctx=None)
 
     async def test_no_content_returns_none(self) -> None:
@@ -199,10 +207,130 @@ class ApiResponseTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("HTTP 409: Archived services are read-only for cost records", str(ctx.exception))
 
 
+_PREVIEW_PATH = "/api/cost-records/close-year/preview"
+_PREVIEW = {
+    "fiscal_year": 2026,
+    "next_fiscal_year": 2027,
+    "uplift_pct": 3.5,
+    "year_not_ended": True,
+    "plan_hash": "sha256:abc",
+    "services": [
+        {
+            "service_id": _SERVICE_ID,
+            "service_name": "Wiki",
+            "conversions": [
+                {
+                    "record_id": _RECORD_ID,
+                    "amount": 1200.0,
+                    "include": True,
+                    "flags": [],
+                    "notes": "private",
+                    "payment_method_id": _PAYMENT_ID,
+                }
+            ],
+            "existing_actual_total": 0.0,
+            "existing_actual_payment_method_ids": [_PAYMENT_ID, None],
+            "next_year": {
+                "action": "create",
+                "amount": 1242.0,
+                "payment_method_id": _PAYMENT_ID,
+                "skip_reason": None,
+                "flags": ["added_during_year"],
+            },
+        }
+    ],
+    "skipped": [{"service_id": _HARDWARE_ID, "service_name": "Old CRM", "reason": "archived"}],
+    "totals": {"converted": 1200.0, "next_year": 1242.0},
+}
+
+
+class ClosePreviewToolTest(unittest.IsolatedAsyncioTestCase):
+    async def test_preview_posts_year_and_uplift_and_hides_notes(self) -> None:
+        api_request = AsyncMock(return_value=_PREVIEW)
+        with patch.object(server, "_api_request", api_request):
+            result = await server.preview_close_fiscal_year(None, 2026, uplift_pct=3.5)
+        api_request.assert_awaited_once_with(
+            "POST",
+            _PREVIEW_PATH,
+            json={"fiscal_year": 2026, "uplift_pct": 3.5},
+            read_only=True,
+            ctx=None,
+        )
+        conversion = result["services"][0]["conversions"][0]
+        self.assertNotIn("notes", conversion)
+        self.assertEqual(
+            conversion,
+            {
+                "record_id": _RECORD_ID,
+                "amount": 1200.0,
+                "include": True,
+                "flags": [],
+                "payment_method_id": _PAYMENT_ID,
+            },
+        )
+        self.assertEqual(result["services"][0]["next_year"], _PREVIEW["services"][0]["next_year"])
+        service_keys = ("service_id", "service_name", "existing_actual_total", "existing_actual_payment_method_ids")
+        for key in service_keys:
+            with self.subTest(service_key=key):
+                self.assertEqual(result["services"][0][key], _PREVIEW["services"][0][key])
+        for key in ("fiscal_year", "next_fiscal_year", "uplift_pct", "year_not_ended", "plan_hash", "skipped", "totals"):
+            with self.subTest(key=key):
+                self.assertEqual(result[key], _PREVIEW[key])
+        self.assertIn("notes", _PREVIEW["services"][0]["conversions"][0])
+
+    async def test_preview_defaults_uplift_to_zero(self) -> None:
+        api_request = AsyncMock(return_value=_PREVIEW | {"services": []})
+        with patch.object(server, "_api_request", api_request):
+            await server.preview_close_fiscal_year(None, 2025)
+        self.assertEqual(api_request.await_args.kwargs["json"], {"fiscal_year": 2025, "uplift_pct": 0})
+
+    async def test_preview_validates_locally(self) -> None:
+        api_request = AsyncMock()
+        cases = ((1899, 0), (2101, 0), (2026, -100.5), (2026, 1000.01), (2026, float("nan")))
+        with patch.object(server, "_api_request", api_request):
+            for year, uplift in cases:
+                with self.subTest(year=year, uplift=uplift), self.assertRaises(ValueError):
+                    await server.preview_close_fiscal_year(None, year, uplift_pct=uplift)
+        api_request.assert_not_awaited()
+
+    async def test_preview_accepts_uplift_bounds(self) -> None:
+        api_request = AsyncMock(return_value=_PREVIEW | {"services": []})
+        with patch.object(server, "_api_request", api_request):
+            for uplift in (-100, 1000):
+                with self.subTest(uplift=uplift):
+                    await server.preview_close_fiscal_year(None, 2026, uplift_pct=uplift)
+        self.assertEqual(api_request.await_count, 2)
+
+    async def _preview_error(self, response: httpx.Response | Exception) -> str:
+        configuration, token, client = _patched_client(response)
+        with configuration, token, client, self.assertRaises(RuntimeError) as ctx:
+            await server.preview_close_fiscal_year(None, 2030)
+        return str(ctx.exception)
+
+    async def test_preview_passes_through_api_detail(self) -> None:
+        response = httpx.Response(400, json={"detail": "Fiscal year cannot be in the future"})
+        message = await self._preview_error(response)
+        self.assertIn("HTTP 400: Fiscal year cannot be in the future", message)
+
+    async def test_preview_forbidden_is_reported_as_a_read(self) -> None:
+        message = await self._preview_error(httpx.Response(403, json={"detail": "Admin role required"}))
+        self.assertIn("HTTP 403: Admin role required", message)
+        self.assertIn("do not allow this read", message)
+
+    async def test_preview_timeout_does_not_suggest_a_saved_change(self) -> None:
+        message = await self._preview_error(httpx.ReadTimeout("slow"))
+        self.assertEqual(message, "CatalogIT API request timed out")
+
+
 class CostToolAnnotationsTest(unittest.TestCase):
     def test_cost_tools_are_annotated(self) -> None:
         tools = {tool.name: tool for tool in asyncio.run(server.mcp.list_tools())}
-        for name in ("get_hardware_cost", "list_payment_methods", "get_service_cost_records"):
+        for name in (
+            "get_hardware_cost",
+            "list_payment_methods",
+            "get_service_cost_records",
+            "preview_close_fiscal_year",
+        ):
             with self.subTest(tool=name):
                 self.assertTrue(tools[name].annotations.readOnlyHint)
         for name in (

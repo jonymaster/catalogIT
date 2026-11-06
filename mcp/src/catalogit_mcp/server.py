@@ -31,7 +31,9 @@ mcp = FastMCP(
     "CatalogIT",
     instructions=(
         "Access to a CatalogIT instance. Use the read tools to look up services, vendors, "
-        "hardware, service cost records, record change history, and the audit log. The create_* "
+        "hardware, service cost records, record change history, and the audit log. "
+        "preview_close_fiscal_year only previews closing a financial year and changes nothing; "
+        "closing or reverting a year is done in the CatalogIT UI. The create_* "
         "and update_* tools change CatalogIT data: confirm the intended change with the user "
         "first, and look up record ids with the read tools instead of guessing them. The server "
         "cannot delete or archive catalog records; the delete_*_cost tools permanently remove "
@@ -99,11 +101,13 @@ async def _api_request(
     *,
     params: dict[str, Any] | None = None,
     json: dict[str, Any] | None = None,
+    read_only: bool = False,
     ctx: Context,
 ) -> Any:
+    """Call the API; read_only marks a POST that changes nothing, for accurate error messages."""
     base_url = _configuration()
     api_token = _api_token(ctx)
-    is_write = method != "GET"
+    is_write = method != "GET" and not read_only
     try:
         async with httpx.AsyncClient(
             base_url=base_url,
@@ -588,6 +592,48 @@ async def delete_hardware_cost(ctx: Context, hardware_id: str) -> dict[str, Any]
         return {"deleted": False, "hardware_id": hardware_id}
     await _api_write("PUT", path, {"amount": 0}, ctx=ctx)
     return {"deleted": True, "hardware_id": hardware_id}
+
+
+def _close_year_conversion(row: dict[str, Any]) -> dict[str, Any]:
+    """Conversion rows carry the record's notes; keep them out like other cost tools."""
+    return {
+        "record_id": row.get("record_id"),
+        "amount": row.get("amount"),
+        "include": row.get("include"),
+        "flags": row.get("flags", []),
+        "payment_method_id": row.get("payment_method_id"),
+    }
+
+
+@mcp.tool(annotations=_READ_ONLY)
+async def preview_close_fiscal_year(
+    ctx: Context,
+    fiscal_year: int,
+    uplift_pct: float = 0,
+) -> dict[str, Any]:
+    """Preview closing a financial year for service costs. This changes nothing.
+
+    Requires an admin account with financial visibility. fiscal_year is a calendar year up to
+    the current one. For each active service with costs that year, lists the estimated records
+    that would become actual and the one next-year estimate that would be created: the sum of
+    the year's actuals after conversion, changed by uplift_pct percent (-100 to 1000, default
+    0). Flags and skip reasons explain each row; archived services are listed as skipped.
+    Cost-record notes are not returned. Closing or reverting a year can only be done in the
+    CatalogIT UI.
+    """
+    if not -100 <= uplift_pct <= 1000:
+        raise ValueError("uplift_pct must be between -100 and 1000")
+    body = {"fiscal_year": _year_arg("fiscal_year", fiscal_year), "uplift_pct": uplift_pct}
+    payload = await _api_request(
+        "POST", "/api/cost-records/close-year/preview", json=body, read_only=True, ctx=ctx
+    )
+    return payload | {
+        "services": [
+            service
+            | {"conversions": [_close_year_conversion(row) for row in service.get("conversions", [])]}
+            for service in payload.get("services", [])
+        ]
+    }
 
 
 _HISTORY_TABLES = {
