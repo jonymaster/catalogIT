@@ -70,6 +70,19 @@ export type ComparisonMode =
   | "actual_vs_budget"
   | "estimated_vs_budget";
 
+/** Every {@link ComparisonMode}, in the order the report lists them. */
+export const COMPARISON_MODES: readonly ComparisonMode[] = [
+  "only_actual",
+  "actual_vs_estimated",
+  "actual_vs_budget",
+  "estimated_vs_budget",
+];
+
+/** Reads a `?mode=` query param; null when it is missing or not a known mode. */
+export function parseComparisonMode(value: string | null): ComparisonMode | null {
+  return COMPARISON_MODES.find((mode) => mode === value) ?? null;
+}
+
 /** Record types included for the current mode (one or two). */
 export function comparisonRecordTypesForMode(
   mode: ComparisonMode,

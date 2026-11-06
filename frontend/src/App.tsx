@@ -2,12 +2,18 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeSync } from "./components/ThemeSync";
 import { ToastProvider } from "./context/ToastContext";
-import { ProtectedRoute, RequireFinancialView, RequireHardwareView } from "./components/ProtectedRoute";
+import {
+  ProtectedRoute,
+  RequireAdmin,
+  RequireFinancialView,
+  RequireHardwareView,
+} from "./components/ProtectedRoute";
 import { Shell } from "./components/Shell";
 import { Login } from "./pages/Login";
 import { AuthCallback } from "./pages/AuthCallback";
 import { ResetPassword } from "./pages/ResetPassword";
 import { CostsReport } from "./pages/CostsReport";
+import { CloseFiscalYear } from "./pages/CloseFiscalYear";
 import { Dashboard } from "./pages/Dashboard";
 import { Calendar } from "./pages/Calendar";
 import { Services } from "./pages/Services";
@@ -62,6 +68,16 @@ export default function App() {
                   element={
                     <RequireFinancialView>
                       <CostsReport />
+                    </RequireFinancialView>
+                  }
+                />
+                <Route
+                  path="/costs/close-year"
+                  element={
+                    <RequireFinancialView>
+                      <RequireAdmin redirectTo="/costs">
+                        <CloseFiscalYear />
+                      </RequireAdmin>
                     </RequireFinancialView>
                   }
                 />

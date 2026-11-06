@@ -11,6 +11,7 @@ from app.models.hardware_location import HardwareLocation
 from app.models.contract import Contract
 from app.models.tag import Tag
 from app.models.service import Service, service_assignments, service_owners, service_tags
+from app.models.fiscal_year_close_batch import FiscalYearCloseBatch
 from app.models.cost_record import CostRecord
 from app.models.service_history import ServiceHistoryEntry
 from app.models.hardware import HardwareAsset
@@ -40,6 +41,7 @@ __all__ = [
     "Service",
     "service_owners",
     "service_assignments",
+    "FiscalYearCloseBatch",
     "CostRecord",
     "ServiceHistoryEntry",
     "HardwareAsset",

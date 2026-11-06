@@ -31,6 +31,15 @@ class CostRecord(Base):
     recorded_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # Set by a close financial year batch: "converted" (estimated -> actual) or "created" (next-year estimate).
+    rollover_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fiscal_year_close_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    rollover_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # The batch that created this record (set once, kept when a later close converts it).
+    rollover_created_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("fiscal_year_close_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     recorded_by: Mapped["User | None"] = relationship(lazy="selectin")  # noqa: F821
     hardware: Mapped["HardwareAsset | None"] = relationship(back_populates="cost_records", lazy="selectin")  # noqa: F821

@@ -72,6 +72,7 @@ _ENTITY_TYPES = {
     "contracts": "contract",
     "cost_centers": "cost_center",
     "cost_records": "cost_record",
+    "fiscal_year_close_batches": "fiscal_year_close_batch",
     "hardware_locations": "hardware_location",
     "hardware_statuses": "hardware_status",
     "integration_config": "integration",
@@ -110,6 +111,9 @@ def entity_display_label(instance: Any) -> str | None:
         if record_type:
             parts.append(str(record_type))
         return " ".join(parts)
+    if table == "fiscal_year_close_batches":
+        year = getattr(instance, "fiscal_year", None)
+        return f"FY{year} close" if year is not None else "Fiscal year close"
     if table == "service_history":
         action_type = getattr(instance, "action_type", None)
         action_date = getattr(instance, "action_date", None)
