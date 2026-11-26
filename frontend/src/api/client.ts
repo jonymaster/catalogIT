@@ -1,11 +1,21 @@
 import axios from "axios";
+import { createCachingAdapter } from "./responseCache";
 
 // Same-origin (path proxy) when unset; split hostnames (e.g. ECS) set VITE_API_BASE_URL at build time.
 const apiBase =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
 
+// Large lists loaded by several pages (dashboard, services, costs, calendar).
+const CACHEABLE_LIST = /^\/?api\/(services|hardware|dashboard)\/$/;
+
+export const responseCache = createCachingAdapter(axios.getAdapter(axios.defaults.adapter), {
+  ttlMs: 30_000,
+  isCacheable: (url) => CACHEABLE_LIST.test(url),
+});
+
 const client = axios.create({
   baseURL: apiBase || "/",
+  adapter: responseCache,
 });
 
 client.interceptors.request.use((config) => {
