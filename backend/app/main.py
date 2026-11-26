@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 import bcrypt
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import select
 
 from app.audit import register_audit_listeners
@@ -148,6 +149,8 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
     app.add_middleware(RequestAuditMiddleware)
+    # List endpoints return hundreds of KB of JSON; gzip cuts that about 10x.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     register_audit_listeners()
 
